@@ -28,7 +28,6 @@ export default function RegistrationPage() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
 
-  // حولنا البيانات لـ state عشان أزرار القبول/الرفض تشتغل
   const [registrations, setRegistrations] = useState<Registration[]>([
     {
       id: "reg-1",
@@ -61,7 +60,6 @@ export default function RegistrationPage() {
 
   useEffect(() => setMounted(true), [])
 
-  // حساب صلاحية الأدمن بشكل موحّد + fallback من session
   useEffect(() => {
     if (!mounted) return
     try {
@@ -121,7 +119,6 @@ export default function RegistrationPage() {
     }
   }
 
-  // أزرار القبول/الرفض
   const handleApprove = (id: string) => {
     setRegistrations((prev) => prev.map((r) => (r.id === id ? { ...r, status: "approved" } : r)))
   }
@@ -129,7 +126,6 @@ export default function RegistrationPage() {
     setRegistrations((prev) => prev.map((r) => (r.id === id ? { ...r, status: "rejected" } : r)))
   }
 
-  // لا نعرض شيء قبل اكتمال الـ mount وتحديد الصلاحية
   if (!mounted || isAdmin === null) return null
   if (!isAdmin) return <div className="text-center py-12">غير مصرح لك بالوصول إلى هذه الصفحة</div>
 

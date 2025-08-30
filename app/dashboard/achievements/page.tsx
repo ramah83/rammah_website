@@ -308,7 +308,6 @@ export default function AchievementsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Recent Achievements */}
       {unlockedAchievements.length > 0 && (
         <Card>
           <CardHeader>
