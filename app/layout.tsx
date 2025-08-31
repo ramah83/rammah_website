@@ -9,17 +9,12 @@ import "./globals.css"
 export const metadata: Metadata = {
   title: "منصة الكيانات الشبابية",
   description: "منصة شاملة لإدارة وتنمية المواهب الشبابية",
-  generator: "v0.app",
 }
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ar" dir="rtl">
-      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
+      <body className={`min-h-screen bg-background text-foreground antialiased font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
         <Suspense fallback={null}>{children}</Suspense>
         <Analytics />
       </body>

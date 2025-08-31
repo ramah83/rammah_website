@@ -1,508 +1,348 @@
-const ADMIN_EMAIL = "admin@youth-platform.com" as const
+export type UserRole = "systemAdmin" | "qualitySupervisor" | "entityManager" | "youth"
 
-interface User {
+export type User = {
   id: string
   name: string
   email: string
-  role: "youth" | "admin"
-  interests: string[]
-  joinDate: string
-  avatar?: string
-  phone?: string
-  birthDate?: string
-  address?: string
-  emergencyContact?: string
-  status: "active" | "inactive"
-  lastLogin?: string
+  password?: string
+  role: UserRole
+  interests?: string[]
+  entityId?: string | null
+  permissions?: string[]
 }
 
-interface Activity {
+export type Entity = {
   id: string
-  title: string
-  description: string
-  category: string
-  instructor: string
-  maxParticipants: number
-  currentParticipants: string[]
-  schedule: string
-  location: string
-  startDate: string
-  endDate: string
-  status: "active" | "completed" | "cancelled"
-  image?: string
-  requirements?: string[]
-  createdBy: string
+  name: string
+  type?: string
+  contactEmail?: string
+  phone?: string
+  location?: string
+  documents?: string[]
   createdAt: string
 }
 
-interface Achievement {
+export type Member = {
   id: string
-  userId: string
-  title: string
-  description: string
-  category: string
-  earnedDate: string
-  points: number
-  badge: string
+  name: string
+  email?: string
+  phone?: string
+  entityId?: string | null
+  joinedAt: string
 }
 
-interface Event {
+export type EventItem = {
   id: string
   title: string
-  description: string
-  date: string
-  time: string
-  location: string
-  category: string
-  organizer: string
-  attendees: string[]
-  maxAttendees?: number
-  status: "upcoming" | "ongoing" | "completed" | "cancelled"
+  date?: string 
+  status: "draft" | "approved" | "cancelled" | "done"
+  entityId?: string | null
 }
 
-type StoreShape = {
+export type ISOForm = {
+  id: string
+  title: string
+  code?: string
+  status: "draft" | "submitted" | "review" | "approved" | "rejected"
+  ownerEntityId?: string | null
+}
+
+export type GovernanceType = "policy" | "procedure" | "minutes" | "decision" | "inquiry" | "response"
+export type GovernanceStatus = "draft" | "review" | "approved" | "archived"
+
+export type GovernanceItem = {
+  id: string
+  type: GovernanceType
+  title: string
+  content?: string
+  entityId?: string | null
+  status: GovernanceStatus
+  date?: string       
+  attachments?: string[]
+}
+
+type DB = {
+  _seeded?: boolean
   users: User[]
-  activities: Activity[]
-  achievements: Achievement[]
-  events: Event[]
-  currentUser: User | null
+  entities: Entity[]
+  members: Member[]
+  events: EventItem[]
+  iso: ISOForm[]
+  governance: GovernanceItem[]
 }
 
-class DataStore {
-  private static instance: DataStore
-  private storageKey = "youth-platform-data"
-  private listeners: Set<() => void> = new Set()
+const STORAGE_KEY = "youth_db_v1"
+const isBrowser = typeof window !== "undefined"
 
-  private constructor() {
-    this.initializeData()
-  }
+const mem: DB = { users: [], entities: [], members: [], events: [], iso: [], governance: [] }
 
-  static getInstance(): DataStore {
-    if (!DataStore.instance) {
-      DataStore.instance = new DataStore()
-    }
-    return DataStore.instance
-  }
-
-  // -------------------- internal helpers --------------------
-
-  private getData(): Partial<StoreShape> {
-    try {
-      const data = localStorage.getItem(this.storageKey)
-      return data ? JSON.parse(data) : {}
-    } catch (error) {
-      console.error("Error reading data:", error)
-      return {}
-    }
-  }
-
-  private saveData(data: Partial<StoreShape>) {
-    try {
-      localStorage.setItem(this.storageKey, JSON.stringify(data))
-      this.notifyListeners()
-    } catch (error) {
-      console.error("Error saving data:", error)
-    }
-  }
-
-  private notifyListeners() {
-    this.listeners.forEach((listener) => listener())
-  }
-
-  subscribe(listener: () => void) {
-    this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
-  }
-
-  private initializeData() {
-    const existingData = this.getData()
-    if (!existingData.users || existingData.users.length === 0) {
-      this.seedInitialData()
-    } else {
-      const data = this.getData() as StoreShape
-      const admin = data.users.find((u) => u.email === ADMIN_EMAIL)
-      if (admin && admin.role !== "admin") {
-        admin.role = "admin"
-        if (data.currentUser?.email === ADMIN_EMAIL) data.currentUser.role = "admin"
-        this.saveData(data)
-      }
-    }
-  }
-
-  private seedInitialData() {
-    const initialData: StoreShape = {
-      users: [
-        {
-          id: "admin-1",
-          name: "أحمد محمد",
-          email: ADMIN_EMAIL,
-          role: "admin",
-          interests: ["إدارة", "تطوير"],
-          joinDate: "2024-01-01",
-          status: "active",
-          avatar: "/admin-avatar.png",
-        },
-        {
-          id: "youth-1",
-          name: "سارة أحمد",
-          email: "sara@example.com",
-          role: "youth",
-          interests: ["كرة القدم", "الرسم"],
-          joinDate: "2024-02-15",
-          status: "active",
-          avatar: "/female-youth-avatar.png",
-        },
-        {
-          id: "youth-2",
-          name: "محمد علي",
-          email: "mohamed@example.com",
-          role: "youth",
-          interests: ["الموسيقى", "ريادة الأعمال"],
-          joinDate: "2024-03-10",
-          status: "active",
-          avatar: "/male-youth-avatar.png",
-        },
-      ],
-      activities: [
-        {
-          id: "activity-1",
-          title: "تدريب كرة القدم",
-          description: "تدريب أسبوعي لتطوير مهارات كرة القدم",
-          category: "رياضة",
-          instructor: "كابتن أحمد",
-          maxParticipants: 20,
-          currentParticipants: ["youth-1", "youth-2"],
-          schedule: "الأحد والثلاثاء 5:00 مساءً",
-          location: "الملعب الرئيسي",
-          startDate: "2024-01-15",
-          endDate: "2024-06-15",
-          status: "active",
-          image: "/football-training.png",
-          requirements: ["ملابس رياضية", "حذاء كرة قدم"],
-          createdBy: "admin-1",
-          createdAt: "2024-01-10",
-        },
-        {
-          id: "activity-2",
-          title: "ورشة الرسم والتصوير",
-          description: "تعلم أساسيات الرسم والتصوير الفني",
-          category: "فنون",
-          instructor: "الأستاذة فاطمة",
-          maxParticipants: 15,
-          currentParticipants: ["youth-1"],
-          schedule: "السبت 3:00 مساءً",
-          location: "استوديو الفنون",
-          startDate: "2024-02-01",
-          endDate: "2024-05-01",
-          status: "active",
-          image: "/art-painting-workshop.png",
-          requirements: ["أدوات رسم", "كراسة رسم"],
-          createdBy: "admin-1",
-          createdAt: "2024-01-25",
-        },
-      ],
-      achievements: [
-        {
-          id: "achievement-1",
-          userId: "youth-1",
-          title: "أول هدف",
-          description: "سجل أول هدف في المباراة",
-          category: "رياضة",
-          earnedDate: "2024-03-15",
-          points: 50,
-          badge: "⚽",
-        },
-        {
-          id: "achievement-2",
-          userId: "youth-1",
-          title: "فنان مبدع",
-          description: "أكمل أول لوحة فنية",
-          category: "فنون",
-          earnedDate: "2024-03-20",
-          points: 75,
-          badge: "🎨",
-        },
-      ],
-      events: [
-        {
-          id: "event-1",
-          title: "بطولة كرة القدم الشهرية",
-          description: "بطولة بين فرق الشباب",
-          date: "2024-04-15",
-          time: "16:00",
-          location: "الملعب الرئيسي",
-          category: "رياضة",
-          organizer: "admin-1",
-          attendees: ["youth-1", "youth-2"],
-          maxAttendees: 50,
-          status: "upcoming",
-        },
-        {
-          id: "event-2",
-          title: "معرض الأعمال الفنية",
-          description: "عرض أعمال الشباب الفنية",
-          date: "2024-04-20",
-          time: "18:00",
-          location: "قاعة المعارض",
-          category: "فنون",
-          organizer: "admin-1",
-          attendees: ["youth-1"],
-          maxAttendees: 100,
-          status: "upcoming",
-        },
-      ],
-      currentUser: null,
-    }
-
-    this.saveData(initialData)
-  }
-
-
-  getUsers(): User[] {
-    return this.getData().users || []
-  }
-
-  getUserById(id: string): User | null {
-    const users = this.getUsers()
-    return users.find((user) => user.id === id) || null
-  }
-
-  createUser(userData: Omit<User, "id" | "joinDate" | "status">): User {
-    const data = this.getData() as StoreShape
-    const role: User["role"] =
-      userData.email === ADMIN_EMAIL ? "admin" : userData.role
-
-    const newUser: User = {
-      ...userData,
-      role,
-      id: `user-${Date.now()}`,
-      joinDate: new Date().toISOString().split("T")[0],
-      status: "active",
-    }
-
-    data.users = [...(data.users || []), newUser]
-    this.saveData(data)
-    return newUser
-  }
-
-  updateUser(id: string, updates: Partial<User>): User | null {
-    const data = this.getData() as StoreShape
-    const userIndex = data.users?.findIndex((user: User) => user.id === id)
-    if (userIndex !== -1) {
-      data.users[userIndex] = { ...data.users[userIndex], ...updates }
-      // لو ده هو المستخدم الحالي، نزّله كمان
-      if (data.currentUser?.id === id) {
-        data.currentUser = { ...data.users[userIndex] }
-      }
-      this.saveData(data)
-      return data.users[userIndex]
-    }
-    return null
-  }
-
-  updateUserRole(email: string, role: User["role"]): boolean {
-    const data = this.getData() as StoreShape
-    const u = data.users.find((x) => x.email === email)
-    if (!u) return false
-    u.role = role
-    if (data.currentUser?.email === email) {
-      data.currentUser.role = role
-    }
-    this.saveData(data)
-    return true
-  }
-
-  deleteUser(id: string): boolean {
-    const data = this.getData() as StoreShape
-    const initialLength = data.users?.length || 0
-    data.users = data.users?.filter((user: User) => user.id !== id) || []
-    if (data.currentUser?.id === id) {
-      data.currentUser = null
-    }
-    if (data.users.length < initialLength) {
-      this.saveData(data)
-      return true
-    }
-    return false
-  }
-
-
-  getActivities(): Activity[] {
-    return this.getData().activities || []
-  }
-
-  getActivityById(id: string): Activity | null {
-    const activities = this.getActivities()
-    return activities.find((activity) => activity.id === id) || null
-  }
-
-  createActivity(activityData: Omit<Activity, "id" | "createdAt" | "currentParticipants">): Activity {
-    const data = this.getData() as StoreShape
-    const newActivity: Activity = {
-      ...activityData,
-      id: `activity-${Date.now()}`,
-      currentParticipants: [],
-      createdAt: new Date().toISOString(),
-    }
-    data.activities = [...(data.activities || []), newActivity]
-    this.saveData(data)
-    return newActivity
-  }
-
-  updateActivity(id: string, updates: Partial<Activity>): Activity | null {
-    const data = this.getData() as StoreShape
-    const i = data.activities?.findIndex((a: Activity) => a.id === id)
-    if (i !== -1) {
-      data.activities[i] = { ...data.activities[i], ...updates }
-      this.saveData(data)
-      return data.activities[i]
-    }
-    return null
-  }
-
-  joinActivity(activityId: string, userId: string): boolean {
-    const data = this.getData() as StoreShape
-    const activity = data.activities?.find((a: Activity) => a.id === activityId)
-    if (activity && !activity.currentParticipants.includes(userId)) {
-      if (activity.currentParticipants.length < activity.maxParticipants) {
-        activity.currentParticipants.push(userId)
-        this.saveData(data)
-        return true
-      }
-    }
-    return false
-  }
-
-  leaveActivity(activityId: string, userId: string): boolean {
-    const data = this.getData() as StoreShape
-    const activity = data.activities?.find((a: Activity) => a.id === activityId)
-    if (activity) {
-      activity.currentParticipants = activity.currentParticipants.filter((id) => id !== userId)
-      this.saveData(data)
-      return true
-    }
-    return false
-  }
-
-
-  getAchievements(): Achievement[] {
-    return this.getData().achievements || []
-  }
-
-  getUserAchievements(userId: string): Achievement[] {
-    const achievements = this.getAchievements()
-    return achievements.filter((achievement) => achievement.userId === userId)
-  }
-
-  createAchievement(achievementData: Omit<Achievement, "id" | "earnedDate">): Achievement {
-    const data = this.getData() as StoreShape
-    const newAchievement: Achievement = {
-      ...achievementData,
-      id: `achievement-${Date.now()}`,
-      earnedDate: new Date().toISOString().split("T")[0],
-    }
-    data.achievements = [...(data.achievements || []), newAchievement]
-    this.saveData(data)
-    return newAchievement
-  }
-
-  // -------------------- Events --------------------
-
-  getEvents(): Event[] {
-    return this.getData().events || []
-  }
-
-  createEvent(eventData: Omit<Event, "id" | "attendees">): Event {
-    const data = this.getData() as StoreShape
-    const newEvent: Event = {
-      ...eventData,
-      id: `event-${Date.now()}`,
-      attendees: [],
-    }
-    data.events = [...(data.events || []), newEvent]
-    this.saveData(data)
-    return newEvent
-  }
-
-  joinEvent(eventId: string, userId: string): boolean {
-    const data = this.getData() as StoreShape
-    const event = data.events?.find((e: Event) => e.id === eventId)
-    if (event && !event.attendees.includes(userId)) {
-      if (!event.maxAttendees || event.attendees.length < event.maxAttendees) {
-        event.attendees.push(userId)
-        this.saveData(data)
-        return true
-      }
-    }
-    return false
-  }
-
-
-  login(email: string, password: string): User | null {
-    const data = this.getData() as StoreShape
-    const user = (data.users || []).find((u) => u.email === email)
-    if (!user) return null
-
-    if (email === ADMIN_EMAIL && password !== "admin123") {
-      return null
-    }
-
-    if (email === ADMIN_EMAIL && user.role !== "admin") {
-      user.role = "admin"
-    }
-
-    user.lastLogin = new Date().toISOString()
-    data.currentUser = { ...user }
-    this.saveData(data)
-    return data.currentUser
-  }
-
-  logout(): void {
-    const data = this.getData() as StoreShape
-    data.currentUser = null
-    this.saveData(data)
-  }
-
-  getCurrentUser(): User | null {
-    const data = this.getData() as StoreShape
-    if (data.currentUser?.email === ADMIN_EMAIL && data.currentUser.role !== "admin") {
-      data.currentUser.role = "admin"
-      const u = data.users.find((x) => x.email === ADMIN_EMAIL)
-      if (u) u.role = "admin"
-      this.saveData(data)
-    }
-    return data.currentUser || null
-  }
-
-  register(userData: Omit<User, "id" | "joinDate" | "status">): User {
-    return this.createUser(userData)
-  }
-
-
-  getStatistics() {
-    const users = this.getUsers()
-    const activities = this.getActivities()
-    const achievements = this.getAchievements()
-    const events = this.getEvents()
-
-    return {
-      totalUsers: users.length,
-      activeUsers: users.filter((u) => u.status === "active").length,
-      totalActivities: activities.length,
-      activeActivities: activities.filter((a) => a.status === "active").length,
-      totalAchievements: achievements.length,
-      upcomingEvents: events.filter((e) => e.status === "upcoming").length,
-      usersByRole: {
-        youth: users.filter((u) => u.role === "youth").length,
-        admin: users.filter((u) => u.role === "admin").length,
-      },
-      activitiesByCategory: activities.reduce((acc, activity) => {
-        acc[activity.category] = (acc[activity.category] || 0) + 1
-        return acc
-      }, {} as Record<string, number>),
-    }
+function readDB(): DB {
+  if (!isBrowser) return mem
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return { users: [], entities: [], members: [], events: [], iso: [], governance: [] }
+    return JSON.parse(raw) as DB
+  } catch {
+    return { users: [], entities: [], members: [], events: [], iso: [], governance: [] }
   }
 }
 
-export const dataStore = DataStore.getInstance()
-export type { User, Activity, Achievement, Event }
+function writeDB(db: DB) {
+  if (!isBrowser) return
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(db))
+  } catch {/* ignore */}
+}
+
+function uid() {
+
+  if (isBrowser && typeof crypto?.randomUUID === "function") return crypto.randomUUID()
+  return "id_" + Math.random().toString(36).slice(2) + Date.now().toString(36)
+}
+
+function seedDemoIfNeeded() {
+  if (!isBrowser) return
+  const db = readDB()
+  if (db._seeded) return
+
+  const ent1: Entity = {
+    id: uid(),
+    name: "مركز تنمية الشباب – القاهرة",
+    type: "مركز شباب",
+    contactEmail: "cairo@youth.org",
+    phone: "01010000001",
+    location: "القاهرة",
+    documents: ["سجل تجاري.pdf", "ترخيص المركز.pdf"],
+    createdAt: new Date().toISOString(),
+  }
+  const ent2: Entity = {
+    id: uid(),
+    name: "جمعية الفنون والإبداع",
+    type: "جمعية",
+    contactEmail: "arts@youth.org",
+    phone: "01020000002",
+    location: "الإسكندرية",
+    documents: ["اللائحة الداخلية.pdf"],
+    createdAt: new Date().toISOString(),
+  }
+  const ent3: Entity = {
+    id: uid(),
+    name: "منتدى رواد الأعمال الشباب",
+    type: "منتدى",
+    contactEmail: "entre@youth.org",
+    phone: "01030000003",
+    location: "أسيوط",
+    createdAt: new Date().toISOString(),
+  }
+
+  const admin: User = { id: uid(), name: "Admin", email: "admin@youth-platform.com", password: "admin123", role: "systemAdmin", permissions: [] }
+  const qm:    User = { id: uid(), name: "Quality Lead", email: "quality@youth.org", password: "123456", role: "qualitySupervisor", permissions: [] }
+  const mngr:  User = { id: uid(), name: "Entity Manager", email: "manager@youth.org", password: "123456", role: "entityManager", entityId: ent1.id, permissions: [] }
+  const youthUser: User = { id: uid(), name: "Ahmed Y", email: "ahmed@youth.org", password: "123456", role: "youth", entityId: ent1.id, interests: ["ريادة الأعمال", "الأدب"] }
+
+  const m1: Member = { id: uid(), name: "محمد أحمد", email: "m.ahmed@example.com", phone: "0101111111", entityId: ent1.id, joinedAt: new Date().toISOString() }
+  const m2: Member = { id: uid(), name: "سارة علي",  email: "sara@example.com",  phone: "0102222222", entityId: ent1.id, joinedAt: new Date().toISOString() }
+  const m3: Member = { id: uid(), name: "نور حسن",  email: "n.hassan@example.com", phone: "0103333333", entityId: ent2.id, joinedAt: new Date().toISOString() }
+
+  const e1: EventItem = { id: uid(), title: "ورشة إدارة المخاطر", date: new Date().toISOString(), status: "approved",  entityId: ent1.id }
+  const e2: EventItem = { id: uid(), title: "حفل تكريم متطوعين",   date: new Date().toISOString(), status: "draft",     entityId: ent2.id }
+  const e3: EventItem = { id: uid(), title: "ملتقى ابتكار للشباب", date: new Date().toISOString(), status: "done",      entityId: ent3.id }
+  const e4: EventItem = { id: uid(), title: "يوم مفتوح للكيانات",  date: new Date().toISOString(), status: "cancelled", entityId: ent1.id }
+
+  const f1: ISOForm = { id: uid(), title: "إجراء تقييم المخاطر", code: "ISO-PR-01", status: "submitted", ownerEntityId: ent1.id }
+  const f2: ISOForm = { id: uid(), title: "سياسة حماية الطفل",   code: "ISO-PL-09", status: "approved",  ownerEntityId: ent2.id }
+  const f3: ISOForm = { id: uid(), title: "نموذج تدقيق داخلي",   code: "ISO-AU-02", status: "review",    ownerEntityId: ent1.id }
+
+  const g1: GovernanceItem = { id: uid(), type: "policy",    title: "لائحة سلوك المتطوعين", status: "approved", entityId: ent1.id, date: new Date().toISOString(), attachments: ["policy-volunteers.pdf"] }
+  const g2: GovernanceItem = { id: uid(), type: "minutes",   title: "محضر اجتماع مجلس الإدارة 2025/08/15", status: "approved", entityId: ent1.id, date: new Date().toISOString() }
+  const g3: GovernanceItem = { id: uid(), type: "decision",  title: "قرار اعتماد ميزانية فعالية الابتكار", status: "approved", entityId: ent3.id, date: new Date().toISOString() }
+  const g4: GovernanceItem = { id: uid(), type: "inquiry",   title: "استفسار: آلية إصدار الشهادات", status: "review", entityId: ent2.id, date: new Date().toISOString() }
+
+  writeDB({
+    _seeded: true,
+    users: [admin, qm, mngr, youthUser],
+    entities: [ent1, ent2, ent3],
+    members: [m1, m2, m3],
+    events: [e1, e2, e3, e4],
+    iso: [f1, f2, f3],
+    governance: [g1, g2, g3, g4],
+  })
+}
+
+function ensure(): DB {
+  seedDemoIfNeeded()
+  return readDB()
+}
+
+function getUsers() { return ensure().users }
+function register(user: Omit<User, "id">) {
+  const db = ensure()
+  if (db.users.some(u => u.email === user.email)) return null
+  const u: User = { id: uid(), ...user }
+  db.users.push(u); writeDB(db); return u
+}
+function login(email: string, password: string) {
+  const db = ensure()
+  return db.users.find(x => x.email === email && x.password === password) || null
+}
+
+function listEntities(): Entity[] { return ensure().entities }
+function findEntity(id: string) { return ensure().entities.find(e => e.id === id) || null }
+function addEntity(data: Omit<Entity, "id" | "createdAt">) {
+  const db = ensure()
+  const ent: Entity = { id: uid(), createdAt: new Date().toISOString(), ...data }
+  db.entities.push(ent); writeDB(db); return ent
+}
+function updateEntity(id: string, patch: Partial<Omit<Entity, "id" | "createdAt">>) {
+  const db = ensure()
+  const i = db.entities.findIndex(e => e.id === id); if (i < 0) return null
+  db.entities[i] = { ...db.entities[i], ...patch }; writeDB(db); return db.entities[i]
+}
+function removeEntity(id: string) {
+  const db = ensure()
+  db.entities = db.entities.filter(e => e.id !== id)
+  db.members  = db.members.filter(m => m.entityId !== id)
+  db.events   = db.events.filter(ev => ev.entityId !== id)
+  db.iso      = db.iso.filter(f => f.ownerEntityId !== id)
+  db.governance = db.governance.filter(g => g.entityId !== id)
+  writeDB(db)
+}
+
+function listMembers(): Member[] { return ensure().members }
+function findMember(id: string) { return ensure().members.find(m => m.id === id) || null }
+function addMember(data: Omit<Member, "id" | "joinedAt">) {
+  const db = ensure()
+  const m: Member = { id: uid(), joinedAt: new Date().toISOString(), ...data }
+  db.members.push(m); writeDB(db); return m
+}
+function updateMember(id: string, patch: Partial<Omit<Member, "id" | "joinedAt">>) {
+  const db = ensure()
+  const i = db.members.findIndex(m => m.id === id); if (i < 0) return null
+  db.members[i] = { ...db.members[i], ...patch }; writeDB(db); return db.members[i]
+}
+function removeMember(id: string) {
+  const db = ensure()
+  db.members = db.members.filter(m => m.id !== id); writeDB(db)
+}
+
+function listEvents(): EventItem[] { return ensure().events }
+function findEvent(id: string) { return ensure().events.find(e => e.id === id) || null }
+function addEvent(data: Omit<EventItem, "id">) {
+  const db = ensure()
+  const ev: EventItem = { id: uid(), ...data }
+  db.events.push(ev); writeDB(db); return ev
+}
+function updateEvent(id: string, patch: Partial<Omit<EventItem, "id">>) {
+  const db = ensure()
+  const i = db.events.findIndex(e => e.id === id); if (i < 0) return null
+  db.events[i] = { ...db.events[i], ...patch }; writeDB(db); return db.events[i]
+}
+function removeEvent(id: string) {
+  const db = ensure()
+  db.events = db.events.filter(e => e.id !== id); writeDB(db)
+}
+
+function listISO(): ISOForm[] { return ensure().iso }
+function findISO(id: string) { return ensure().iso.find(f => f.id === id) || null }
+function addISO(data: Omit<ISOForm, "id">) {
+  const db = ensure()
+  const f: ISOForm = { id: uid(), ...data }
+  db.iso.push(f); writeDB(db); return f
+}
+function updateISO(id: string, patch: Partial<Omit<ISOForm, "id">>) {
+  const db = ensure()
+  const i = db.iso.findIndex(f => f.id === id); if (i < 0) return null
+  db.iso[i] = { ...db.iso[i], ...patch }; writeDB(db); return db.iso[i]
+}
+function removeISO(id: string) {
+  const db = ensure()
+  db.iso = db.iso.filter(f => f.id !== id); writeDB(db)
+}
+
+function listGovernance(): GovernanceItem[] { return ensure().governance }
+function findGovernance(id: string) { return ensure().governance.find(g => g.id === id) || null }
+function addGovernance(data: Omit<GovernanceItem, "id">) {
+  const db = ensure()
+  const item: GovernanceItem = { id: uid(), ...data }
+  db.governance.push(item); writeDB(db); return item
+}
+function updateGovernance(id: string, patch: Partial<Omit<GovernanceItem, "id">>) {
+  const db = ensure()
+  const i = db.governance.findIndex(g => g.id === id); if (i < 0) return null
+  db.governance[i] = { ...db.governance[i], ...patch }; writeDB(db); return db.governance[i]
+}
+function removeGovernance(id: string) {
+  const db = ensure()
+  db.governance = db.governance.filter(g => g.id !== id); writeDB(db)
+}
+
+const createGov = addGovernance
+
+function getStatistics() {
+  const db = ensure()
+  const usersByRole: Record<UserRole, number> = {
+    systemAdmin: 0, qualitySupervisor: 0, entityManager: 0, youth: 0,
+  }
+  db.users.forEach(u => { usersByRole[u.role]++ })
+
+  const eventStatus: Record<EventItem["status"], number> = { draft: 0, approved: 0, cancelled: 0, done: 0 }
+  db.events.forEach(e => { eventStatus[e.status] = (eventStatus[e.status] || 0) + 1 })
+
+  const isoStatus: Record<ISOForm["status"], number> = { draft: 0, submitted: 0, review: 0, approved: 0, rejected: 0 }
+  db.iso.forEach(f => { isoStatus[f.status] = (isoStatus[f.status] || 0) + 1 })
+
+  return {
+    totals: {
+      users: db.users.length,
+      entities: db.entities.length,
+      members: db.members.length,
+      events: db.events.length,
+      iso: db.iso.length,
+      governance: db.governance.length,
+    },
+    usersByRole,
+    eventStatus,
+    isoStatus,
+  }
+}
+
+function resetAll(reseed = false) {
+  const empty: DB = { users: [], entities: [], members: [], events: [], iso: [], governance: [] }
+  writeDB(empty)
+  if (reseed) seedDemoIfNeeded()
+}
+const listGov   = listGovernance
+const createEntity = addEntity
+const createMember = addMember
+const createEvent  = addEvent
+const createISO    = addISO
+
+export const dataStore = {
+  getUsers,
+  register,
+  login,
+
+  listEntities,
+  listMembers,
+  listEvents,
+  listISO,
+
+  addEntity,
+  addMember,
+  addEvent,
+  addISO,
+
+  createEntity,
+  createMember,
+  createEvent,
+  createISO,
+
+  listGovernance,
+  addGovernance,
+  updateGovernance,
+  removeGovernance,
+  listGov,
+  createGov,
+
+  resetAll,
+}

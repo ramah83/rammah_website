@@ -1,306 +1,288 @@
 "use client"
 
-import {
-  useCurrentUser,
-  useStatistics,
-  useActivities,
-  useUserActivities,
-  useAchievements,
-  useEvents,
-} from "@/hooks/use-data-store"
+import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
+import { Separator } from "@/components/ui/separator"
 import {
-  Trophy, Palette, Calculator, Music, BookOpen,
-  Calendar, Award, TrendingUp, Activity, Users, Plus,
+  Users, Building2, CalendarDays, ShieldCheck, FileText, BarChart3, ArrowRight, LogOut,
 } from "lucide-react"
-import { useRouter } from "next/navigation"
-import { useEffect, useMemo, useState } from "react"
 
-const ADMIN_EMAIL = "admin@youth-platform.com"
-const ADMIN_ONLY = false
+type UserRole = "systemAdmin" | "qualitySupervisor" | "entityManager" | "youth"
 
-export default function Dashboard() {
-  // 1) أول hook
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
+type Session = {
+  id: string
+  email: string
+  name: string
+  role: UserRole
+  entityId?: string | null
+  permissions?: string[]
+}
 
-  // 2) نعلن باقي الـ hooks دايمًا بنفس الترتيب (بدون early return)
-  const user = useCurrentUser()
-  const statistics = useStatistics()
-  const allActivities = useActivities()
-  const userActivities = useUserActivities(user?.id || "")
-  const userAchievements = useAchievements(user?.id)
-  const events = useEvents()
+const roleLabel: Record<UserRole, string> = {
+  systemAdmin: "مدير النظام",
+  qualitySupervisor: "مشرف جودة",
+  entityManager: "مسؤول كيان",
+  youth: "مستخدم",
+}
+
+export default function DashboardPage() {
   const router = useRouter()
 
-  const effectiveRole: "admin" | "youth" | undefined = useMemo(() => {
-    if (!user) return undefined
-    return user.email === ADMIN_EMAIL ? "admin" : (user.role as "admin" | "youth")
-  }, [user])
+  const [hydrated, setHydrated] = useState(false)
+  const [session, setSession] = useState<Session | null>(null)
 
-  // 3) التحويلات بعد mounted فقط
+  const [stats, setStats] = useState({ entities: 0, members: 0, events: 0, iso: 0 })
+
+  useEffect(() => { setHydrated(true) }, [])
+
   useEffect(() => {
-    if (!mounted) return
-    if (!user) {
-      router.push("/")
-      return
+    if (!hydrated) return
+    try {
+      const s = localStorage.getItem("session")
+      if (!s) {
+        router.replace("/")
+        return
+      }
+      setSession(JSON.parse(s))
+    } catch {
+      router.replace("/")
     }
-    if (ADMIN_ONLY && effectiveRole !== "admin") {
-      router.push("/")
+  }, [hydrated, router])
+
+  useEffect(() => {
+    if (!hydrated) return
+    fetch("/api/stats")
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((data) => {
+        setStats({
+          entities: Number(data?.entities) || 0,
+          members: Number(data?.members) || 0,
+          events: Number(data?.events) || 0,
+          iso: Number(data?.iso) || 0,
+        })
+      })
+      .catch(() => {
+        setStats({ entities: 0, members: 0, events: 0, iso: 0 })
+      })
+  }, [hydrated])
+
+  const show = useMemo(() => {
+    if (!session) {
+      return { overview: true, entities: false, members: false, events: false, iso: false, governance: false, reports: false }
     }
-  }, [mounted, user, effectiveRole, router])
+    return {
+      overview: true,
+      entities: ["systemAdmin", "entityManager"].includes(session.role),
+      members: ["systemAdmin", "entityManager"].includes(session.role),
+      events: ["systemAdmin", "entityManager", "qualitySupervisor", "youth"].includes(session.role),
+      iso: ["systemAdmin", "qualitySupervisor"].includes(session.role),
+      governance: ["systemAdmin", "qualitySupervisor"].includes(session.role),
+      reports: true,
+    }
+  }, [session])
 
-  const interestIcons = {
-    "كرة القدم": Trophy,
-    الرسم: Palette,
-    "ريادة الأعمال": Calculator,
-    الموسيقى: Music,
-    الأدب: BookOpen,
-  } as const
+  const defaultTab = "overview"
 
-  // 4) منغيرش ترتيب hooks — نتحكم في العرض بس
-  return mounted ? (
-    !user ? null : effectiveRole === "admin" ? (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">مرحباً {user.name}</h2>
-            <p className="text-gray-600">إحصائيات المنصة والأنشطة</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">لوحة التحكم</h1>
+            <p className="text-gray-600">
+              {session ? <>مرحباً {session.name} 👋 — ادارة المنصة حسب دورك وصلاحياتك</> : ""}
+            </p>
           </div>
-          <Button onClick={() => router.push("/dashboard/activities")}>
-            <Plus className="h-4 w-4 mr-2" />
-            إضافة نشاط جديد
-          </Button>
+          <div className="flex items-center gap-2">
+            {session && (
+              <Badge variant="secondary" className="text-sm">
+                {roleLabel[session.role]}
+              </Badge>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                try { localStorage.removeItem("session") } catch {}
+                router.replace("/")
+              }}
+              className="gap-2"
+            >
+              <LogOut className="h-4 w-4" />
+              تسجيل الخروج
+            </Button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">إجمالي الشباب</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{statistics.usersByRole.youth}</div>
-              <p className="text-xs text-muted-foreground">شاب نشط</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">الأنشطة النشطة</CardTitle>
-              <Activity className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{statistics.activeActivities}</div>
-              <p className="text-xs text-muted-foreground">من أصل {statistics.totalActivities}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">إجمالي المستخدمين</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{statistics.totalUsers}</div>
-              <p className="text-xs text-muted-foreground">{statistics.activeUsers} نشط</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">الإنجازات</CardTitle>
-              <Award className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{statistics.totalAchievements}</div>
-              <p className="text-xs text-muted-foreground">إنجاز محقق</p>
-            </CardContent>
-          </Card>
+        {/* بطاقات الإحصائيات — بتبدأ 0 عند SSR/CSR وبعدين تتحدث بعد التركيب */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard title="الكيانات" icon={<Building2 className="h-4 w-4 text-blue-600" />} value={stats.entities} />
+          <StatCard title="الأعضاء" icon={<Users className="h-4 w-4 text-blue-600" />} value={stats.members} />
+          <StatCard title="الفعاليات" icon={<CalendarDays className="h-4 w-4 text-blue-600" />} value={stats.events} />
+          <StatCard title="نماذج ISO" icon={<ShieldCheck className="h-4 w-4 text-blue-600" />} value={stats.iso} />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>الأنشطة حسب الفئة</CardTitle>
-              <CardDescription>توزيع الأنشطة حسب النوع</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {Object.entries(statistics.activitiesByCategory).map(([category, count]) => {
-                const Icon = (interestIcons as any)[category] || Activity
-                const percentage = statistics.totalActivities ? (count / statistics.totalActivities) * 100 : 0
-                return (
-                  <div key={category} className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Icon className="h-5 w-5 text-blue-600 mr-2" />
-                      <span>{category}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Progress value={percentage} className="w-20" />
-                      <span className="text-sm text-muted-foreground">{count}</span>
-                    </div>
-                  </div>
-                )
-              })}
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="pb-0">
+            <CardTitle className="text-lg">الوحدات</CardTitle>
+            <CardDescription>اختَر وحدة للإدارة أو الاستعراض</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <Tabs defaultValue={defaultTab} className="w-full">
+              <TabsList className="grid grid-cols-2 md:grid-cols-6 gap-1">
+                <TabsTrigger value="overview">الملخص</TabsTrigger>
+                {show.entities && <TabsTrigger value="entities">الكيانات</TabsTrigger>}
+                {show.members && <TabsTrigger value="members">الأعضاء</TabsTrigger>}
+                {show.events && <TabsTrigger value="events">الفعاليات</TabsTrigger>}
+                {show.iso && <TabsTrigger value="iso">نماذج ISO</TabsTrigger>}
+                {show.governance && <TabsTrigger value="governance">الحوكمة</TabsTrigger>}
+                {show.reports && <TabsTrigger value="reports">التقارير</TabsTrigger>}
+              </TabsList>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>الأحداث القادمة</CardTitle>
-              <CardDescription>الفعاليات والأنشطة المجدولة</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {events
-                .filter((e) => e.status === "upcoming")
-                .slice(0, 3)
-                .map((event) => {
-                  const Icon = (interestIcons as any)[event.category] || Calendar
-                  return (
-                    <div key={event.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                      <div className="flex items-center">
-                        <Icon className="h-5 w-5 text-blue-600 mr-2" />
-                        <div>
-                          <p className="font-medium">{event.title}</p>
-                          <p className="text-sm text-muted-foreground">{event.date}</p>
-                        </div>
-                      </div>
-                      <Badge>{event.status === "upcoming" ? "قريباً" : event.status}</Badge>
-                    </div>
-                  )
-                })}
-            </CardContent>
-          </Card>
-        </div>
+              <TabsContent value="overview" className="space-y-4">
+                <QuickLinks
+                  items={[
+                    show.entities && { label: "إدارة الكيانات", href: "/entities" },
+                    show.members && { label: "إدارة الأعضاء", href: "/members" },
+                    show.events && { label: "إدارة الفعاليات", href: "/events" },
+                    show.iso && { label: "نماذج ISO", href: "/iso" },
+                    show.governance && { label: "الحوكمة", href: "/governance" },
+                    show.reports && { label: "التقارير ولوحات البيانات", href: "/reports" },
+                  ].filter(Boolean) as { label: string; href: string }[]}
+                />
+              </TabsContent>
+
+              {show.entities && (
+                <TabsContent value="entities">
+                  <UnitCard
+                    icon={<Building2 className="h-5 w-5 text-blue-600" />}
+                    title="إدارة الكيانات (Youth Entities)"
+                    desc="إنشاء وتحديث بيانات الكيانات، المستندات، التواصل والموقع."
+                    href="/entities"
+                  />
+                </TabsContent>
+              )}
+
+              {show.members && (
+                <TabsContent value="members">
+                  <UnitCard
+                    icon={<Users className="h-5 w-5 text-blue-600" />}
+                    title="إدارة الأعضاء (Members)"
+                    desc="تسجيل وربط الأعضاء بالكيانات."
+                    href="/members"
+                  />
+                </TabsContent>
+              )}
+
+              {show.events && (
+                <TabsContent value="events">
+                  <UnitCard
+                    icon={<CalendarDays className="h-5 w-5 text-blue-600" />}
+                    title="إدارة الفعاليات (Events)"
+                    desc="جدولة الفعاليات، إدارة الحضور والتقارير."
+                    href="/events"
+                  />
+                </TabsContent>
+              )}
+
+              {show.iso && (
+                <TabsContent value="iso">
+                  <UnitCard
+                    icon={<ShieldCheck className="h-5 w-5 text-blue-600" />}
+                    title="نماذج ISO (إجراءات وسياسات)"
+                    desc="مكتبة النماذج، سير الاعتماد، وسجل التدقيق."
+                    href="/iso"
+                  />
+                </TabsContent>
+              )}
+
+              {show.governance && (
+                <TabsContent value="governance">
+                  <UnitCard
+                    icon={<FileText className="h-5 w-5 text-blue-600" />}
+                    title="الحوكمة (Governance)"
+                    desc="اللوائح، محاضر الاجتماعات، القرارات، واعتمادات النماذج."
+                    href="/governance"
+                  />
+                </TabsContent>
+              )}
+
+              {show.reports && (
+                <TabsContent value="reports">
+                  <UnitCard
+                    icon={<BarChart3 className="h-5 w-5 text-blue-600" />}
+                    title="التقارير ولوحات البيانات (Dashboards)"
+                    desc="ملخصات بالأرقام والرسوم البيانية عن الكيانات والأعضاء والفعاليات و ISO."
+                    href="/reports"
+                  />
+                </TabsContent>
+              )}
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        <Separator className="opacity-0" />
       </div>
-    ) : (
-      // لوحة المستخدم العادي
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">مرحباً بك، {user.name}</h2>
-            <p className="text-gray-600">تابع أنشطتك وإنجازاتك</p>
-          </div>
-          <Button onClick={() => router.push("/dashboard/activities")}>
-            <Plus className="h-4 w-4 mr-2" />
-            انضم لنشاط جديد
+    </div>
+  )
+}
+
+/* ====== Components ====== */
+function StatCard({ title, icon, value }: { title: string; icon: React.ReactNode; value: number }) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm text-gray-600">{title}</CardTitle>
+        <CardDescription className="flex items-center gap-2">{icon} إجمالي {title}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{value}</div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function QuickLinks({ items }: { items: { label: string; href: string }[] }) {
+  const router = useRouter()
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>اختصارات سريعة</CardTitle>
+        <CardDescription>روابط مباشرة لأكثر المهام استخدامًا</CardDescription>
+      </CardHeader>
+      <CardContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {items.map((it) => (
+          <Button key={it.href} variant="outline" className="justify-between" onClick={() => router.push(it.href)}>
+            {it.label}
+            <ArrowRight className="h-4 w-4" />
           </Button>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+function UnitCard({ icon, title, desc, href }: { icon: React.ReactNode; title: string; desc: string; href: string }) {
+  const router = useRouter()
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <div className="space-y-1">
+          <CardTitle className="flex items-center gap-2">
+            {icon}
+            <span>{title}</span>
+          </CardTitle>
+          <CardDescription>{desc}</CardDescription>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>اهتماماتي</CardTitle>
-                <CardDescription>المجالات التي تهتم بها</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  {user.interests.map((interest) => {
-                    const Icon = (interestIcons as any)[interest] || Activity
-                    return (
-                      <div
-                        key={interest}
-                        className="flex items-center p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/dashboard/${interest === "كرة القدم" ? "sports" : "arts"}`)}
-                      >
-                        <Icon className="h-8 w-8 text-blue-600 mr-3" />
-                        <div>
-                          <p className="font-medium">{interest}</p>
-                          <p className="text-sm text-muted-foreground">اضغط للاستكشاف</p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>الأنشطة الحالية</CardTitle>
-                <CardDescription>الأنشطة التي تشارك فيها حالياً</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {userActivities.slice(0, 3).map((activity) => {
-                  const Icon = (interestIcons as any)[activity.category] || Activity
-                  return (
-                    <div
-                      key={activity.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex items-center">
-                        <Icon className="h-6 w-6 text-blue-600 mr-3" />
-                        <div>
-                          <p className="font-medium">{activity.title}</p>
-                          <p className="text-sm text-muted-foreground">{activity.schedule}</p>
-                        </div>
-                      </div>
-                      <Badge variant={activity.status === "active" ? "default" : "secondary"}>
-                        {activity.status === "active" ? "نشط" : activity.status}
-                      </Badge>
-                    </div>
-                  )
-                })}
-                {userActivities.length === 0 && (
-                  <p className="text-center text-muted-foreground py-4">لم تنضم لأي أنشطة بعد</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>إحصائياتي</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">الأنشطة المشارك بها</span>
-                  <span className="font-bold">{userActivities.length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">الإنجازات المحققة</span>
-                  <span className="font-bold">{userAchievements.length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">النقاط المكتسبة</span>
-                  <span className="font-bold">{userAchievements.reduce((sum, a) => sum + a.points, 0)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">التقييم العام</span>
-                  <Badge variant="default">
-                    {userAchievements.length >= 3 ? "ممتاز" : userAchievements.length >= 1 ? "جيد" : "مبتدئ"}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>الإنجازات الأخيرة</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {userAchievements.slice(0, 3).map((achievement) => (
-                  <div key={achievement.id} className="flex items-center">
-                    <span className="text-lg mr-2">{achievement.badge}</span>
-                    <div>
-                      <p className="text-sm font-medium">{achievement.title}</p>
-                      <p className="text-xs text-muted-foreground">{achievement.earnedDate}</p>
-                    </div>
-                  </div>
-                ))}
-                {userAchievements.length === 0 && (
-                  <p className="text-center text-muted-foreground py-4">لا توجد إنجازات بعد</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-    )
-  ) : null
+        <Button variant="outline" onClick={() => router.push(href)} className="shrink-0">
+          فتح الصفحة
+          <ArrowRight className="h-4 w-4 ms-2" />
+        </Button>
+      </CardHeader>
+    </Card>
+  )
 }

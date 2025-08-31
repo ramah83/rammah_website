@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -9,39 +10,48 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRouter } from "next/navigation"
-import { Users, Trophy, Palette, Calculator, Music, BookOpen } from "lucide-react"
-import { dataStore } from "@/lib/data-store"
+import { Users } from "lucide-react"
+
+type UserRole = "systemAdmin" | "qualitySupervisor" | "entityManager" | "dataUser" | "youth"
+
+const ADMIN_EMAIL = "admin@youth-platform.com"
+
+// نحافظ على الأدوار المدعومة فقط
+function normalizeRole(role: unknown): Exclude<UserRole, "dataUser"> {
+  const allowed: Array<Exclude<UserRole, "dataUser">> = [
+    "systemAdmin",
+    "qualitySupervisor",
+    "entityManager",
+    "youth",
+  ]
+  return allowed.includes(role as any) ? (role as any) : "youth"
+}
 
 export default function HomePage() {
-  // mounted guard لمنع مشاكل hydration
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
 
-  // الحالة
   const [isLogin, setIsLogin] = useState(true)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
-    userType: "youth" as "youth" | "admin",
+    role: "youth" as UserRole,
     interests: [] as string[],
+    entityId: null as string | null,
   })
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
-  const interests = [
-    { id: "كرة القدم", label: "كرة القدم", icon: Trophy },
-    { id: "الرسم", label: "الرسم", icon: Palette },
-    { id: "ريادة الأعمال", label: "ريادة الأعمال", icon: Calculator },
-    { id: "الموسيقى", label: "الموسيقى", icon: Music },
-    { id: "الأدب", label: "الأدب", icon: BookOpen },
-    { id: "الاقتصاد", label: "الاقتصاد", icon: Calculator },
-    { id: "التكنولوجيا", label: "التكنولوجيا", icon: Users },
-    { id: "أخرى", label: "أخرى", icon: Users },
-  ]
-
-  const ADMIN_EMAIL = "admin@youth-platform.com"
+  // لو فيه جلسة محفوظة، ادخل مباشرة
+  useEffect(() => {
+    if (!mounted) return
+    try {
+      const s = localStorage.getItem("session")
+      if (s) router.replace("/dashboard")
+    } catch {}
+  }, [mounted, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,52 +60,89 @@ export default function HomePage() {
 
     try {
       if (isLogin) {
-        const user = dataStore.login(formData.email, formData.password)
-
-        if (user) {
-          // ترقية الأدمن
-          if (formData.email === ADMIN_EMAIL) user.role = "admin"
-
-          // حفظ الجلسة ليستعملها الداشبورد/الصفحات الداخلية
-          localStorage.setItem(
-            "session",
-            JSON.stringify({ email: user.email, role: user.role, name: user.name })
-          )
-
-          router.push("/dashboard")
-        } else {
-          setError("البريد الإلكتروني أو كلمة المرور غير صحيحة")
+        if (!formData.email || !formData.password) {
+          setError("يرجى إدخال البريد الإلكتروني وكلمة المرور")
+          return
         }
+        if (formData.password.length < 3) {
+          setError("كلمة المرور قصيرة جداً")
+          return
+        }
+
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email: formData.email, password: formData.password }),
+        })
+
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setError(data?.error || "البريد الإلكتروني أو كلمة المرور غير صحيحة")
+          return
+        }
+
+        const finalRole =
+          formData.email === ADMIN_EMAIL ? "systemAdmin" : normalizeRole(data?.role)
+
+        localStorage.setItem(
+          "session",
+          JSON.stringify({
+            id: data?.id,
+            email: data?.email,
+            role: finalRole,
+            name: data?.name ?? "مستخدم",
+            entityId: data?.entityId ?? null,
+            permissions: data?.permissions ?? [],
+          })
+        )
+        router.replace("/dashboard")
       } else {
-        // التسجيل
+        // تسجيل جديد
         if (!formData.name.trim()) {
           setError("يرجى إدخال الاسم الكامل")
           return
         }
-
-        const existingUsers = dataStore.getUsers()
-        if (existingUsers.some((u) => u.email === formData.email)) {
-          setError("هذا البريد الإلكتروني مستخدم بالفعل")
+        if (!formData.email) {
+          setError("يرجى إدخال البريد الإلكتروني")
+          return
+        }
+        if (!formData.password || formData.password.length < 3) {
+          setError("كلمة المرور قصيرة جداً")
           return
         }
 
-        const enforcedRole = formData.email === ADMIN_EMAIL ? "admin" : formData.userType
+        const enforcedRole =
+          formData.email === ADMIN_EMAIL ? "systemAdmin" : normalizeRole(formData.role)
 
-        const newUser = dataStore.register({
-          name: formData.name,
-          email: formData.email,
-          role: enforcedRole,
-          interests: formData.interests,
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            name: formData.name,
+            email: formData.email,
+            password: formData.password,
+            role: enforcedRole,
+            interests: formData.interests,
+            entityId: formData.entityId,
+          }),
         })
 
-        if (newUser) {
-          setError("")
-          alert("تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول الآن.")
-          setIsLogin(true)
-          setFormData({ name: "", email: "", password: "", userType: "youth", interests: [] })
-        } else {
-          setError("حدث خطأ أثناء إنشاء الحساب")
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setError(data?.error || "حدث خطأ أثناء إنشاء الحساب")
+          return
         }
+
+        // نجاح: رجّعه لعلامة تبويب تسجيل الدخول مع تهيئة الحقول
+        setIsLogin(true)
+        setFormData({
+          name: "",
+          email: formData.email,
+          password: "",
+          role: "youth",
+          interests: [],
+          entityId: null,
+        })
       }
     } catch {
       setError("حدث خطأ غير متوقع")
@@ -104,16 +151,6 @@ export default function HomePage() {
     }
   }
 
-  const toggleInterest = (interestId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      interests: prev.interests.includes(interestId)
-        ? prev.interests.filter((id) => id !== interestId)
-        : [...prev.interests, interestId],
-    }))
-  }
-
-  // التحكم في العرض لتفادي hydration
   return (
     mounted && (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -123,32 +160,57 @@ export default function HomePage() {
               <Users className="h-12 w-12 text-blue-600" />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">منصة الكيانات الشبابية</h1>
-            <p className="text-gray-600">منصة شاملة لإدارة وتنمية المواهب الشبابية</p>
+            <p className="text-gray-600">منصة شاملة لإدارة وتنمية الكيانات الشبابية</p>
           </div>
 
           <Card>
-            <CardHeader>
-              <Tabs value={isLogin ? "login" : "register"} onValueChange={(value) => setIsLogin(value === "login")}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="login">تسجيل الدخول</TabsTrigger>
-                  <TabsTrigger value="register">إنشاء حساب</TabsTrigger>
+            <CardHeader className="text-center space-y-4">
+              {isLogin ? (
+                <>
+                  <CardTitle className="text-2xl font-bold text-gray-900">مرحباً بعودتك</CardTitle>
+                  <CardDescription className="text-gray-600">
+                    سجل دخولك للوصول إلى حسابك
+                  </CardDescription>
+                </>
+              ) : (
+                <>
+                  <CardTitle className="text-2xl font-bold text-gray-900">انضم إلينا</CardTitle>
+                  <CardDescription className="text-gray-600">
+                    أنشئ حساباً جديداً وابدأ رحلتك معنا
+                  </CardDescription>
+                </>
+              )}
+
+              <Tabs
+                value={isLogin ? "login" : "register"}
+                onValueChange={(value) => {
+                  setIsLogin(value === "login")
+                  setError("")
+                }}
+                className="w-full"
+              >
+                <TabsList className="grid w-full grid-cols-2 bg-gray-100 rounded-lg p-1">
+                  <TabsTrigger
+                    value="login"
+                    className="data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md"
+                  >
+                    تسجيل الدخول
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="register"
+                    className="data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md"
+                  >
+                    إنشاء حساب
+                  </TabsTrigger>
                 </TabsList>
-
-                <TabsContent value="login">
-                  <CardTitle>مرحباً بعودتك</CardTitle>
-                  <CardDescription>سجل دخولك للوصول إلى حسابك</CardDescription>
-                </TabsContent>
-
-                <TabsContent value="register">
-                  <CardTitle>انضم إلينا</CardTitle>
-                  <CardDescription>أنشئ حساباً جديداً وابدأ رحلتك معنا</CardDescription>
-                </TabsContent>
               </Tabs>
             </CardHeader>
 
             <CardContent>
               {error && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                  {error}
+                </div>
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -160,7 +222,7 @@ export default function HomePage() {
                       type="text"
                       placeholder="أدخل اسمك الكامل"
                       value={formData.name}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                      onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
                       required
                     />
                   </div>
@@ -173,7 +235,7 @@ export default function HomePage() {
                     type="email"
                     placeholder="أدخل بريدك الإلكتروني"
                     value={formData.email}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
+                    onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
                     required
                   />
                 </div>
@@ -185,70 +247,35 @@ export default function HomePage() {
                     type="password"
                     placeholder="أدخل كلمة المرور"
                     value={formData.password}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
+                    onChange={(e) => setFormData((p) => ({ ...p, password: e.target.value }))}
                     required
                   />
                 </div>
 
                 {!isLogin && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="userType">نوع المستخدم</Label>
-                      <Select
-                        value={formData.userType}
-                        onValueChange={(value: "youth" | "admin") =>
-                          setFormData((prev) => ({ ...prev, userType: value }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="اختر نوع المستخدم" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="youth">شاب</SelectItem>
-                          <SelectItem value="admin">مدير</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {formData.userType === "youth" && (
-                      <div className="space-y-2">
-                        <Label>اهتماماتك</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {interests.map((interest) => {
-                            const Icon = interest.icon
-                            const isSelected = formData.interests.includes(interest.id)
-                            return (
-                              <Button
-                                key={interest.id}
-                                type="button"
-                                variant={isSelected ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => toggleInterest(interest.id)}
-                                className="justify-start"
-                              >
-                                <Icon className="h-4 w-4 mr-2" />
-                                {interest.label}
-                              </Button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </>
+                  <div className="space-y-2">
+                    <Label htmlFor="role">نوع المستخدم</Label>
+                    <Select
+                      value={formData.role}
+                      onValueChange={(v: UserRole) => setFormData((p) => ({ ...p, role: v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر نوع المستخدم" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="systemAdmin">مدير النظام</SelectItem>
+                        <SelectItem value="qualitySupervisor">مشرف جودة</SelectItem>
+                        <SelectItem value="entityManager">مسؤول كيان</SelectItem>
+                        <SelectItem value="youth">مستخدم</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
 
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? "جاري التحميل..." : isLogin ? "تسجيل الدخول" : "إنشاء الحساب"}
                 </Button>
               </form>
-
-              {isLogin && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
-                  <p className="font-medium mb-1">حسابات تجريبية:</p>
-                  <p>• المدير العام: admin@youth-platform.com (كلمة المرور: admin123)</p>
-                  <p>• الشاب: sara@example.com (أي كلمة مرور)</p>
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>
@@ -256,3 +283,4 @@ export default function HomePage() {
     )
   )
 }
+
