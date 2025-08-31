@@ -96,12 +96,10 @@ export function Sidebar({ userType }: SidebarProps) {
 
   return (
     <>
-      {/* Desktop Sidebar */}
       <div className="hidden md:flex h-screen w-64 flex-col fixed inset-y-0 z-50 bg-white border-r">
         <SidebarContent />
       </div>
 
-      {/* Mobile Sidebar */}
       <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
         <SheetTrigger asChild>
           <Button variant="outline" size="icon" className="md:hidden fixed top-4 left-4 z-40 bg-transparent">

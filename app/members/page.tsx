@@ -1,15 +1,17 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Users, UserPlus, Building2, Search, Plus } from "lucide-react"
+
+import { Users, UserPlus, Building2, Search } from "lucide-react"
 import { dataStore } from "@/lib/data-store"
 
 type UserRole = "systemAdmin" | "qualitySupervisor" | "entityManager" | "youth"
@@ -51,15 +53,9 @@ export default function MembersPage() {
 
   useEffect(() => {
     const s = localStorage.getItem("session")
-    if (!s) {
-      router.push("/")
-      return
-    }
+    if (!s) { router.push("/"); return }
     const parsed: Session = JSON.parse(s)
-    if (!["systemAdmin", "entityManager"].includes(parsed.role)) {
-      router.push("/dashboard")
-      return
-    }
+    if (!["systemAdmin", "entityManager"].includes(parsed.role)) { router.push("/dashboard"); return }
     setSession(parsed)
   }, [router])
 
@@ -72,16 +68,12 @@ export default function MembersPage() {
       setList(members)
 
       if (ents.length && !form.entityId) {
-        const defaultEnt =
-          (ents.find((e: any) => e.id === session?.entityId)?.id as string | undefined) ||
-          (ents[0]?.id as string | undefined)
-        if (defaultEnt) {
-          setForm((p) => ({ ...p, entityId: defaultEnt }))
-        }
+        const def =
+          ents.find((e: any) => e.id === session?.entityId)?.id ??
+          ents[0]?.id
+        if (def) setForm(p => ({ ...p, entityId: def }))
       }
-      if (session?.entityId) {
-        setFilterEntity(session.entityId)
-      }
+      if (session?.entityId) setFilterEntity(session.entityId)
     } catch {
       setEntities([])
       setList([])
@@ -133,138 +125,151 @@ export default function MembersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="mx-auto max-w-6xl space-y-6">
-        {/* العنوان */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">إدارة الأعضاء</h1>
-            <p className="text-gray-600">تسجيل الأعضاء وربطهم بالكيانات</p>
-          </div>
-          <Badge variant="secondary" className="text-sm flex items-center gap-1">
-            <Users className="h-4 w-4" />
-            {list.length} عضو
-          </Badge>
-        </div>
+    <div dir="rtl" className="relative min-h-screen overflow-hidden flex flex-col">
+      <div className="absolute inset-0 -z-10">
+        <div
+          className="w-full h-full bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/LoginPage.png')" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0d3c8f] via-[#1368d6] to-[#0a2e6a] opacity-90" />
+      </div>
 
-        {/* النموذج */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-blue-600" />
+      <div className="pointer-events-none -z-0">
+        <div className="absolute -top-10 right-14 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute top-28 left-1/3 h-40 w-40 rounded-full bg-cyan-300/10 blur-3xl" />
+        <div className="absolute bottom-24 right-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute bottom-0 left-0 h-72 w-72 -translate-x-1/4 translate-y-1/4 rounded-full bg-sky-300/10 blur-3xl" />
+      </div>
+
+      <HeaderBar />
+
+      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8">
+        <div className="rounded-[22px] bg-white/12 backdrop-blur-2xl ring-1 ring-white/25 p-5 md:p-6 text-white flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center">
+              <Users className="h-5 w-5" />
+            </span>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-extrabold">إدارة الأعضاء</h1>
+              <p className="text-white/80 text-sm">تسجيل الأعضاء وربطهم بالكيانات</p>
+            </div>
+          </div>
+          <div className="h-9 px-3 rounded-full bg-white/15 ring-1 ring-white/25 text-white/95 flex items-center">
+            {list.length} عضو
+          </div>
+        </div>
+      </section>
+
+      <main className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-6 space-y-6 pb-10 text-white">
+
+        <GlassCard className="mx-3 sm:mx-[1cm]">
+          <CardHeader className="pb-0 px-5 pt-5">
+            <CardTitle className="flex items-center gap-2 text-white">
+              <UserPlus className="h-5 w-5" />
               إضافة عضو جديد
             </CardTitle>
-            <CardDescription>أدخل بيانات العضو واختر الكيان التابع له</CardDescription>
+            <CardDescription className="text-white/80">أدخل بيانات العضو واختر الكيان التابع له</CardDescription>
           </CardHeader>
-          <CardContent>
+
+          <div className="mx-5 my-4 h-px bg-white/15" />
+
+          <CardContent className="px-5 pb-5">
             <form onSubmit={onSave} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>الكيان</Label>
-                <Select
-                  value={form.entityId}
-                  onValueChange={(v) => setForm((p) => ({ ...p, entityId: v }))}
-                >
-                  <SelectTrigger>
+              <Field label="الكيان">
+                <Select value={form.entityId} onValueChange={(v) => setForm((p) => ({ ...p, entityId: v }))}>
+                  <SelectTrigger className="h-11 rounded-xl bg-white text-slate-900 border-slate-200">
                     <SelectValue placeholder="اختر الكيان" />
                   </SelectTrigger>
                   <SelectContent>
                     {entities.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.name}
-                      </SelectItem>
+                      <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
 
-              <div className="space-y-2">
-                <Label htmlFor="name">اسم العضو</Label>
+              <Field label="اسم العضو">
                 <Input
                   id="name"
                   value={form.name}
                   onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                  className="h-11 rounded-xl bg-white text-slate-900 placeholder:text-slate-400 border-slate-200 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:border-blue-400"
                 />
-              </div>
+              </Field>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">البريد الإلكتروني</Label>
+              <Field label="البريد الإلكتروني">
                 <Input
                   id="email"
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+                  className="h-11 rounded-xl bg-white text-slate-900 placeholder:text-slate-400 border-slate-200 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:border-blue-400"
                 />
-              </div>
+              </Field>
 
-              <div className="space-y-2">
-                <Label htmlFor="phone">رقم الهاتف</Label>
+              <Field label="رقم الهاتف">
                 <Input
                   id="phone"
                   value={form.phone}
                   onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+                  className="h-11 rounded-xl bg-white text-slate-900 placeholder:text-slate-400 border-slate-200 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:border-blue-400"
                 />
-              </div>
+              </Field>
 
-              <div className="space-y-2">
-                <Label htmlFor="roleInEntity">دور العضو داخل الكيان</Label>
+              <Field label="دور العضو داخل الكيان" className="md:col-span-2">
                 <Input
                   id="roleInEntity"
                   value={form.roleInEntity}
                   onChange={(e) => setForm((p) => ({ ...p, roleInEntity: e.target.value }))}
+                  className="h-11 rounded-xl bg-white text-slate-900 placeholder:text-slate-400 border-slate-200 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:border-blue-400"
                 />
-              </div>
+              </Field>
 
               <div className="md:col-span-2 flex items-center gap-3 pt-2">
-                <Button type="submit" disabled={saving} className="gap-2">
-                  {saving ? (
-                    <>جارٍ الحفظ...</>
-                  ) : (
-                    <>
-                      <Plus className="h-4 w-4" />
-                      إضافة
-                    </>
-                  )}
+                <Button type="submit" disabled={saving} className="gap-2 h-11 rounded-full bg-white text-slate-900 font-semibold">
+                  {saving ? "جارٍ الحفظ..." : "إضافة"}
                 </Button>
-                <Button type="button" variant="outline" onClick={resetForm}>
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="h-11 px-5 rounded-full bg-white/14 hover:bg-white/22 ring-1 ring-white/25 hover:ring-white/40 text-white transition"
+                >
                   مسح الحقول
-                </Button>
+                </button>
               </div>
             </form>
           </CardContent>
-        </Card>
+        </GlassCard>
 
-        {/* الفلاتر + القائمة */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle>قائمة الأعضاء</CardTitle>
-            <CardDescription>فلترة حسب الكيان أو البحث بالاسم/البريد/الهاتف</CardDescription>
+        <GlassCard className="mx-3 sm:mx-[1cm]">
+          <CardHeader className="pb-0 px-5 pt-5">
+            <CardTitle className="text-white">قائمة الأعضاء</CardTitle>
+            <CardDescription className="text-white/80">فلترة حسب الكيان أو البحث بالاسم/البريد/الهاتف</CardDescription>
           </CardHeader>
-          <CardContent>
+
+          <CardContent className="px-5 pb-5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-              <div className="space-y-2">
-                <Label>فلتر الكيان</Label>
+              <Field label="فلتر الكيان">
                 <Select value={filterEntity} onValueChange={setFilterEntity}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-11 rounded-xl bg-white text-slate-900 border-slate-200">
                     <SelectValue placeholder="جميع الكيانات" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">جميع الكيانات</SelectItem>
                     {entities.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.name}
-                      </SelectItem>
+                      <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
 
-              <div className="space-y-2 md:col-span-2">
-                <Label>بحث</Label>
+              <div className="md:col-span-2">
+                <Label className="text-white/90 text-sm">بحث</Label>
                 <div className="relative">
-                  <Search className="absolute top-1/2 -translate-y-1/2 right-3 h-4 w-4 text-gray-400" />
+                  <Search className="absolute top-1/2 -translate-y-1/2 right-3 h-4 w-4 text-slate-400" />
                   <Input
                     placeholder="ابحث بالاسم/البريد/الهاتف..."
-                    className="pr-9"
+                    className="pr-9 h-11 rounded-xl bg-white text-slate-900 placeholder:text-slate-400 border-slate-200 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:border-blue-400"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
@@ -273,30 +278,33 @@ export default function MembersPage() {
             </div>
 
             {filtered.length === 0 ? (
-              <div className="text-center py-10 text-gray-500">لا يوجد أعضاء لعرضهم</div>
+              <div className="text-center py-10 text-white/70">لا يوجد أعضاء لعرضهم</div>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-3">
                 {filtered.map((m) => {
                   const ent = entities.find((e) => e.id === m.entityId)
                   return (
-                    <li key={m.id} className="p-3 rounded border bg-white flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="rounded-full bg-blue-100 text-blue-700 w-8 h-8 grid place-items-center">
-                          <Users className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{m.name}</div>
-                          <div className="text-xs text-gray-500">
-                            {m.email || "-"} • {m.phone || "-"}
+                    <li
+                      key={m.id}
+                      className="rounded-2xl bg-white/12 backdrop-blur-2xl ring-1 ring-white/20 p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="rounded-xl bg-white/15 h-10 w-10 grid place-items-center ring-1 ring-white/20">
+                            <Users className="h-5 w-5 text-white/90" />
+                          </div>
+                          <div className="space-y-0.5">
+                            <div className="font-semibold text-white">{m.name}</div>
+                            <div className="text-xs text-white/80">{m.email || "—"} • {m.phone || "—"}</div>
                           </div>
                         </div>
-                      </div>
-                      <div className="text-xs text-gray-500 text-right">
-                        <div className="flex items-center gap-1 justify-end">
-                          <Building2 className="h-3 w-3" />
-                          <span>{ent?.name || "بدون كيان"}</span>
+                        <div className="text-xs text-white/80 text-right">
+                          <div className="flex items-center gap-1 justify-end">
+                            <Building2 className="h-3 w-3" />
+                            <span>{ent?.name || "بدون كيان"}</span>
+                          </div>
+                          {m.roleInEntity && <div className="mt-1">الدور: {m.roleInEntity}</div>}
                         </div>
-                        {m.roleInEntity && <div className="mt-1">الدور: {m.roleInEntity}</div>}
                       </div>
                     </li>
                   )
@@ -304,10 +312,65 @@ export default function MembersPage() {
               </ul>
             )}
           </CardContent>
-        </Card>
+        </GlassCard>
+      </main>
+    </div>
+  )
+}
 
-        <Separator className="opacity-0" />
+
+function HeaderBar() {
+  const pathname = usePathname()
+  const linkCls = (href: string) =>
+    `px-3 py-1 rounded-lg transition ${
+      pathname === href ? "bg-white/15 text-white" : "text-white/85 hover:text-white"
+    }`
+
+  return (
+    <header className="relative z-10">
+      <div className="mx-auto max-w-6xl px-4">
+        <div className="mt-4 h-14 w-full rounded-2xl bg-white/10 backdrop-blur-xl ring-1 ring-white/20 flex items-center justify-between px-4">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-xl bg-white/20 flex items-center justify-center">
+              <Users className="h-5 w-5 text-white/90" />
+            </div>
+            <Link href="/" className="text-white font-semibold">منصة الكيانات الشبابية</Link>
+          </div>
+          <nav className="hidden sm:flex items-center gap-1 text-sm">
+            <Link href="/" className={linkCls("/")}>الرئيسية</Link>
+            <Link href="/about" className={linkCls("/about")}>عن المنصة</Link>
+            <Link href="/support" className={linkCls("/support")}>الدعم</Link>
+            <Link href="/dashboard" className={linkCls("/dashboard")}>لوحة التحكم</Link>
+            <Link href="/members" className={linkCls("/members")}>الأعضاء</Link>
+
+          </nav>
+        </div>
       </div>
+    </header>
+  )
+}
+
+function Field({
+  label,
+  children,
+  className = "",
+}: {
+  label: string
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <label className={`block space-y-1 ${className}`}>
+      <span className="text-white/90 text-sm">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-2xl bg-white/12 backdrop-blur-2xl ring-1 ring-white/20 text-white ${className}`}>
+      {children}
     </div>
   )
 }

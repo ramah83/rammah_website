@@ -1,32 +1,25 @@
-// app/reports/page.tsx
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
+
 import { Users, Building2, CalendarDays, ShieldCheck, Filter } from "lucide-react"
 import { dataStore } from "@/lib/data-store"
 
 type UserRole = "systemAdmin" | "qualitySupervisor" | "entityManager" | "youth"
-
-type Session = {
-  id: string
-  email: string
-  name: string
-  role: UserRole
-  entityId?: string | null
-}
-
+type Session = { id: string; email: string; name: string; role: UserRole; entityId?: string | null }
 type RangeKey = "7" | "30" | "90" | "all"
 
 export default function ReportsPage() {
   const router = useRouter()
 
-  // ---- state (كل الhooks هنا فوق) ----
   const [session, setSession] = useState<Session | null>(null)
 
   const [entities, setEntities] = useState<any[]>([])
@@ -34,28 +27,20 @@ export default function ReportsPage() {
   const [events, setEvents] = useState<any[]>([])
   const [iso, setISO] = useState<any[]>([])
 
-  // فلاتر
   const [range, setRange] = useState<RangeKey>("30")
   const [entityFilter, setEntityFilter] = useState<string>("all")
   const [search, setSearch] = useState("")
 
-  // ---- تأكيد الجلسة (بدون return مبكر) ----
   useEffect(() => {
     try {
       const s = localStorage.getItem("session")
-      if (!s) {
-        setSession(null)
-        router.replace("/")
-        return
-      }
+      if (!s) { setSession(null); router.replace("/"); return }
       setSession(JSON.parse(s))
     } catch {
-      setSession(null)
-      router.replace("/")
+      setSession(null); router.replace("/")
     }
   }, [router])
 
-  // ---- تحميل الداتا من dataStore (بدون return) ----
   useEffect(() => {
     const safe = <T,>(fn?: () => T[] | undefined) => (typeof fn === "function" ? fn() ?? [] : [])
     try {
@@ -68,7 +53,6 @@ export default function ReportsPage() {
     }
   }, [])
 
-  // ---- helpers ثابتة ----
   const withinRange = (dateStr?: string) => {
     if (!dateStr) return true
     if (range === "all") return true
@@ -78,24 +62,16 @@ export default function ReportsPage() {
     return d >= limit
   }
 
-  // ---- فلترة حسب الكيان والزمن والبحث (useMemo تُستدعى دائمًا) ----
   const filtered = useMemo(() => {
-    const filterByEntity = (entityId?: string) => {
-      if (entityFilter === "all") return true
-      return (entityId ?? "") === entityFilter
-    }
+    const filterByEntity = (entityId?: string) => (entityFilter === "all" ? true : (entityId ?? "") === entityFilter)
     const q = search.trim().toLowerCase()
 
-    const ents = (entities || []).filter((e) =>
-      q ? String(e.name ?? "").toLowerCase().includes(q) : true
-    )
+    const ents = (entities || []).filter((e) => (q ? String(e.name ?? "").toLowerCase().includes(q) : true))
 
     const mems = (members || [])
       .filter((m) => filterByEntity(m.entityId))
       .filter((m) =>
-        q
-          ? [m.name, m.email, m.phone].filter(Boolean).join(" ").toLowerCase().includes(q)
-          : true
+        q ? [m.name, m.email, m.phone].filter(Boolean).join(" ").toLowerCase().includes(q) : true
       )
 
     const evs = (events || [])
@@ -112,7 +88,6 @@ export default function ReportsPage() {
     return { ents, mems, evs, isoForms }
   }, [entities, members, events, iso, entityFilter, range, search])
 
-  // ---- KPIs ----
   const kpis = useMemo(
     () => ({
       entities: filtered.ents.length,
@@ -123,7 +98,6 @@ export default function ReportsPage() {
     [filtered]
   )
 
-  // ---- تجميع حسب الكيان ----
   const byEntity = useMemo(() => {
     const nameOf = (id?: string) => entities.find((e) => e.id === id)?.name || "غير محدد"
     const group: Record<string, { name: string; members: number; events: number; iso: number }> = {}
@@ -148,7 +122,6 @@ export default function ReportsPage() {
       .slice(0, 6)
   }, [filtered, entities])
 
-  // ---- توزيع الحالات ----
   const eventStatusDist = useMemo(() => {
     const dist: Record<string, number> = { draft: 0, approved: 0, cancelled: 0, done: 0 }
     filtered.evs.forEach((ev) => { dist[ev.status] = (dist[ev.status] || 0) + 1 })
@@ -161,84 +134,85 @@ export default function ReportsPage() {
     return dist
   }, [filtered.isoForms])
 
-  // ---- progress bar بسيط ----
-  function Bar({ value = 0, max = 1 }: { value: number; max: number }) {
-    const pct = max > 0 ? Math.round((value / max) * 100) : 0
-    return (
-      <div className="w-full h-2 rounded bg-gray-100 overflow-hidden">
-        <div className="h-2 bg-blue-600" style={{ width: `${pct}%` }} />
-      </div>
-    )
-  }
-
   const maxEntityMetric = Math.max(1, ...byEntity.map((x) => x.members + x.events + x.iso))
 
-  // ---- JSX ----
+  if (!session) return null
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <div className="flex items-center justify-between">
+    <div dir="rtl" className="relative min-h-screen overflow-hidden flex flex-col">
+
+      <div className="absolute inset-0 -z-10">
+        <div className="w-full h-full bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/LoginPage.png')" }} />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0d3c8f] via-[#1368d6] to-[#0a2e6a] opacity-90" />
+      </div>
+
+
+      <div className="pointer-events-none -z-0">
+        <div className="absolute -top-10 right-14 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute top-28 left-1/3 h-40 w-40 rounded-full bg-cyan-300/10 blur-3xl" />
+        <div className="absolute bottom-24 right-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute bottom-0 left-0 h-72 w-72 -translate-x-1/4 translate-y-1/4 rounded-full bg-sky-300/10 blur-3xl" />
+      </div>
+
+
+      <HeaderBar />
+
+
+      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8">
+        <div className="rounded-[22px] bg-white/12 backdrop-blur-2xl ring-1 ring-white/25 p-5 md:p-6 text-white flex items-center justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">التقارير ولوحات البيانات</h1>
-            <p className="text-gray-600">ملخصات ديناميكية مبنية على البيانات الحالية</p>
+            <h1 className="text-2xl md:text-3xl font-extrabold">التقارير ولوحات البيانات</h1>
+            <p className="text-white/80 text-sm">ملخصات ديناميكية مبنية على البيانات الحالية</p>
           </div>
         </div>
+      </section>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-gray-600">الكيانات</CardTitle>
-              <CardDescription className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-blue-600" /> إجمالي الكيانات
-              </CardDescription>
-            </CardHeader>
-            <CardContent><div className="text-2xl font-bold">{kpis.entities}</div></CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-gray-600">الأعضاء</CardTitle>
-              <CardDescription className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-blue-600" /> إجمالي الأعضاء
-              </CardDescription>
-            </CardHeader>
-            <CardContent><div className="text-2xl font-bold">{kpis.members}</div></CardContent>
-          </Card>
+      <main className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-6 space-y-6 pb-10 text-white">
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-gray-600">الفعاليات</CardTitle>
-              <CardDescription className="flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-blue-600" /> فعاليات في المدى المحدد
-              </CardDescription>
-            </CardHeader>
-            <CardContent><div className="text-2xl font-bold">{kpis.events}</div></CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-gray-600">نماذج ISO</CardTitle>
-              <CardDescription className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-blue-600" /> إجمالي النماذج
-              </CardDescription>
-            </CardHeader>
-            <CardContent><div className="text-2xl font-bold">{kpis.iso}</div></CardContent>
-          </Card>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mx-3 sm:mx-[1cm]">
+          <GlassStat
+            title="الكيانات"
+            subtitle="إجمالي الكيانات"
+            icon={<Building2 className="h-4 w-4" />}
+            value={kpis.entities}
+          />
+          <GlassStat
+            title="الأعضاء"
+            subtitle="إجمالي الأعضاء"
+            icon={<Users className="h-4 w-4" />}
+            value={kpis.members}
+          />
+          <GlassStat
+            title="الفعاليات"
+            subtitle={`في المدى (${range === "all" ? "كل الوقت" : `آخر ${range} يوم`})`}
+            icon={<CalendarDays className="h-4 w-4" />}
+            value={kpis.events}
+          />
+          <GlassStat
+            title="نماذج ISO"
+            subtitle="إجمالي النماذج"
+            icon={<ShieldCheck className="h-4 w-4" />}
+            value={kpis.iso}
+          />
         </div>
 
-        {/* فلاتر عامة */}
-        <Card>
-          <CardHeader className="pb-0">
-            <CardTitle className="flex items-center gap-2"><Filter className="h-4 w-4" /> الفلاتر</CardTitle>
-            <CardDescription>طبّق فلاتر عامة على التقارير</CardDescription>
+
+        <GlassCard className="mx-3 sm:mx-[1cm]">
+          <CardHeader className="pb-0 px-5 pt-5">
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Filter className="h-4 w-4" /> الفلاتر
+            </CardTitle>
+            <CardDescription className="text-white/80">طبّق فلاتر عامة على التقارير</CardDescription>
           </CardHeader>
-          <CardContent className="pt-4">
+          <CardContent className="pt-4 px-5 pb-5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <div className="text-xs text-gray-600 mb-1">المدى الزمني</div>
+              <Field label="المدى الزمني">
                 <Select value={range} onValueChange={(v: RangeKey) => setRange(v)}>
-                  <SelectTrigger><SelectValue placeholder="اختر المدى" /></SelectTrigger>
+                  <SelectTrigger className="h-11 rounded-xl bg-white text-slate-900 border-slate-200">
+                    <SelectValue placeholder="اختر المدى" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="7">آخر 7 أيام</SelectItem>
                     <SelectItem value="30">آخر 30 يوم</SelectItem>
@@ -246,11 +220,13 @@ export default function ReportsPage() {
                     <SelectItem value="all">كل الوقت</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div>
-                <div className="text-xs text-gray-600 mb-1">الكيان</div>
+              </Field>
+
+              <Field label="الكيان">
                 <Select value={entityFilter} onValueChange={setEntityFilter}>
-                  <SelectTrigger><SelectValue placeholder="كل الكيانات" /></SelectTrigger>
+                  <SelectTrigger className="h-11 rounded-xl bg-white text-slate-900 border-slate-200">
+                    <SelectValue placeholder="كل الكيانات" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">جميع الكيانات</SelectItem>
                     {entities.map((e, i) => (
@@ -258,60 +234,63 @@ export default function ReportsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div>
-                <div className="text-xs text-gray-600 mb-1">بحث</div>
+              </Field>
+
+              <Field label="بحث">
                 <Input
                   placeholder="ابحث باسم كيان/عضو/فعالية/نموذج..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  className="h-11 rounded-xl bg-white text-slate-900 placeholder:text-slate-400 border-slate-200 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:border-blue-400"
                 />
-              </div>
+              </Field>
             </div>
           </CardContent>
-        </Card>
+        </GlassCard>
 
-        {/* أعلى الكيانات نشاطًا */}
-        <Card>
-          <CardHeader>
-            <CardTitle>أعلى الكيانات نشاطًا</CardTitle>
-            <CardDescription>مجموع (أعضاء + فعاليات + ISO) بعد تطبيق الفلاتر</CardDescription>
+
+        <GlassCard className="mx-3 sm:mx-[1cm]">
+          <CardHeader className="px-5 pt-5">
+            <CardTitle className="text-white">أعلى الكيانات نشاطًا</CardTitle>
+            <CardDescription className="text-white/80">
+              مجموع (أعضاء + فعاليات + ISO) بعد تطبيق الفلاتر
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-3 px-5 pb-5">
             {byEntity.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">لا توجد بيانات للعرض</div>
+              <div className="text-center text-white/70 py-8">لا توجد بيانات للعرض</div>
             ) : (
               byEntity.map((row) => {
                 const total = row.members + row.events + row.iso
                 return (
                   <div key={row.entityId} className="grid grid-cols-1 md:grid-cols-4 items-center gap-2">
                     <div className="md:col-span-1">
-                      <div className="font-medium">{row.name}</div>
-                      <div className="text-xs text-gray-500">إجمالي: {total}</div>
+                      <div className="font-semibold text-white">{row.name}</div>
+                      <div className="text-xs text-white/80">إجمالي: {total}</div>
                     </div>
                     <div className="md:col-span-3 space-y-1">
-                      <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center justify-between text-xs text-white/85">
                         <span>أعضاء ({row.members})</span>
                         <span>فعاليات ({row.events})</span>
                         <span>ISO ({row.iso})</span>
                       </div>
-                      <Bar value={total} max={maxEntityMetric} />
+                      <GlassBar value={total} max={maxEntityMetric} />
                     </div>
                   </div>
                 )
               })
             )}
           </CardContent>
-        </Card>
+        </GlassCard>
 
-        {/* توزيع الحالات */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>توزيع حالات الفعاليات</CardTitle>
-              <CardDescription>بعد تطبيق الفلاتر</CardDescription>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mx-3 sm:mx-[1cm]">
+          <GlassCard>
+            <CardHeader className="px-5 pt-5">
+              <CardTitle className="text-white">توزيع حالات الفعاليات</CardTitle>
+              <CardDescription className="text-white/80">بعد تطبيق الفلاتر</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-3 px-5 pb-5">
               {(["draft","approved","cancelled","done"] as const).map((st) => {
                 const v = eventStatusDist[st] || 0
                 const max = Math.max(1, ...Object.values(eventStatusDist))
@@ -325,19 +304,19 @@ export default function ReportsPage() {
                       </span>
                       <Badge variant="secondary">{v}</Badge>
                     </div>
-                    <Bar value={v} max={max} />
+                    <GlassBar value={v} max={max} />
                   </div>
                 )
               })}
             </CardContent>
-          </Card>
+          </GlassCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>توزيع حالات نماذج ISO</CardTitle>
-              <CardDescription>بعد تطبيق الفلاتر</CardDescription>
+          <GlassCard>
+            <CardHeader className="px-5 pt-5">
+              <CardTitle className="text-white">توزيع حالات نماذج ISO</CardTitle>
+              <CardDescription className="text-white/80">بعد تطبيق الفلاتر</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-3 px-5 pb-5">
               {(["draft","submitted","review","approved","rejected"] as const).map((st) => {
                 const v = isoStatusDist[st] || 0
                 const max = Math.max(1, ...Object.values(isoStatusDist))
@@ -352,16 +331,96 @@ export default function ReportsPage() {
                       </span>
                       <Badge variant="secondary">{v}</Badge>
                     </div>
-                    <Bar value={v} max={max} />
+                    <GlassBar value={v} max={max} />
                   </div>
                 )
               })}
             </CardContent>
-          </Card>
+          </GlassCard>
         </div>
 
         <Separator className="opacity-0" />
+      </main>
+    </div>
+  )
+}
+
+
+
+function HeaderBar() {
+  const pathname = usePathname()
+  const linkCls = (href: string) =>
+    `px-3 py-1 rounded-lg transition ${pathname === href ? "bg-white/15 text-white" : "text-white/85 hover:text-white"}`
+  return (
+    <header className="relative z-10">
+      <div className="mx-auto max-w-6xl px-4">
+        <div className="mt-4 h-14 w-full rounded-2xl bg-white/10 backdrop-blur-xl ring-1 ring-white/20 flex items-center justify-between px-4">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-xl bg-white/20 flex items-center justify-center">
+              <Building2 className="h-5 w-5 text-white/90" />
+            </div>
+            <Link href="/" className="text-white font-semibold">منصة الكيانات الشبابية</Link>
+          </div>
+          <nav className="hidden sm:flex items-center gap-1 text-sm">
+            <Link href="/" className={linkCls("/")}>الرئيسية</Link>
+            <Link href="/about" className={linkCls("/about")}>عن المنصة</Link>
+            <Link href="/support" className={linkCls("/support")}>الدعم</Link>
+            <Link href="/dashboard" className={linkCls("/dashboard")}>لوحة التحكم</Link>
+            <Link href="/reports" className={linkCls("/reports")}>التقارير</Link>
+          </nav>
+        </div>
       </div>
+    </header>
+  )
+}
+
+function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-2xl bg-white/12 backdrop-blur-2xl ring-1 ring-white/20 text-white ${className}`}>
+      {children}
+    </div>
+  )
+}
+
+function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <label className={`block space-y-1 ${className}`}>
+      <span className="text-white/90 text-sm">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function GlassStat({
+  title,
+  subtitle,
+  icon,
+  value,
+}: {
+  title: string
+  subtitle: string
+  icon: React.ReactNode
+  value: number | string
+}) {
+  return (
+    <div className="rounded-2xl bg-white/12 backdrop-blur-2xl ring-1 ring-white/20 text-white p-4">
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <div className="text-sm text-white/85">{title}</div>
+          <div className="text-xs text-white/70">{subtitle}</div>
+        </div>
+        <div className="h-9 w-9 rounded-xl bg-white/15 grid place-items-center ring-1 ring-white/20">{icon}</div>
+      </div>
+      <div className="mt-3 text-2xl font-extrabold">{value}</div>
+    </div>
+  )
+}
+
+function GlassBar({ value = 0, max = 1 }: { value: number; max: number }) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0
+  return (
+    <div className="w-full h-2 rounded-full bg-white/15 overflow-hidden ring-1 ring-white/20">
+      <div className="h-full bg-white" style={{ width: `${pct}%` }} />
     </div>
   )
 }

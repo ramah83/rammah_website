@@ -91,7 +91,7 @@ function writeDB(db: DB) {
   if (!isBrowser) return
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db))
-  } catch {/* ignore */}
+  } catch {}
 }
 
 function uid() {

@@ -13,7 +13,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "بيانات الدخول غير صحيحة" }, { status: 401 })
   }
 
-  // رجّع فقط اللي نحتاجه للسيشن على المتصفح
   return NextResponse.json({
     id: u.id,
     email: u.email,

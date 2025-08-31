@@ -1,0 +1,12 @@
+{
+  "/api/stats/route": "app/api/stats/route.js",
+  "/api/iso/route": "app/api/iso/route.js",
+  "/api/entities/route": "app/api/entities/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/page": "app/page.js",
+  "/about/page": "app/about/page.js",
+  "/support/page": "app/support/page.js",
+  "/events/page": "app/events/page.js",
+  "/iso/page": "app/iso/page.js",
+  "/dashboard/page": "app/dashboard/page.js"
+}

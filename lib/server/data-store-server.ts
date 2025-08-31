@@ -1,7 +1,7 @@
-import 'server-only'
-import { getDB, uid, ensureTables } from './sqlite'
+import "server-only"
+import { getDB, uid, ensureTables } from "./sqlite"
 
-export type UserRole = 'systemAdmin' | 'qualitySupervisor' | 'entityManager' | 'youth'
+export type UserRole = "systemAdmin" | "qualitySupervisor" | "entityManager" | "youth"
 
 export type User = {
   id: string
@@ -13,15 +13,23 @@ export type User = {
   entityId?: string | null
   permissions?: string[]
 }
+
+export type GovernanceType =
+  | "policy" | "procedure" | "minutes" | "decision" | "inquiry" | "response"
+
+export type GovernanceStatus = "draft" | "review" | "approved" | "archived"
+
 export type GovernanceItem = {
   id: string
   title: string
-  type?: string
-  status?: "draft" | "review" | "approved" | "rejected"
+  type: GovernanceType
+  status: GovernanceStatus
   entityId?: string | null
   createdAt: string
-  decisionDate?: string | null
+  updatedAt: string
   notes?: string | null
+  decisionDate?: string | null
+  attachments?: string[]
 }
 
 export type Entity = {
@@ -48,7 +56,7 @@ export type EventItem = {
   id: string
   title: string
   date?: string
-  status: 'draft' | 'approved' | 'cancelled' | 'done'
+  status: "draft" | "approved" | "cancelled" | "done"
   entityId?: string | null
 }
 
@@ -56,17 +64,18 @@ export type ISOForm = {
   id: string
   title: string
   code?: string
-  status: 'draft' | 'submitted' | 'review' | 'approved' | 'rejected'
+  status: "draft" | "submitted" | "review" | "approved" | "rejected"
   ownerEntityId?: string | null
 }
 
 const J = (v: any) => JSON.stringify(v ?? null)
 const P = <T = any>(s: any) => {
-  try { return JSON.parse(s ?? 'null') as T }
+  try { return JSON.parse(s ?? "null") as T }
   catch { return null as any }
 }
 
 ensureTables()
+
 
 export function getUsers(): User[] {
   const rows = getDB().prepare(`SELECT * FROM users`).all()
@@ -77,7 +86,7 @@ export function getUsers(): User[] {
   }))
 }
 
-export function register(u: Omit<User, 'id'>) {
+export function register(u: Omit<User, "id">) {
   const db = getDB()
   const exists = db.prepare(`SELECT 1 FROM users WHERE email = ?`).get(u.email)
   if (exists) return null
@@ -110,7 +119,6 @@ export function login(email: string, password: string) {
   } as User
 }
 
-/* ================== Entities ================== */
 export function listEntities(): Entity[] {
   const rows = getDB()
     .prepare(`SELECT * FROM entities ORDER BY datetime(createdAt) DESC`)
@@ -118,7 +126,7 @@ export function listEntities(): Entity[] {
   return rows.map((r: any) => ({ ...r, documents: P<string[]>(r.documents) }))
 }
 
-export function addEntity(data: Omit<Entity, 'id' | 'createdAt'>): Entity {
+export function addEntity(data: Omit<Entity, "id" | "createdAt">): Entity {
   const id = uid()
   const createdAt = new Date().toISOString()
   getDB()
@@ -140,12 +148,12 @@ export function addEntity(data: Omit<Entity, 'id' | 'createdAt'>): Entity {
   return { id, ...data, createdAt }
 }
 
-/* ================== Members ================== */
+
 export function listMembers(): Member[] {
   return getDB().prepare(`SELECT * FROM members`).all() as Member[]
 }
 
-export function addMember(data: Omit<Member, 'id' | 'joinedAt'>): Member {
+export function addMember(data: Omit<Member, "id" | "joinedAt">): Member {
   const id = uid()
   const joinedAt = new Date().toISOString()
   getDB()
@@ -163,26 +171,80 @@ export function addMember(data: Omit<Member, 'id' | 'joinedAt'>): Member {
     )
   return { id, ...data, joinedAt }
 }
+
 export function listGovernance(): GovernanceItem[] {
-  return getDB().prepare(`SELECT * FROM governance ORDER BY datetime(createdAt) DESC`).all() as GovernanceItem[]
+  const rows = getDB()
+    .prepare(`SELECT * FROM governance ORDER BY datetime(createdAt) DESC`)
+    .all()
+  return rows.map((r: any) => {
+    const meta = r.meta ? JSON.parse(r.meta) : {}
+    return {
+      id: r.id,
+      title: r.title,
+      type: r.type as GovernanceType,
+      status: (r.status ?? "draft") as GovernanceStatus,
+      entityId: r.entityId ?? null,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      notes: r.description ?? null,                 // description -> notes
+      decisionDate: meta.decisionDate ?? null,
+      attachments: meta.attachments ?? [],
+    }
+  })
 }
 
-export function addGovernance(data: Omit<GovernanceItem, "id" | "createdAt">): GovernanceItem {
+export function addGovernance(input: {
+  title: string
+  type: GovernanceType
+  status?: GovernanceStatus
+  entityId?: string | null
+  notes?: string | null
+  decisionDate?: string | null
+  attachments?: string[]
+}): GovernanceItem {
+  const db = getDB()
   const id = uid()
-  const createdAt = new Date().toISOString()
-  getDB().prepare(`
-    INSERT INTO governance (id, title, type, status, entityId, createdAt, decisionDate, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, data.title, data.type ?? null, data.status ?? null, data.entityId ?? null, createdAt, data.decisionDate ?? null, data.notes ?? null)
-  return { id, createdAt, ...data }
+  const now = new Date().toISOString()
+
+  const meta = JSON.stringify({
+    decisionDate: input.decisionDate ?? null,
+    attachments: input.attachments ?? [],
+  })
+
+  db.prepare(`
+    INSERT INTO governance (id, type, title, description, entityId, status, meta, createdAt, updatedAt)
+    VALUES (?,  ?,    ?,     ?,          ?,        ?,      ?,    ?,         ?)
+  `).run(
+    id,
+    input.type,
+    input.title,
+    input.notes ?? null,
+    input.entityId ?? null,
+    input.status ?? "draft",
+    meta,
+    now,
+    now
+  )
+
+  return {
+    id,
+    title: input.title,
+    type: input.type,
+    status: input.status ?? "draft",
+    entityId: input.entityId ?? null,
+    createdAt: now,
+    updatedAt: now,
+    notes: input.notes ?? null,
+    decisionDate: input.decisionDate ?? null,
+    attachments: input.attachments ?? [],
+  }
 }
 
-/* ================== Events ================== */
 export function listEvents(): EventItem[] {
   return getDB().prepare(`SELECT * FROM events`).all() as EventItem[]
 }
 
-export function addEvent(data: Omit<EventItem, 'id'>): EventItem {
+export function addEvent(data: Omit<EventItem, "id">): EventItem {
   const id = uid()
   getDB()
     .prepare(`
@@ -193,12 +255,11 @@ export function addEvent(data: Omit<EventItem, 'id'>): EventItem {
   return { id, ...data }
 }
 
-/* ================== ISO ================== */
 export function listISO(): ISOForm[] {
   return getDB().prepare(`SELECT * FROM iso`).all() as ISOForm[]
 }
 
-export function addISO(data: Omit<ISOForm, 'id'>): ISOForm {
+export function addISO(data: Omit<ISOForm, "id">): ISOForm {
   const id = uid()
   getDB()
     .prepare(`
@@ -209,7 +270,6 @@ export function addISO(data: Omit<ISOForm, 'id'>): ISOForm {
   return { id, ...data }
 }
 
-/* ================== Utilities ================== */
 export function resetAll() {
   const db = getDB()
   db.exec(`
@@ -218,6 +278,7 @@ export function resetAll() {
     DELETE FROM members;
     DELETE FROM events;
     DELETE FROM iso;
+    DELETE FROM governance;
   `)
 }
 
@@ -227,80 +288,94 @@ export function seedIfEmpty() {
   if (c > 0) return
 
   const e1 = addEntity({
-    name: 'مركز تنمية الشباب – القاهرة',
-    type: 'مركز شباب',
-    contactEmail: 'cairo@youth.org',
-    phone: '01010000001',
-    location: 'القاهرة',
-    documents: ['سجل تجاري.pdf', 'ترخيص المركز.pdf'],
+    name: "مركز تنمية الشباب – القاهرة",
+    type: "مركز شباب",
+    contactEmail: "cairo@youth.org",
+    phone: "01010000001",
+    location: "القاهرة",
+    documents: ["سجل تجاري.pdf", "ترخيص المركز.pdf"],
   })
   const e2 = addEntity({
-    name: 'جمعية الفنون والإبداع',
-    type: 'جمعية',
-    contactEmail: 'arts@youth.org',
-    phone: '01020000002',
-    location: 'الإسكندرية',
-    documents: ['اللائحة الداخلية.pdf'],
+    name: "جمعية الفنون والإبداع",
+    type: "جمعية",
+    contactEmail: "arts@youth.org",
+    phone: "01020000002",
+    location: "الإسكندرية",
+    documents: ["اللائحة الداخلية.pdf"],
   })
   const e3 = addEntity({
-    name: 'منتدى رواد الأعمال الشباب',
-    type: 'منتدى',
-    contactEmail: 'entre@youth.org',
-    phone: '01030000003',
-    location: 'أسيوط',
+    name: "منتدى رواد الأعمال الشباب",
+    type: "منتدى",
+    contactEmail: "entre@youth.org",
+    phone: "01030000003",
+    location: "أسيوط",
     documents: [],
   })
 
   register({
-    name: 'Admin',
-    email: 'admin@youth-platform.com',
-    password: 'admin123',
-    role: 'systemAdmin',
+    name: "Admin",
+    email: "admin@youth-platform.com",
+    password: "admin123",
+    role: "systemAdmin",
     interests: [],
     permissions: [],
   })
   register({
-    name: 'Quality Lead',
-    email: 'quality@youth.org',
-    password: '123456',
-    role: 'qualitySupervisor',
+    name: "Quality Lead",
+    email: "quality@youth.org",
+    password: "123456",
+    role: "qualitySupervisor",
     interests: [],
     permissions: [],
   })
   register({
-    name: 'Entity Manager',
-    email: 'manager@youth.org',
-    password: '123456',
-    role: 'entityManager',
+    name: "Entity Manager",
+    email: "manager@youth.org",
+    password: "123456",
+    role: "entityManager",
     entityId: e1.id,
     interests: [],
     permissions: [],
   })
   register({
-    name: 'Ahmed Y',
-    email: 'ahmed@youth.org',
-    password: '123456',
-    role: 'youth',
+    name: "Ahmed Y",
+    email: "ahmed@youth.org",
+    password: "123456",
+    role: "youth",
     entityId: e1.id,
-    interests: ['ريادة الأعمال', 'الأدب'],
+    interests: ["ريادة الأعمال", "الأدب"],
     permissions: [],
   })
 
-  addMember({ name: 'محمد أحمد', email: 'm.ahmed@example.com', phone: '0101111111', entityId: e1.id })
-  addMember({ name: 'سارة علي', email: 'sara@example.com', phone: '0102222222', entityId: e1.id })
-  addMember({ name: 'نور حسن', email: 'n.hassan@example.com', phone: '0103333333', entityId: e2.id })
+  addMember({ name: "محمد أحمد", email: "m.ahmed@example.com", phone: "0101111111", entityId: e1.id })
+  addMember({ name: "سارة علي", email: "sara@example.com", phone: "0102222222", entityId: e1.id })
+  addMember({ name: "نور حسن", email: "n.hassan@example.com", phone: "0103333333", entityId: e2.id })
 
-  addEvent({ title: 'ورشة إدارة المخاطر', date: new Date().toISOString(), status: 'approved', entityId: e1.id })
-  addEvent({ title: 'حفل تكريم متطوعين', date: new Date().toISOString(), status: 'draft', entityId: e2.id })
-  addEvent({ title: 'ملتقى ابتكار للشباب', date: new Date().toISOString(), status: 'done', entityId: e3.id })
-  addEvent({ title: 'يوم مفتوح للكيانات', date: new Date().toISOString(), status: 'cancelled', entityId: e1.id })
+  addEvent({ title: "ورشة إدارة المخاطر", date: new Date().toISOString(), status: "approved", entityId: e1.id })
+  addEvent({ title: "حفل تكريم متطوعين", date: new Date().toISOString(), status: "draft", entityId: e2.id })
+  addEvent({ title: "ملتقى ابتكار للشباب", date: new Date().toISOString(), status: "done", entityId: e3.id })
+  addEvent({ title: "يوم مفتوح للكيانات", date: new Date().toISOString(), status: "cancelled", entityId: e1.id })
 
-  addISO({ title: 'إجراء تقييم المخاطر', code: 'ISO-PR-01', status: 'submitted', ownerEntityId: e1.id })
-  addISO({ title: 'سياسة حماية الطفل', code: 'ISO-PL-09', status: 'approved', ownerEntityId: e2.id })
-  addISO({ title: 'نموذج تدقيق داخلي', code: 'ISO-AU-02', status: 'review', ownerEntityId: e1.id })
-  addGovernance({ title: "اعتماد لائحة السلوك", type: "policy", status: "approved", entityId: e1.id, decisionDate: new Date().toISOString(), notes: "تمت المراجعة والاعتماد" })
-addGovernance({ title: "محضر اجتماع مجلس الإدارة", type: "meeting", status: "review", entityId: e2.id, notes: "قيد المراجعة" })
+  addISO({ title: "إجراء تقييم المخاطر", code: "ISO-PR-01", status: "submitted", ownerEntityId: e1.id })
+  addISO({ title: "سياسة حماية الطفل", code: "ISO-PL-09", status: "approved", ownerEntityId: e2.id })
+  addISO({ title: "نموذج تدقيق داخلي", code: "ISO-AU-02", status: "review", ownerEntityId: e1.id })
 
+  // Governance seed
+  addGovernance({
+    title: "اعتماد لائحة السلوك",
+    type: "policy",
+    status: "approved",
+    entityId: e1.id,
+    decisionDate: new Date().toISOString(),
+    notes: "تمت المراجعة والاعتماد",
+  })
+  addGovernance({
+    title: "محضر اجتماع مجلس الإدارة",
+    type: "minutes",              
+    status: "review",
+    entityId: e2.id,
+    notes: "قيد المراجعة",
+  })
 }
 
 export const dataStore = {
