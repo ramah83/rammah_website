@@ -4,17 +4,25 @@ import React, { useEffect, useMemo, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ClipboardList, FileText, Gavel, Plus, Search, Users } from "lucide-react"
+import { ClipboardList, FileText, Gavel, Plus, Search, Users, Trash2, Pencil, Check, X } from "lucide-react"
 
 type UserRole = "systemAdmin" | "qualitySupervisor" | "entityManager" | "youth"
 type Session = { id: string; email: string; name: string; role: UserRole; entityId?: string | null }
 type GovType = "policy" | "procedure" | "minutes" | "decision" | "inquiry" | "response"
+
+const PALETTE = {
+  bg: "#EFE6DE",     
+  text: "#1D1D1D",    
+  sub: "#4A4A4A",      
+  white: "#F6F6F6",    
+  primary: "#EC1A24",  
+  border: "#E5DED7",  
+}
 
 const typeLabel: Record<GovType, string> = {
   policy: "سياسة/لائحة",
@@ -26,12 +34,12 @@ const typeLabel: Record<GovType, string> = {
 }
 
 const typeStyle: Record<GovType, string> = {
-  policy: "bg-sky-500/15 text-sky-100 ring-1 ring-sky-400/25",
-  procedure: "bg-cyan-500/15 text-cyan-100 ring-1 ring-cyan-400/25",
-  minutes: "bg-amber-500/15 text-amber-100 ring-1 ring-amber-400/25",
-  decision: "bg-emerald-500/15 text-emerald-100 ring-1 ring-emerald-400/25",
-  inquiry: "bg-violet-500/15 text-violet-100 ring-1 ring-violet-400/25",
-  response: "bg-white/10 text-white/90 ring-1 ring-white/20",
+  policy:   "bg-white text-[#1D1D1D] ring-1 ring-[#E5DED7]",
+  procedure:"bg-[#F6F6F6] text-[#1D1D1D] ring-1 ring-[#E5DED7]",
+  minutes:  "bg-[#F6F6F6] text-[#1D1D1D] ring-1 ring-[#E5DED7]",
+  decision: "bg-[#EC1A24]/10 text-[#EC1A24] ring-1 ring-[#EC1A24]/30",
+  inquiry:  "bg-white text-[#1D1D1D] ring-1 ring-[#E5DED7]",
+  response: "bg-[#F6F6F6] text-[#1D1D1D] ring-1 ring-[#E5DED7]",
 }
 
 const typeIcon: Record<GovType, React.ReactElement> = {
@@ -56,22 +64,27 @@ export default function GovernancePage() {
   const canCreate = (role: UserRole) => ["systemAdmin", "qualitySupervisor"].includes(role)
   const [form, setForm] = useState<FormState>({ type: "policy", title: "", content: "" })
 
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState<{ title: string; notes: string; type: GovType } | null>(null)
+
   useEffect(() => {
     const s = localStorage.getItem("session")
     if (!s) { router.push("/"); return }
     setSession(JSON.parse(s))
   }, [router])
 
+  const refreshList = async () => {
+    try {
+      const res = await fetch("/api/governance", { cache: "no-store" })
+      const items = await res.json()
+      setList(Array.isArray(items) ? items : [])
+    } catch {
+      setList([])
+    }
+  }
+
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/governance", { cache: "no-store" })
-        const items = await res.json()
-        setList(Array.isArray(items) ? items : [])
-      } catch {
-        setList([])
-      }
-    })()
+    refreshList()
   }, [])
 
   const filtered = useMemo(() => {
@@ -107,15 +120,13 @@ export default function GovernancePage() {
         body: JSON.stringify({
           title: form.title.trim(),
           type: form.type,
-          notes: form.content.trim(), 
+          notes: form.content.trim(),
           status: "draft",
           entityId: session?.entityId ?? null,
         }),
       })
       if (!res.ok) throw new Error("فشل الحفظ")
-
-      const listRes = await fetch("/api/governance", { cache: "no-store" })
-      setList(await listRes.json())
+      await refreshList()
       resetForm()
     } catch (err: any) {
       alert(err?.message || "حدث خطأ")
@@ -124,63 +135,107 @@ export default function GovernancePage() {
     }
   }
 
+  const onDelete = async (id: string) => {
+    if (!confirm("هل تريد حذف هذا السجل؟")) return
+    try {
+      const res = await fetch("/api/governance", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
+      if (!res.ok) throw new Error("فشل الحذف")
+      setList(prev => prev.filter((x: any) => x.id !== id))
+    } catch (e: any) {
+      alert(e?.message || "حدث خطأ أثناء الحذف")
+    }
+  }
+
+  const startEdit = (g: any) => {
+    setEditingId(g.id)
+    setEditDraft({ title: g.title, notes: g.notes || "", type: g.type })
+  }
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditDraft(null)
+  }
+  const confirmEdit = async () => {
+    if (!editingId || !editDraft) return
+    try {
+      const res = await fetch("/api/governance", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingId,
+          title: editDraft.title,
+          notes: editDraft.notes,
+          type: editDraft.type,
+        }),
+      })
+      if (!res.ok) throw new Error("فشل التعديل")
+      await refreshList()
+      cancelEdit()
+    } catch (e: any) {
+      alert(e?.message || "حدث خطأ أثناء التعديل")
+    }
+  }
+
   return (
-    <div dir="rtl" className="relative min-h-screen overflow-hidden flex flex-col">
-      <div className="absolute inset-0 -z-10">
-        <div
-          className="w-full h-full bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/LoginPage.png')" }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0d3c8f] via-[#1368d6] to-[#0a2e6a] opacity-90" />
-      </div>
-
-      <div className="pointer-events-none -z-0">
-        <div className="absolute -top-10 right-14 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute top-28 left-1/3 h-40 w-40 rounded-full bg-cyan-300/10 blur-3xl" />
-        <div className="absolute bottom-24 right-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute bottom-0 left-0 h-72 w-72 -translate-x-1/4 translate-y-1/4 rounded-full bg-sky-300/10 blur-3xl" />
-      </div>
-
+    <div dir="rtl" className="min-h-screen" style={{ backgroundColor: PALETTE.bg }}>
       <HeaderBar />
 
-      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8">
-        <div className="rounded-[22px] bg-white/12 backdrop-blur-2xl ring-1 ring-white/25 p-5 md:p-6 text-white flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center">
-              <Gavel className="h-5 w-5" />
-            </span>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-extrabold">الحوكمة</h1>
-              <p className="text-white/80 text-sm">اللوائح، محاضر الاجتماعات، القرارات، وسجل التدقيق</p>
+      <section className="mx-auto max-w-6xl w-full px-4 pt-8">
+        <div
+          className="rounded-2xl p-5 md:p-6 shadow-sm border"
+          style={{ backgroundColor: "#FFFFFF", borderColor: PALETTE.border }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span
+                className="h-10 w-10 rounded-xl grid place-items-center"
+                style={{ backgroundColor: "#ffffff", border: `1px solid ${PALETTE.border}`, color: PALETTE.primary }}
+              >
+                <Gavel className="h-5 w-5" />
+              </span>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-extrabold" style={{ color: PALETTE.text }}>
+                  الحوكمة
+                </h1>
+                <p className="text-sm" style={{ color: PALETTE.sub }}>
+                  اللوائح، محاضر الاجتماعات، القرارات، وسجل التدقيق
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="h-9 px-3 rounded-full bg-white/15 ring-1 ring-white/25 text-white/95 flex items-center">
-            {filtered.length} عنصر
+            <div
+              className="h-9 px-3 rounded-full grid place-items-center text-sm"
+              style={{ backgroundColor: "#ffffff", color: PALETTE.text, border: `1px solid ${PALETTE.border}` }}
+            >
+              {filtered.length} عنصر
+            </div>
           </div>
         </div>
       </section>
 
-      <main className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-6 space-y-6 pb-10 text-white">
-        <GlassCard className="mx-3 sm:mx-[1cm]">
-          <CardHeader className="pb-0 px-5 pt-5 space-y-1.5">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <ClipboardList className="h-5 w-5" />
+      <main className="mx-auto max-w-6xl w-full px-4 mt-6 space-y-6 pb-12">
+
+        <Card className="shadow-sm" style={{ borderColor: PALETTE.border, backgroundColor: "#FFFFFF", color: PALETTE.text }}>
+          <CardHeader className="pb-0">
+            <CardTitle className="flex items-center gap-2" style={{ color: PALETTE.text }}>
+              <ClipboardList className="h-5 w-5" style={{ color: PALETTE.primary }} />
               إضافة سجل حوكمة
             </CardTitle>
-            <CardDescription className="text-white/80">أدخل البيانات التالية لإنشاء عنصر حوكمة جديد</CardDescription>
+            <CardDescription style={{ color: PALETTE.sub }}>
+              أدخل البيانات التالية لإنشاء عنصر جديد
+            </CardDescription>
           </CardHeader>
-
-          <div className="mx-5 my-4 h-px bg-white/15" />
-
-          <CardContent className="px-5 pb-5">
+          <div className="mx-5 my-4 h-px" style={{ backgroundColor: PALETTE.border }} />
+          <CardContent>
             <form onSubmit={onSave} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="نوع السجل">
                 <Select
                   value={form.type}
                   onValueChange={(v: GovType) => setForm(p => ({ ...p, type: v }))}
-                  disabled={!canCreate(session.role)}
                 >
-                  <SelectTrigger className="h-11 rounded-xl bg-white text-slate-900 border-slate-200">
+                  <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor: "#FFFFFF", borderColor: PALETTE.border, color: PALETTE.text }}>
                     <SelectValue placeholder="اختر النوع" />
                   </SelectTrigger>
                   <SelectContent>
@@ -199,8 +254,9 @@ export default function GovernancePage() {
                   id="title"
                   value={form.title}
                   onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-                  disabled={!canCreate(session.role)}
-                  className="h-11 rounded-xl bg-white text-slate-900 placeholder:text-slate-400 border-slate-200 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:border-blue-400"
+                  className="h-11 rounded-xl"
+                  style={{ backgroundColor: "#FFFFFF", borderColor: PALETTE.border, color: PALETTE.text }}
+                  placeholder="مثال: لائحة السلوك المهني"
                 />
               </Field>
 
@@ -210,8 +266,8 @@ export default function GovernancePage() {
                   rows={5}
                   value={form.content}
                   onChange={e => setForm(p => ({ ...p, content: e.target.value }))}
-                  disabled={!canCreate(session.role)}
-                  className="w-full rounded-xl bg-white text-slate-900 placeholder:text-slate-400 border border-slate-200 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:border-blue-400 px-3 py-2"
+                  className="w-full rounded-xl px-3 py-2 outline-none focus:ring-2"
+                  style={{ backgroundColor: "#FFFFFF", border: `1px solid ${PALETTE.border}`, color: PALETTE.text, boxShadow: "0 0 0 0 rgba(0,0,0,0)" }}
                   placeholder="اكتب تفاصيل السجل..."
                 />
               </Field>
@@ -219,30 +275,30 @@ export default function GovernancePage() {
               <div className="md:col-span-2 flex items-center gap-3 pt-2">
                 <Button
                   type="submit"
-                  disabled={!canCreate(session.role) || saving}
-                  className="gap-2 h-11 rounded-full bg-white text-slate-900 font-semibold"
+                  disabled={saving}
+                  className="gap-2 h-11 rounded-xl"
+                  style={{ backgroundColor: PALETTE.primary, color: "#FFFFFF" }}
                 >
                   {saving ? "جارٍ الحفظ..." : (<><Plus className="h-4 w-4" />حفظ</>)}
                 </Button>
-                {!canCreate(session.role) && (
-                  <span className="text-xs text-white/80">لا تملك صلاحية إنشاء سجلات حوكمة</span>
-                )}
               </div>
             </form>
           </CardContent>
-        </GlassCard>
+        </Card>
 
-        <GlassCard className="mx-3 sm:mx-[1cm]">
-          <CardHeader className="pb-0 px-5 pt-5">
-            <CardTitle className="text-white">قائمة سجلات الحوكمة</CardTitle>
-            <CardDescription className="text-white/80">فلترة حسب النوع أو البحث بالعنوان/المحتوى</CardDescription>
+        <Card className="shadow-sm" style={{ borderColor: PALETTE.border, backgroundColor: "#FFFFFF", color: PALETTE.text }}>
+          <CardHeader className="pb-0">
+            <CardTitle style={{ color: PALETTE.text }}>قائمة سجلات الحوكمة</CardTitle>
+            <CardDescription style={{ color: PALETTE.sub }}>
+              فلترة حسب النوع أو البحث بالعنوان/المحتوى
+            </CardDescription>
           </CardHeader>
 
-          <CardContent className="px-5 pb-5">
+          <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
               <Field label="فلتر النوع">
                 <Select value={filterType} onValueChange={(v: GovType | "all") => setFilterType(v)}>
-                  <SelectTrigger className="h-11 rounded-xl bg-white text-slate-900 border-slate-200">
+                  <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor: "#FFFFFF", borderColor: PALETTE.border, color: PALETTE.text }}>
                     <SelectValue placeholder="كل الأنواع" />
                   </SelectTrigger>
                   <SelectContent>
@@ -258,12 +314,13 @@ export default function GovernancePage() {
               </Field>
 
               <div className="md:col-span-2">
-                <Label className="text-white/90 text-sm">بحث</Label>
+                <Label className="text-sm" style={{ color: PALETTE.text }}>بحث</Label>
                 <div className="relative">
-                  <Search className="absolute top-1/2 -translate-y-1/2 right-3 h-4 w-4 text-slate-400" />
+                  <Search className="absolute top-1/2 -translate-y-1/2 right-3 h-4 w-4" style={{ color: "#9CA3AF" }} />
                   <Input
                     placeholder="ابحث بالعنوان/المحتوى..."
-                    className="pr-9 h-11 rounded-xl bg-white text-slate-900 placeholder:text-slate-400 border-slate-200 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:border-blue-400"
+                    className="pr-9 h-11 rounded-xl"
+                    style={{ backgroundColor: "#FFFFFF", borderColor: PALETTE.border, color: PALETTE.text }}
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                   />
@@ -272,31 +329,111 @@ export default function GovernancePage() {
             </div>
 
             {filtered.length === 0 ? (
-              <div className="text-center py-10 text-white/70">لا توجد سجلات حوكمة بعد</div>
+              <div className="text-center py-10" style={{ color: PALETTE.sub }}>لا توجد سجلات حوكمة بعد</div>
             ) : (
               <ul className="space-y-3">
                 {filtered.map((g: any) => (
                   <li
                     key={g.id}
-                    className="rounded-2xl bg-white/12 backdrop-blur-2xl ring-1 ring-white/20 p-4"
+                    className="rounded-xl p-4 hover:shadow-sm transition border"
+                    style={{ backgroundColor: "#FFFFFF", borderColor: PALETTE.border }}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <div className="font-semibold text-white">{g.title}</div>
-                        <div className="text-xs text-white/80">
-                          {g.notes || "—"}
-                        </div>
+                      <div className="space-y-1 w-full">
+                        {editingId === g.id ? (
+                          <div className="space-y-2">
+                            <Input
+                              value={editDraft?.title || ""}
+                              onChange={(e) => setEditDraft(p => ({ ...(p as any), title: e.target.value }))}
+                              className="h-10 rounded-xl"
+                              style={{ backgroundColor: "#FFFFFF", borderColor: PALETTE.border, color: PALETTE.text }}
+                            />
+                            <textarea
+                              rows={3}
+                              value={editDraft?.notes || ""}
+                              onChange={(e) => setEditDraft(p => ({ ...(p as any), notes: e.target.value }))}
+                              className="w-full rounded-xl px-3 py-2"
+                              style={{ backgroundColor: "#FFFFFF", border: `1px solid ${PALETTE.border}`, color: PALETTE.text }}
+                            />
+                            <div className="max-w-xs">
+                              <Select
+                                value={editDraft?.type || g.type}
+                                onValueChange={(v: GovType) => setEditDraft(p => ({ ...(p as any), type: v }))}
+                              >
+                                <SelectTrigger className="h-10 rounded-xl" style={{ backgroundColor: "#FFFFFF", borderColor: PALETTE.border, color: PALETTE.text }}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="policy">سياسة/لائحة</SelectItem>
+                                  <SelectItem value="procedure">إجراء</SelectItem>
+                                  <SelectItem value="minutes">محضر اجتماع</SelectItem>
+                                  <SelectItem value="decision">قرار</SelectItem>
+                                  <SelectItem value="inquiry">استفسار</SelectItem>
+                                  <SelectItem value="response">ردّ</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="font-semibold" style={{ color: PALETTE.text }}>{g.title}</div>
+                            <div className="text-xs" style={{ color: PALETTE.sub }}>{g.notes || "—"}</div>
+                          </>
+                        )}
                       </div>
-                      <div className="flex flex-col items-end gap-2">
+
+                      <div className="flex flex-col items-end gap-2 shrink-0">
                         <span className={`inline-flex items-center gap-1 h-6 px-2 rounded-full ${typeStyle[g.type as GovType]}`}>
                           {typeIcon[g.type as GovType]}
                           {typeLabel[g.type as GovType] ?? g.type}
                         </span>
                         {g.createdAt && (
-                          <span className="text-[11px] text-white/70">
+                          <span className="text-[11px]" style={{ color: PALETTE.sub }}>
                             {new Date(g.createdAt).toLocaleString("ar-EG")}
                           </span>
                         )}
+
+                        {/* أزرار الإجراءات */}
+                        <div className="flex items-center gap-2 mt-1">
+                          {editingId === g.id ? (
+                            <>
+                              <Button
+                                variant="secondary"
+                                className="h-8 px-2 rounded-lg"
+                                style={{ backgroundColor: "#FFFFFF", border: `1px solid ${PALETTE.border}`, color: PALETTE.text }}
+                                onClick={confirmEdit}
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                className="h-8 px-2 rounded-lg"
+                                style={{ backgroundColor: "#FFFFFF", border: `1px solid ${PALETTE.border}`, color: PALETTE.text }}
+                                onClick={cancelEdit}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                variant="secondary"
+                                className="h-8 px-2 rounded-lg"
+                                style={{ backgroundColor: "#FFFFFF", border: `1px solid ${PALETTE.border}`, color: PALETTE.text }}
+                                onClick={() => startEdit(g)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                className="h-8 px-2 rounded-lg"
+                                style={{ backgroundColor: "transparent", border: `1px solid ${PALETTE.primary}`, color: PALETTE.primary }}
+                                onClick={() => onDelete(g.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </li>
@@ -304,41 +441,56 @@ export default function GovernancePage() {
               </ul>
             )}
           </CardContent>
-        </GlassCard>
+        </Card>
       </main>
     </div>
   )
 }
 
-
 function HeaderBar() {
   const pathname = usePathname()
   const linkCls = (href: string) =>
-    `px-3 py-1 rounded-lg transition ${
-      pathname === href ? "bg-white/15 text-white" : "text-white/85 hover:text-white"
+    `px-3 py-2 rounded-lg text-sm transition ${
+      pathname === href
+        ? "text-white"
+        : "hover:opacity-90"
     }`
 
   return (
-    <header className="relative z-10">
+    <header
+      className="border-b sticky top-0 z-20 backdrop-blur"
+      style={{ backgroundColor: "#EFE6DECC", borderColor: PALETTE.border }}
+    >
       <div className="mx-auto max-w-6xl px-4">
-        <div className="mt-4 h-14 w-full rounded-2xl bg-white/10 backdrop-blur-xl ring-1 ring-white/20 flex items-center justify-between px-4">
+        <div className="h-14 w-full flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl bg-white/20 flex items-center justify-center">
-              <Users className="h-5 w-5 text-white/90" />
+            <div
+              className="h-8 w-8 rounded-lg grid place-items-center"
+              style={{ backgroundColor: PALETTE.primary, color: "#FFFFFF" }}
+            >
+              <Users className="h-4 w-4" />
             </div>
-            <Link href="/" className="text-white font-semibold">منصة الكيانات الشبابية</Link>
+            <Link href="/" className="font-semibold" style={{ color: PALETTE.text }}>
+              منصة الكيانات الشبابية
+            </Link>
           </div>
-          <nav className="hidden sm:flex items-center gap-1 text-sm">
-            <Link href="/" className={linkCls("/")}>الرئيسية</Link>
-            <Link href="/about" className={linkCls("/about")}>عن المنصة</Link>
-            <Link href="/support" className={linkCls("/support")}>الدعم</Link>
-            <Link href="/dashboard" className={linkCls("/dashboard")}>لوحة التحكم</Link>
-            <Link href="/governance" className={linkCls("/governance")}>الحوكمة</Link>
+          <nav className="hidden sm:flex items-center gap-1">
+            <Link href="/"         className={linkCls("/")}         style={navStyle(pathname === "/")}        >الرئيسية</Link>
+            <Link href="/about"    className={linkCls("/about")}    style={navStyle(pathname === "/about")}   >عن المنصة</Link>
+            <Link href="/support"  className={linkCls("/support")}  style={navStyle(pathname === "/support")} >الدعم</Link>
+            <Link href="/dashboard"className={linkCls("/dashboard")}style={navStyle(pathname === "/dashboard")}>لوحة التحكم</Link>
+            <Link href="/governance"className={linkCls("/governance")}style={navStyle(pathname === "/governance")}>الحوكمة</Link>
           </nav>
         </div>
       </div>
     </header>
   )
+}
+
+function navStyle(active: boolean): React.CSSProperties {
+  return active
+    ? { backgroundColor: "#EC1A24", border: "1px solid #EC1A24", color: "#FFFFFF" }
+    : { color: "#1D1D1D", border: "1px solid transparent" }
 }
 
 function Field({
@@ -352,16 +504,8 @@ function Field({
 }) {
   return (
     <label className={`block space-y-1 ${className}`}>
-      <span className="text-white/90 text-sm">{label}</span>
+      <span className="text-sm" style={{ color: PALETTE.text }}>{label}</span>
       {children}
     </label>
-  )
-}
-
-function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-2xl bg-white/12 backdrop-blur-2xl ring-1 ring-white/20 text-white ${className}`}>
-      {children}
-    </div>
   )
 }

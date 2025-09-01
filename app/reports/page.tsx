@@ -11,7 +11,6 @@ import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
 
 import { Users, Building2, CalendarDays, ShieldCheck, Filter } from "lucide-react"
-import { dataStore } from "@/lib/data-store"
 
 type UserRole = "systemAdmin" | "qualitySupervisor" | "entityManager" | "youth"
 type Session = { id: string; email: string; name: string; role: UserRole; entityId?: string | null }
@@ -19,7 +18,6 @@ type RangeKey = "7" | "30" | "90" | "all"
 
 export default function ReportsPage() {
   const router = useRouter()
-
   const [session, setSession] = useState<Session | null>(null)
 
   const [entities, setEntities] = useState<any[]>([])
@@ -30,7 +28,47 @@ export default function ReportsPage() {
   const [range, setRange] = useState<RangeKey>("30")
   const [entityFilter, setEntityFilter] = useState<string>("all")
   const [search, setSearch] = useState("")
+  const [errMsg, setErrMsg] = useState<string>("")
+  const [loading, setLoading] = useState<boolean>(true)
 
+  // Helpers to read API (يتحمّل تنسيقات رجوع مختلفة)
+  const readArray = (data: any) =>
+    Array.isArray(data)
+      ? data
+      : Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data?.entities)
+          ? data.entities
+          : Array.isArray(data?.members)
+            ? data.members
+            : Array.isArray(data?.events)
+              ? data.events
+              : []
+
+  const api = {
+    getEntities: async () => {
+      const res = await fetch("/api/entities", { cache: "no-store" })
+      if (!res.ok) throw new Error("GET /api/entities failed")
+      return readArray(await res.json())
+    },
+    getMembers: async () => {
+      const res = await fetch("/api/members", { cache: "no-store" })
+      if (!res.ok) throw new Error("GET /api/members failed")
+      return readArray(await res.json())
+    },
+    getEvents: async () => {
+      const res = await fetch("/api/events", { cache: "no-store" })
+      if (!res.ok) throw new Error("GET /api/events failed")
+      return readArray(await res.json())
+    },
+    getISO: async () => {
+      const res = await fetch("/api/iso", { cache: "no-store" })
+      if (!res.ok) throw new Error("GET /api/iso failed")
+      return readArray(await res.json())
+    },
+  }
+
+  // session
   useEffect(() => {
     try {
       const s = localStorage.getItem("session")
@@ -41,23 +79,46 @@ export default function ReportsPage() {
     }
   }, [router])
 
+  // load data from server
   useEffect(() => {
-    const safe = <T,>(fn?: () => T[] | undefined) => (typeof fn === "function" ? fn() ?? [] : [])
-    try {
-      setEntities(safe(dataStore?.listEntities))
-      setMembers(safe(dataStore?.listMembers))
-      setEvents(safe(dataStore?.listEvents))
-      setISO(safe(dataStore?.listISO))
-    } catch {
-      setEntities([]); setMembers([]); setEvents([]); setISO([])
-    }
+    let mounted = true
+    ;(async () => {
+      setLoading(true); setErrMsg("")
+      try {
+        const [ents, mems, evs, isoItems] = await Promise.all([
+          api.getEntities(),
+          api.getMembers(),
+          api.getEvents(),
+          api.getISO(),
+        ])
+        if (!mounted) return
+        setEntities(ents)
+        setMembers(mems)
+        setEvents(evs)
+        setISO(isoItems)
+      } catch (e: any) {
+        if (!mounted) return
+        setErrMsg(e?.message || "تعذّر تحميل البيانات")
+        setEntities([]); setMembers([]); setEvents([]); setISO([])
+      } finally {
+        mounted && setLoading(false)
+      }
+    })()
+    return () => { mounted = false }
   }, [])
+
+  // إذا المستخدم منتمي لكيان وفلتر الكيان ما اتحددش، نختاره تلقائيًا
+  useEffect(() => {
+    if (!session || entityFilter !== "all") return
+    if (session.entityId) setEntityFilter(session.entityId)
+  }, [session]) // intentional single-run after session
 
   const withinRange = (dateStr?: string) => {
     if (!dateStr) return true
     if (range === "all") return true
     const days = Number(range)
     const d = new Date(dateStr).getTime()
+    if (Number.isNaN(d)) return false
     const limit = Date.now() - days * 24 * 60 * 60 * 1000
     return d >= limit
   }
@@ -70,9 +131,7 @@ export default function ReportsPage() {
 
     const mems = (members || [])
       .filter((m) => filterByEntity(m.entityId))
-      .filter((m) =>
-        q ? [m.name, m.email, m.phone].filter(Boolean).join(" ").toLowerCase().includes(q) : true
-      )
+      .filter((m) => q ? [m.name, m.email, m.phone].filter(Boolean).join(" ").toLowerCase().includes(q) : true)
 
     const evs = (events || [])
       .filter((ev) => filterByEntity(ev.entityId))
@@ -81,20 +140,13 @@ export default function ReportsPage() {
 
     const isoForms = (iso || [])
       .filter((f) => filterByEntity(f.ownerEntityId))
-      .filter((f) =>
-        q ? [f.title, f.code, f.status].filter(Boolean).join(" ").toLowerCase().includes(q) : true
-      )
+      .filter((f) => q ? [f.title, f.code, f.status].filter(Boolean).join(" ").toLowerCase().includes(q) : true)
 
     return { ents, mems, evs, isoForms }
   }, [entities, members, events, iso, entityFilter, range, search])
 
   const kpis = useMemo(
-    () => ({
-      entities: filtered.ents.length,
-      members: filtered.mems.length,
-      events: filtered.evs.length,
-      iso: filtered.isoForms.length,
-    }),
+    () => ({ entities: filtered.ents.length, members: filtered.mems.length, events: filtered.evs.length, iso: filtered.isoForms.length }),
     [filtered]
   )
 
@@ -139,78 +191,38 @@ export default function ReportsPage() {
   if (!session) return null
 
   return (
-    <div dir="rtl" className="relative min-h-screen overflow-hidden flex flex-col">
-
-      <div className="absolute inset-0 -z-10">
-        <div className="w-full h-full bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/LoginPage.png')" }} />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0d3c8f] via-[#1368d6] to-[#0a2e6a] opacity-90" />
-      </div>
-
-
-      <div className="pointer-events-none -z-0">
-        <div className="absolute -top-10 right-14 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute top-28 left-1/3 h-40 w-40 rounded-full bg-cyan-300/10 blur-3xl" />
-        <div className="absolute bottom-24 right-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute bottom-0 left-0 h-72 w-72 -translate-x-1/4 translate-y-1/4 rounded-full bg-sky-300/10 blur-3xl" />
-      </div>
-
-
+    <div dir="rtl" className="relative min-h-screen overflow-hidden flex flex-col" style={{ backgroundColor: "#EFE6DE" }}>
       <HeaderBar />
 
-
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8">
-        <div className="rounded-[22px] bg-white/12 backdrop-blur-2xl ring-1 ring-white/25 p-5 md:p-6 text-white flex items-center justify-between">
+        <div className="rounded-[22px] p-5 md:p-6 flex items-center justify-between" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
           <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold">التقارير ولوحات البيانات</h1>
-            <p className="text-white/80 text-sm">ملخصات ديناميكية مبنية على البيانات الحالية</p>
+            <h1 className="text-2xl md:text-3xl font-extrabold" style={{ color: "#1D1D1D" }}>التقارير ولوحات البيانات</h1>
+            <p className="text-sm" style={{ color: "#6B6B6B" }}>{errMsg ? errMsg : "ملخصات ديناميكية مبنية على البيانات الحالية"}</p>
           </div>
         </div>
       </section>
 
-
-      <main className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-6 space-y-6 pb-10 text-white">
-
-
+      <main className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-6 space-y-6 pb-10" style={{ color: "#1D1D1D" }}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mx-3 sm:mx-[1cm]">
-          <GlassStat
-            title="الكيانات"
-            subtitle="إجمالي الكيانات"
-            icon={<Building2 className="h-4 w-4" />}
-            value={kpis.entities}
-          />
-          <GlassStat
-            title="الأعضاء"
-            subtitle="إجمالي الأعضاء"
-            icon={<Users className="h-4 w-4" />}
-            value={kpis.members}
-          />
-          <GlassStat
-            title="الفعاليات"
-            subtitle={`في المدى (${range === "all" ? "كل الوقت" : `آخر ${range} يوم`})`}
-            icon={<CalendarDays className="h-4 w-4" />}
-            value={kpis.events}
-          />
-          <GlassStat
-            title="نماذج ISO"
-            subtitle="إجمالي النماذج"
-            icon={<ShieldCheck className="h-4 w-4" />}
-            value={kpis.iso}
-          />
+          <SurfaceStat title="الكيانات" subtitle="إجمالي الكيانات" icon={<Building2 className="h-4 w-4" color="#1D1D1D" />} value={kpis.entities} />
+          <SurfaceStat title="الأعضاء" subtitle="إجمالي الأعضاء" icon={<Users className="h-4 w-4" color="#1D1D1D" />} value={kpis.members} />
+          <SurfaceStat title="الفعاليات" subtitle={`في المدى (${range === "all" ? "كل الوقت" : `آخر ${range} يوم`})`} icon={<CalendarDays className="h-4 w-4" color="#1D1D1D" />} value={kpis.events} />
+          <SurfaceStat title="نماذج ISO" subtitle="إجمالي النماذج" icon={<ShieldCheck className="h-4 w-4" color="#1D1D1D" />} value={kpis.iso} />
         </div>
 
-
-        <GlassCard className="mx-3 sm:mx-[1cm]">
+        <SurfaceCard className="mx-3 sm:mx-[1cm]">
           <CardHeader className="pb-0 px-5 pt-5">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <Filter className="h-4 w-4" /> الفلاتر
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-4 w-4" color="#1D1D1D" /> الفلاتر
             </CardTitle>
-            <CardDescription className="text-white/80">طبّق فلاتر عامة على التقارير</CardDescription>
+            <CardDescription style={{ color: "#6B6B6B" }}>طبّق فلاتر عامة على التقارير</CardDescription>
           </CardHeader>
           <CardContent className="pt-4 px-5 pb-5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Field label="المدى الزمني">
                 <Select value={range} onValueChange={(v: RangeKey) => setRange(v)}>
-                  <SelectTrigger className="h-11 rounded-xl bg-white text-slate-900 border-slate-200">
+                  <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E3E3E3", color: "#1D1D1D" }}>
                     <SelectValue placeholder="اختر المدى" />
                   </SelectTrigger>
                   <SelectContent>
@@ -224,7 +236,7 @@ export default function ReportsPage() {
 
               <Field label="الكيان">
                 <Select value={entityFilter} onValueChange={setEntityFilter}>
-                  <SelectTrigger className="h-11 rounded-xl bg-white text-slate-900 border-slate-200">
+                  <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E3E3E3", color: "#1D1D1D" }}>
                     <SelectValue placeholder="كل الكيانات" />
                   </SelectTrigger>
                   <SelectContent>
@@ -241,54 +253,51 @@ export default function ReportsPage() {
                   placeholder="ابحث باسم كيان/عضو/فعالية/نموذج..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="h-11 rounded-xl bg-white text-slate-900 placeholder:text-slate-400 border-slate-200 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:border-blue-400"
+                  className="h-11 rounded-xl"
+                  style={{ backgroundColor: "#FFFFFF", color: "#1D1D1D", borderColor: "#E3E3E3" }}
                 />
               </Field>
             </div>
           </CardContent>
-        </GlassCard>
+        </SurfaceCard>
 
-
-        <GlassCard className="mx-3 sm:mx-[1cm]">
+        <SurfaceCard className="mx-3 sm:mx-[1cm]">
           <CardHeader className="px-5 pt-5">
-            <CardTitle className="text-white">أعلى الكيانات نشاطًا</CardTitle>
-            <CardDescription className="text-white/80">
-              مجموع (أعضاء + فعاليات + ISO) بعد تطبيق الفلاتر
-            </CardDescription>
+            <CardTitle>أعلى الكيانات نشاطًا</CardTitle>
+            <CardDescription style={{ color: "#6B6B6B" }}>مجموع (أعضاء + فعاليات + ISO) بعد تطبيق الفلاتر</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 px-5 pb-5">
             {byEntity.length === 0 ? (
-              <div className="text-center text-white/70 py-8">لا توجد بيانات للعرض</div>
+              <div className="text-center py-8" style={{ color: "#7A7A7A" }}>{loading ? "جارٍ التحميل..." : "لا توجد بيانات للعرض"}</div>
             ) : (
               byEntity.map((row) => {
                 const total = row.members + row.events + row.iso
                 return (
                   <div key={row.entityId} className="grid grid-cols-1 md:grid-cols-4 items-center gap-2">
                     <div className="md:col-span-1">
-                      <div className="font-semibold text-white">{row.name}</div>
-                      <div className="text-xs text-white/80">إجمالي: {total}</div>
+                      <div className="font-semibold" style={{ color: "#1D1D1D" }}>{row.name}</div>
+                      <div className="text-xs" style={{ color: "#6B6B6B" }}>إجمالي: {total}</div>
                     </div>
                     <div className="md:col-span-3 space-y-1">
-                      <div className="flex items-center justify-between text-xs text-white/85">
+                      <div className="flex items-center justify-between text-xs" style={{ color: "#6B6B6B" }}>
                         <span>أعضاء ({row.members})</span>
                         <span>فعاليات ({row.events})</span>
                         <span>ISO ({row.iso})</span>
                       </div>
-                      <GlassBar value={total} max={maxEntityMetric} />
+                      <SurfaceBar value={total} max={maxEntityMetric} />
                     </div>
                   </div>
                 )
               })
             )}
           </CardContent>
-        </GlassCard>
-
+        </SurfaceCard>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mx-3 sm:mx-[1cm]">
-          <GlassCard>
+          <SurfaceCard>
             <CardHeader className="px-5 pt-5">
-              <CardTitle className="text-white">توزيع حالات الفعاليات</CardTitle>
-              <CardDescription className="text-white/80">بعد تطبيق الفلاتر</CardDescription>
+              <CardTitle>توزيع حالات الفعاليات</CardTitle>
+              <CardDescription style={{ color: "#6B6B6B" }}>بعد تطبيق الفلاتر</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 px-5 pb-5">
               {(["draft","approved","cancelled","done"] as const).map((st) => {
@@ -297,24 +306,24 @@ export default function ReportsPage() {
                 return (
                   <div key={st}>
                     <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="capitalize">
+                      <span>
                         {st === "draft" ? "مسودة" :
                          st === "approved" ? "معتمد" :
                          st === "cancelled" ? "ملغي" : "منفذ"}
                       </span>
                       <Badge variant="secondary">{v}</Badge>
                     </div>
-                    <GlassBar value={v} max={max} />
+                    <SurfaceBar value={v} max={max} />
                   </div>
                 )
               })}
             </CardContent>
-          </GlassCard>
+          </SurfaceCard>
 
-          <GlassCard>
+          <SurfaceCard>
             <CardHeader className="px-5 pt-5">
-              <CardTitle className="text-white">توزيع حالات نماذج ISO</CardTitle>
-              <CardDescription className="text-white/80">بعد تطبيق الفلاتر</CardDescription>
+              <CardTitle>توزيع حالات نماذج ISO</CardTitle>
+              <CardDescription style={{ color: "#6B6B6B" }}>بعد تطبيق الفلاتر</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 px-5 pb-5">
               {(["draft","submitted","review","approved","rejected"] as const).map((st) => {
@@ -323,7 +332,7 @@ export default function ReportsPage() {
                 return (
                   <div key={st}>
                     <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="capitalize">
+                      <span>
                         {st === "draft" ? "مسودة" :
                          st === "submitted" ? "مُقدَّم" :
                          st === "review" ? "قيد المراجعة" :
@@ -331,12 +340,12 @@ export default function ReportsPage() {
                       </span>
                       <Badge variant="secondary">{v}</Badge>
                     </div>
-                    <GlassBar value={v} max={max} />
+                    <SurfaceBar value={v} max={max} />
                   </div>
                 )
               })}
             </CardContent>
-          </GlassCard>
+          </SurfaceCard>
         </div>
 
         <Separator className="opacity-0" />
@@ -345,28 +354,42 @@ export default function ReportsPage() {
   )
 }
 
-
-
 function HeaderBar() {
   const pathname = usePathname()
-  const linkCls = (href: string) =>
-    `px-3 py-1 rounded-lg transition ${pathname === href ? "bg-white/15 text-white" : "text-white/85 hover:text-white"}`
+  const active = (href: string) => pathname === href
+
   return (
     <header className="relative z-10">
       <div className="mx-auto max-w-6xl px-4">
-        <div className="mt-4 h-14 w-full rounded-2xl bg-white/10 backdrop-blur-xl ring-1 ring-white/20 flex items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl bg-white/20 flex items-center justify-center">
-              <Building2 className="h-5 w-5 text-white/90" />
+        <div className="mt-4 h-14 w-full rounded-2xl flex items-center justify-between px-4" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 6px 12px rgba(0,0,0,0.04)" }}>
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-lg grid place-items-center" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>
+              <Building2 className="h-5 w-5" color="#1D1D1D" />
             </div>
-            <Link href="/" className="text-white font-semibold">منصة الكيانات الشبابية</Link>
+            <Link href="/" className="font-semibold" style={{ color: "#1D1D1D" }}>
+              منصة الكيانات الشبابية
+            </Link>
           </div>
           <nav className="hidden sm:flex items-center gap-1 text-sm">
-            <Link href="/" className={linkCls("/")}>الرئيسية</Link>
-            <Link href="/about" className={linkCls("/about")}>عن المنصة</Link>
-            <Link href="/support" className={linkCls("/support")}>الدعم</Link>
-            <Link href="/dashboard" className={linkCls("/dashboard")}>لوحة التحكم</Link>
-            <Link href="/reports" className={linkCls("/reports")}>التقارير</Link>
+            {[
+              { href: "/", label: "الرئيسية" },
+              { href: "/about", label: "عن المنصة" },
+              { href: "/support", label: "الدعم" },
+              { href: "/dashboard", label: "لوحة التحكم" },
+              { href: "/reports", label: "التقارير" },
+            ].map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className="px-3 py-1 rounded-lg transition"
+                style={{
+                  color: active(l.href) ? "#FFFFFF" : "#1D1D1D",
+                  backgroundColor: active(l.href) ? "#EC1A24" : "transparent",
+                }}
+              >
+                {l.label}
+              </Link>
+            ))}
           </nav>
         </div>
       </div>
@@ -374,9 +397,9 @@ function HeaderBar() {
   )
 }
 
-function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+function SurfaceCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl bg-white/12 backdrop-blur-2xl ring-1 ring-white/20 text-white ${className}`}>
+    <div className={`rounded-2xl ${className}`} style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
       {children}
     </div>
   )
@@ -385,42 +408,34 @@ function GlassCard({ children, className = "" }: { children: React.ReactNode; cl
 function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <label className={`block space-y-1 ${className}`}>
-      <span className="text-white/90 text-sm">{label}</span>
+      <span className="text-sm" style={{ color: "#1D1D1D" }}>{label}</span>
       {children}
     </label>
   )
 }
 
-function GlassStat({
-  title,
-  subtitle,
-  icon,
-  value,
-}: {
-  title: string
-  subtitle: string
-  icon: React.ReactNode
-  value: number | string
-}) {
+function SurfaceStat({ title, subtitle, icon, value }: { title: string; subtitle: string; icon: React.ReactNode; value: number | string }) {
   return (
-    <div className="rounded-2xl bg-white/12 backdrop-blur-2xl ring-1 ring-white/20 text-white p-4">
+    <div className="rounded-2xl p-4" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <div className="text-sm text-white/85">{title}</div>
-          <div className="text-xs text-white/70">{subtitle}</div>
+          <div className="text-sm" style={{ color: "#6B6B6B" }}>{title}</div>
+          <div className="text-xs" style={{ color: "#7A7A7A" }}>{subtitle}</div>
         </div>
-        <div className="h-9 w-9 rounded-xl bg-white/15 grid place-items-center ring-1 ring-white/20">{icon}</div>
+        <div className="h-9 w-9 rounded-xl grid place-items-center" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>
+          {icon}
+        </div>
       </div>
-      <div className="mt-3 text-2xl font-extrabold">{value}</div>
+      <div className="mt-3 text-2xl font-extrabold" style={{ color: "#1D1D1D" }}>{value}</div>
     </div>
   )
 }
 
-function GlassBar({ value = 0, max = 1 }: { value: number; max: number }) {
+function SurfaceBar({ value = 0, max = 1 }: { value: number; max: number }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0
   return (
-    <div className="w-full h-2 rounded-full bg-white/15 overflow-hidden ring-1 ring-white/20">
-      <div className="h-full bg-white" style={{ width: `${pct}%` }} />
+    <div className="w-full h-2 rounded-full overflow-hidden" style={{ backgroundColor: "#F1EFEA", border: "1px solid #E7E2DC" }}>
+      <div className="h-full" style={{ width: `${pct}%`, backgroundColor: "#EC1A24" }} />
     </div>
   )
 }

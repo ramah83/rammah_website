@@ -1,53 +1,61 @@
-export const runtime = "nodejs"
-export const dynamic = "force-dynamic"
-export const revalidate = 0
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-import { NextResponse } from "next/server"
-import { getDB } from "@/lib/server/sqlite"
+import { NextResponse } from "next/server";
+import { cookies, headers } from "next/headers";
+import { getEntity, listEntities, updateEntity, removeEntity } from "@/lib/server/data-store-server";
+
+type UserRole = "systemAdmin" | "qualitySupervisor" | "entityManager" | "youth";
+type Session = { id: string; email: string; name: string; role: UserRole; entityId?: string | null };
+
+async function getSession(): Promise<Session | null> {
+  try {
+    const jar = await cookies();
+    const rawCookie = jar.get("session")?.value;
+    const hdrs = await headers();
+    const rawHeader = hdrs.get("x-session");
+    const raw = rawCookie ?? rawHeader ?? null;
+    return raw ? (JSON.parse(raw) as Session) : null;
+  } catch { return null }
+}
+async function ensureRole(allowed: UserRole[]) {
+  const s = await getSession();
+  if (!s) return NextResponse.json({ error: "غير مصرح: لا توجد جلسة" }, { status: 401 });
+  if (!allowed.includes(s.role)) return NextResponse.json({ error: "ممنوع: الصلاحيات غير كافية" }, { status: 403 });
+  return null;
+}
+
+export async function GET(_req: Request, ctx: { params: { id: string } }) {
+  const one = getEntity(ctx.params.id) || listEntities().find(e => e.id === ctx.params.id);
+  if (!one) return NextResponse.json({ error: "not found" }, { status: 404 });
+  return NextResponse.json(one);
+}
 
 export async function PATCH(req: Request, ctx: { params: { id: string } }) {
-  const { id } = ctx.params
-  const patch = await req.json()
-  const db = getDB()
+  const guard = await ensureRole(["systemAdmin", "entityManager"]);
+  if (guard) return guard;
 
-  const row: any = db.prepare("SELECT * FROM entities WHERE id=?").get(id)
-  if (!row) return NextResponse.json({ error: "not found" }, { status: 404 })
+  const { id } = ctx.params;
+  const patch = await req.json();
 
-  const updated = {
-    ...row,
-    ...patch,
-    documents: JSON.stringify(patch.documents ?? (row.documents ? JSON.parse(row.documents) : [])),
-  }
-
-  db.prepare(`
-    UPDATE entities
-       SET name=?, type=?, contactEmail=?, phone=?, location=?, documents=?
-     WHERE id=?
-  `).run(
-    updated.name,
-    updated.type ?? null,
-    updated.contactEmail ?? null,
-    updated.phone ?? null,
-    updated.location ?? null,
-    updated.documents,
-    id
-  )
-
-  return NextResponse.json({
-    id,
-    name: updated.name,
-    type: updated.type ?? null,
-    contactEmail: updated.contactEmail ?? null,
-    phone: updated.phone ?? null,
-    location: updated.location ?? null,
-    documents: JSON.parse(updated.documents),
-    createdAt: row.createdAt,
-  })
+  const updated = updateEntity(id, {
+    name: patch?.name,
+    type: patch?.type,
+    contactEmail: patch?.contactEmail,
+    phone: patch?.phone,
+    location: patch?.location,
+    documents: Array.isArray(patch?.documents) ? patch.documents.map(String) : undefined,
+  });
+  if (!updated) return NextResponse.json({ error: "not found" }, { status: 404 });
+  return NextResponse.json(updated);
 }
 
 export async function DELETE(_req: Request, ctx: { params: { id: string } }) {
-  const { id } = ctx.params
-  const db = getDB()
-  db.prepare("DELETE FROM entities WHERE id=?").run(id)
-  return NextResponse.json({ ok: true })
+  // خلي الحذف للأدمن فقط
+  const guard = await ensureRole(["systemAdmin"]);
+  if (guard) return guard;
+
+  removeEntity(ctx.params.id);
+  return NextResponse.json({ ok: true });
 }

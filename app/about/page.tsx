@@ -6,42 +6,45 @@ import { Users } from "lucide-react";
 
 export default function AboutPage() {
   return (
-    <div dir="rtl" className="relative min-h-screen overflow-hidden flex flex-col">
-      {/* الخلفية (غيّر الصورة من /public/LoginPage.png لو حابب) */}
-      <div className="absolute inset-0 -z-10">
-        <div
-          className="w-full h-full bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/LoginPage.png')" }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0d3c8f] via-[#1368d6] to-[#0a2e6a] opacity-90" />
-      </div>
-
-      {/* زخارف ناعمة */}
-      <div className="pointer-events-none -z-0">
-        <div className="absolute -top-10 right-14 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute top-28 left-1/3 h-40 w-40 rounded-full bg-cyan-300/10 blur-3xl" />
-        <div className="absolute bottom-24 right-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute bottom-0 left-0 h-72 w-72 -translate-x-1/4 translate-y-1/4 rounded-full bg-sky-300/10 blur-3xl" />
-      </div>
-
-      {/* Header */}
+    <div
+      dir="rtl"
+      className="relative min-h-screen overflow-hidden flex flex-col"
+      style={{ backgroundColor: "#EFE6DE" }}
+    >
       <HeaderBar />
 
       {/* Hero */}
-      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-10 md:pt-16">
-        <div className="rounded-[24px] bg-white/12 backdrop-blur-2xl ring-1 ring-white/25 p-6 md:p-10 text-white shadow-[0_28px_80px_-24px_rgba(0,0,0,0.55)]">
+      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8 md:pt-12">
+        <div
+          className="rounded-[24px] p-6 md:p-10"
+          style={{
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E7E2DC",
+            boxShadow: "0 12px 24px rgba(0,0,0,0.06)",
+          }}
+        >
           <div className="flex items-center gap-3 mb-4">
-            <div className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center">
-              <Users className="h-5 w-5 text-white/95" />
+            <div
+              className="h-10 w-10 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}
+            >
+              <Users className="h-5 w-5" color="#1D1D1D" />
             </div>
-            <span className="text-white/90 text-sm">عن المنصة</span>
+            <span className="text-sm" style={{ color: "#6B6B6B" }}>
+              عن المنصة
+            </span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-extrabold leading-tight">
+
+          <h1
+            className="text-3xl md:text-4xl font-extrabold leading-tight"
+            style={{ color: "#1D1D1D" }}
+          >
             منصة الكيانات الشبابية
           </h1>
-          <p className="text-white/85 mt-3 md:text-lg leading-relaxed">
-            منصّة رقمية متكاملة تساعد الكيانات الشبابية على الإدارة، التنظيم، قياس الأثر، وتقديم
-            البرامج بكفاءة. نجمع بين سهولة الاستخدام وقوة التحليلات لتسريع نمو المجتمع الشبابي.
+          <p className="mt-3 md:text-lg leading-relaxed" style={{ color: "#595959" }}>
+            منصّة رقمية متكاملة تساعد الكيانات الشبابية على الإدارة، التنظيم، قياس الأثر،
+            وتقديم البرامج بكفاءة. نجمع بين سهولة الاستخدام وقوة التحليلات لتسريع نمو
+            المجتمع الشبابي.
           </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -55,8 +58,13 @@ export default function AboutPage() {
 
       {/* المزايا */}
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-8 md:mt-12">
-        <h2 className="text-white text-2xl md:text-3xl font-bold mb-4">ماذا نقدّم؟</h2>
-        <p className="text-white/80 mb-6">
+        <h2
+          className="text-2xl md:text-3xl font-bold mb-2"
+          style={{ color: "#1D1D1D" }}
+        >
+          ماذا نقدّم؟
+        </h2>
+        <p className="mb-6" style={{ color: "#6B6B6B" }}>
           أدوات متكاملة لإدارة الأعضاء والفعاليات والبرامج، مع تقارير لحظية ولوحات قياس أثر.
         </p>
 
@@ -90,7 +98,14 @@ export default function AboutPage() {
 
       {/* أرقام سريعة */}
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-8 md:mt-12">
-        <div className="rounded-2xl bg-white/10 backdrop-blur-xl ring-1 ring-white/20 p-5 md:p-7 text-white">
+        <div
+          className="rounded-2xl p-5 md:p-7"
+          style={{
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E7E2DC",
+            boxShadow: "0 8px 18px rgba(0,0,0,0.05)",
+          }}
+        >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             <Stat title="كيان مسجّل" value="120+" />
             <Stat title="برنامج مُدار" value="450+" />
@@ -102,7 +117,12 @@ export default function AboutPage() {
 
       {/* لماذا نحن */}
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-8 md:mt-12">
-        <h2 className="text-white text-2xl md:text-3xl font-bold mb-4">لماذا تختارنا؟</h2>
+        <h2
+          className="text-2xl md:text-3xl font-bold mb-4"
+          style={{ color: "#1D1D1D" }}
+        >
+          لماذا تختارنا؟
+        </h2>
         <div className="grid md:grid-cols-2 gap-4">
           <ValueCard
             title="سهولة وتجربة مستخدم"
@@ -125,23 +145,38 @@ export default function AboutPage() {
 
       {/* CTA */}
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-10 mb-10">
-        <div className="rounded-[22px] bg-white/12 backdrop-blur-2xl ring-1 ring-white/25 p-6 md:p-8 text-white flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div
+          className="rounded-[22px] p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+          style={{
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E7E2DC",
+            boxShadow: "0 12px 24px rgba(0,0,0,0.06)",
+          }}
+        >
           <div>
-            <h3 className="text-xl md:text-2xl font-bold">جاهز تبدأ رحلتك مع المنصة؟</h3>
-            <p className="text-white/85 mt-1">
+            <h3 className="text-xl md:text-2xl font-bold" style={{ color: "#1D1D1D" }}>
+              جاهز تبدأ رحلتك مع المنصة؟
+            </h3>
+            <p className="mt-1" style={{ color: "#595959" }}>
               سجّل كيانك الآن وابدأ إدارة برامجك وقياس أثرها بسهولة.
             </p>
           </div>
           <div className="flex gap-3">
             <Link
               href="/"
-              className="inline-flex items-center justify-center h-11 px-5 rounded-full bg-white text-slate-900 font-semibold"
+              className="inline-flex items-center justify-center h-11 px-5 rounded-full font-semibold"
+              style={{ backgroundColor: "#EC1A24", color: "#FFFFFF" }}
             >
               أنشئ حساباً
             </Link>
             <Link
               href="/support"
-              className="inline-flex items-center justify-center h-11 px-5 rounded-full ring-1 ring-white/60 text-white hover:bg-white/10"
+              className="inline-flex items-center justify-center h-11 px-5 rounded-full"
+              style={{
+                color: "#1D1D1D",
+                border: "1px solid #E0E0E0",
+                backgroundColor: "#FFFFFF",
+              }}
             >
               تواصل معنا
             </Link>
@@ -149,7 +184,6 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Footer */}
       <FooterBar />
     </div>
   );
@@ -159,27 +193,49 @@ export default function AboutPage() {
 
 function HeaderBar() {
   const pathname = usePathname();
-  const linkCls = (href: string) =>
-    `px-3 py-1 rounded-lg transition ${
-      pathname === href ? "bg-white/15 text-white" : "text-white/85 hover:text-white"
-    }`;
+  const active = (href: string) => pathname === href;
 
   return (
     <header className="relative z-10">
       <div className="mx-auto max-w-6xl px-4">
-        <div className="mt-4 h-14 w-full rounded-2xl bg-white/10 backdrop-blur-xl ring-1 ring-white/20 flex items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl bg-white/20 flex items-center justify-center">
-              <Users className="h-5 w-5 text-white/90" />
+        <div
+          className="mt-4 h-14 w-full rounded-2xl flex items-center justify-between px-4"
+          style={{
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E7E2DC",
+            boxShadow: "0 6px 12px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="h-8 w-8 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}
+            >
+              <Users className="h-5 w-5" color="#1D1D1D" />
             </div>
-            <Link href="/" className="text-white font-semibold">
+            <Link href="/" className="font-semibold" style={{ color: "#1D1D1D" }}>
               منصة الكيانات الشبابية
             </Link>
           </div>
+
           <nav className="hidden sm:flex items-center gap-1 text-sm">
-            <Link href="/" className={linkCls("/")}>الرئيسية</Link>
-            <Link href="/about" className={linkCls("/about")}>عن المنصة</Link>
-            <Link href="/support" className={linkCls("/support")}>الدعم</Link>
+            {[
+              { href: "/", label: "الرئيسية" },
+              { href: "/about", label: "عن المنصة" },
+              { href: "/support", label: "الدعم" },
+            ].map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className="px-3 py-1 rounded-lg transition"
+                style={{
+                  color: active(l.href) ? "#FFFFFF" : "#1D1D1D",
+                  backgroundColor: active(l.href) ? "#EC1A24" : "transparent",
+                }}
+              >
+                {l.label}
+              </Link>
+            ))}
           </nav>
         </div>
       </div>
@@ -190,15 +246,25 @@ function HeaderBar() {
 function FooterBar() {
   return (
     <footer className="relative z-10">
-      <div className="mx-auto max-w-6xl px-4 pb-4">
-        <div className="mt-6 h-12 w-full rounded-2xl bg-white/10 backdrop-blur-xl ring-1 ring-white/20 flex items-center justify-between px-4">
-          <p className="text-white/80 text-xs">
-            © {new Date().getFullYear()} منصة الكيانات الشبابية — كل الحقوق محفوظة
-          </p>
-          <div className="flex items-center gap-3 text-xs">
-            <Link className="text-white/80 hover:text-white" href="/privacy">الخصوصية</Link>
-            <span className="text-white/30">•</span>
-            <Link className="text-white/80 hover:text-white" href="/terms">الشروط</Link>
+      <div className="mx-auto max-w-6xl px-4 pb-6">
+        <div
+          className="mt-6 h-12 w-full rounded-2xl flex items-center justify-between px-4 text-xs"
+          style={{
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E7E2DC",
+            boxShadow: "0 6px 12px rgba(0,0,0,0.04)",
+            color: "#595959",
+          }}
+        >
+          <p>© {new Date().getFullYear()} منصة الكيانات الشبابية — كل الحقوق محفوظة</p>
+          <div className="flex items-center gap-3">
+            <Link href="/privacy" className="hover:underline" style={{ color: "#1D1D1D" }}>
+              الخصوصية
+            </Link>
+            <span style={{ color: "#B9B9B9" }}>•</span>
+            <Link href="/terms" className="hover:underline" style={{ color: "#1D1D1D" }}>
+              الشروط
+            </Link>
           </div>
         </div>
       </div>
@@ -208,7 +274,14 @@ function FooterBar() {
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center h-8 px-3 rounded-full bg-white/15 ring-1 ring-white/25 text-white/95 text-xs">
+    <span
+      className="inline-flex items-center h-8 px-3 rounded-full text-xs"
+      style={{
+        backgroundColor: "#F6F6F6",
+        color: "#1D1D1D",
+        border: "1px solid #E3E3E3",
+      }}
+    >
       {children}
     </span>
   );
@@ -216,9 +289,20 @@ function Badge({ children }: { children: React.ReactNode }) {
 
 function FeatureCard({ title, desc }: { title: string; desc: string }) {
   return (
-    <div className="rounded-2xl bg-white/10 backdrop-blur-xl ring-1 ring-white/20 p-5 text-white">
-      <h3 className="font-semibold text-lg">{title}</h3>
-      <p className="text-white/85 mt-1 text-sm leading-relaxed">{desc}</p>
+    <div
+      className="rounded-2xl p-5"
+      style={{
+        backgroundColor: "#FFFFFF",
+        border: "1px solid #E7E2DC",
+        boxShadow: "0 8px 18px rgba(0,0,0,0.05)",
+      }}
+    >
+      <h3 className="font-semibold text-lg" style={{ color: "#1D1D1D" }}>
+        {title}
+      </h3>
+      <p className="mt-1 text-sm leading-relaxed" style={{ color: "#595959" }}>
+        {desc}
+      </p>
     </div>
   );
 }
@@ -226,20 +310,33 @@ function FeatureCard({ title, desc }: { title: string; desc: string }) {
 function Stat({ title, value }: { title: string; value: string }) {
   return (
     <div className="space-y-1">
-      <div className="text-2xl md:text-3xl font-extrabold">{value}</div>
-      <div className="text-white/80 text-sm">{title}</div>
+      <div className="text-2xl md:text-3xl font-extrabold" style={{ color: "#1D1D1D" }}>
+        {value}
+      </div>
+      <div className="text-sm" style={{ color: "#6B6B6B" }}>
+        {title}
+      </div>
     </div>
   );
 }
 
 function ValueCard({ title, points }: { title: string; points: string[] }) {
   return (
-    <div className="rounded-2xl bg-white/10 backdrop-blur-xl ring-1 ring-white/20 p-5 text-white">
-      <h3 className="font-semibold text-lg">{title}</h3>
-      <ul className="mt-2 space-y-2 text-white/85 text-sm">
+    <div
+      className="rounded-2xl p-5"
+      style={{
+        backgroundColor: "#FFFFFF",
+        border: "1px solid #E7E2DC",
+        boxShadow: "0 8px 18px rgba(0,0,0,0.05)",
+      }}
+    >
+      <h3 className="font-semibold text-lg" style={{ color: "#1D1D1D" }}>
+        {title}
+      </h3>
+      <ul className="mt-2 space-y-2 text-sm">
         {points.map((p, i) => (
-          <li key={i} className="flex items-start gap-2">
-            <span className="mt-1 inline-block h-2 w-2 rounded-full bg-white/70" />
+          <li key={i} className="flex items-start gap-2" style={{ color: "#595959" }}>
+            <span className="mt-2 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#EC1A24" }} />
             <span>{p}</span>
           </li>
         ))}

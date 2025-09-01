@@ -12,8 +12,17 @@ import { useRouter } from "next/navigation";
 import { Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
 type UserRole = "systemAdmin" | "qualitySupervisor" | "entityManager" | "dataUser" | "youth";
 const ADMIN_EMAIL = "admin@youth-platform.com";
+
+// لوحة ألوان الهوية
+const PALETTE = {
+  black: "#1D1D1D",
+  red: "#EC1A24",
+  white: "#F6F6F6",
+  beige: "#EFE6DE",
+};
 
 function normalizeRole(role: unknown): Exclude<UserRole, "dataUser"> {
   const allowed: Array<Exclude<UserRole, "dataUser">> = [
@@ -146,36 +155,48 @@ export default function HomePage() {
 
   return (
     mounted && (
-      <div dir="rtl" className="relative min-h-screen overflow-hidden flex flex-col">
-        <div className="absolute inset-0 -z-10">
-          <div className="w-full h-full bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/LoginPage.png')" }} />
-          <div className="absolute inset-0 bg-gradient-to-br from-[#0d3c8f] via-[#1368d6] to-[#0a2e6a] opacity-90" />
-        </div>
-
-        <div className="pointer-events-none -z-0">
-          <div className="absolute -top-10 right-14 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
-          <div className="absolute top-28 left-1/3 h-40 w-40 rounded-full bg-cyan-300/10 blur-3xl" />
-          <div className="absolute bottom-24 right-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
-          <div className="absolute bottom-0 left-0 h-72 w-72 -translate-x-1/4 translate-y-1/4 rounded-full bg-sky-300/10 blur-3xl" />
-        </div>
-
+      <div
+        dir="rtl"
+        className="relative min-h-screen overflow-hidden flex flex-col"
+        style={{ backgroundColor: PALETTE.beige }}
+      >
+        {/* شريط علوي */}
         <HeaderBar />
 
-        <main className="flex-1 flex items-center justify-center p-4">
-          <div className="relative z-10 w-full max-w-[420px]">
-            <div className="text-center mb-7">
-              <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-white/10 ring-1 ring-white/20 backdrop-blur flex items-center justify-center">
-                <Users className="h-8 w-8 text-white/95" />
-              </div>
-              <h1 className="text-3xl font-extrabold text-white tracking-wide">منصة الكيانات الشبابية</h1>
-              <p className="text-white/80 mt-1 text-sm">منصة شاملة لإدارة وتنمية الكيانات الشبابية</p>
-            </div>
+        {/* مقدمة الهوية أعلى النموذج */}
+        <div className="mx-auto max-w-6xl px-4 w-full mt-6">
+          <BrandHeader />
+        </div>
 
-            <Card className="rounded-[22px] bg-white/12 backdrop-blur-2xl border-white/25 text-white shadow-[0_28px_80px_-24px_rgba(0,0,0,0.55)]">
-              <CardHeader className="text-center space-y-4 pb-3">
-                <CardTitle className="text-2xl font-bold">{isLogin ? "مرحباً بعودتك" : "انضم إلينا"}</CardTitle>
-                <CardDescription className="text-white/80">
-                  {isLogin ? "سجل دخولك للوصول إلى حسابك" : "أنشئ حساباً جديداً وابدأ رحلتك معنا"}
+        {/* المحتوى */}
+        <main className="flex-1 flex items-center justify-center p-4">
+          <div className="relative z-10 w-full max-w-[460px]">
+            <Card
+              className="rounded-[22px] border"
+              style={{
+                backgroundColor: "#FFFFFF",
+                borderColor: "#E7E2DC",
+                boxShadow:
+                  "0 12px 24px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.05)",
+              }}
+            >
+              <CardHeader className="text-center space-y-3 pb-3">
+                <div
+                  className="mx-auto mb-2 h-14 w-14 rounded-2xl flex items-center justify-center"
+                  style={{ backgroundColor: PALETTE.white, border: `1px solid #E5E5E5` }}
+                >
+                  <Users className="h-8 w-8" color={PALETTE.black} />
+                </div>
+                <CardTitle
+                  className="text-2xl font-extrabold tracking-wide"
+                  style={{ color: PALETTE.black }}
+                >
+                  {isLogin ? "مرحباً بعودتك" : "إنشاء حساب جديد"}
+                </CardTitle>
+                <CardDescription style={{ color: "#6B6B6B" }}>
+                  {isLogin
+                    ? "سجل دخولك للوصول إلى حسابك"
+                    : "أنشئ حساباً وابدأ رحلتك معنا"}
                 </CardDescription>
 
                 <Tabs
@@ -186,16 +207,29 @@ export default function HomePage() {
                   }}
                   className="w-full"
                 >
-                  <TabsList className="grid w-full grid-cols-2 bg-white/10 rounded-full p-1">
+                  <TabsList
+                    className="grid w-full grid-cols-2 rounded-full p-1"
+                    style={{ backgroundColor: PALETTE.white }}
+                  >
                     <TabsTrigger
                       value="login"
-                      className="h-10 rounded-full text-white/90 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow"
+                      className="h-10 rounded-full data-[state=active]:shadow"
+                      style={{
+                        color: PALETTE.black,
+                        backgroundColor: "transparent",
+                      }}
+                      data-state={isLogin ? "active" : undefined}
                     >
                       تسجيل الدخول
                     </TabsTrigger>
                     <TabsTrigger
                       value="register"
-                      className="h-10 rounded-full text-white/90 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow"
+                      className="h-10 rounded-full data-[state=active]:shadow"
+                      style={{
+                        color: PALETTE.black,
+                        backgroundColor: "transparent",
+                      }}
+                      data-state={!isLogin ? "active" : undefined}
                     >
                       إنشاء حساب
                     </TabsTrigger>
@@ -205,7 +239,14 @@ export default function HomePage() {
 
               <CardContent className="pt-0">
                 {error && (
-                  <div className="mb-4 p-3 rounded-lg bg-red-500/10 text-red-50 ring-1 ring-red-400/30 text-sm">
+                  <div
+                    className="mb-4 p-3 rounded-lg text-sm"
+                    style={{
+                      color: PALETTE.red,
+                      background: "#FDEBEC",
+                      border: `1px solid ${PALETTE.red}33`,
+                    }}
+                  >
                     {error}
                   </div>
                 )}
@@ -213,7 +254,9 @@ export default function HomePage() {
                 <form onSubmit={handleSubmit} className="space-y-4">
                   {!isLogin && (
                     <div className="space-y-2">
-                      <Label htmlFor="name" className="text-white/90 text-sm">الاسم الكامل</Label>
+                      <Label htmlFor="name" className="text-sm" style={{ color: PALETTE.black }}>
+                        الاسم الكامل
+                      </Label>
                       <Input
                         id="name"
                         type="text"
@@ -221,13 +264,20 @@ export default function HomePage() {
                         value={formData.name}
                         onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
                         required
-                        className="h-11 rounded-xl bg-white/95 text-slate-900 placeholder:text-slate-400 border-white/40 focus-visible:ring-white"
+                        className="h-11 rounded-xl"
+                        style={{
+                          backgroundColor: PALETTE.white,
+                          color: PALETTE.black,
+                          borderColor: "#E3E3E3",
+                        }}
                       />
                     </div>
                   )}
 
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-white/90 text-sm">البريد الإلكتروني</Label>
+                    <Label htmlFor="email" className="text-sm" style={{ color: PALETTE.black }}>
+                      البريد الإلكتروني
+                    </Label>
                     <Input
                       id="email"
                       type="email"
@@ -235,12 +285,19 @@ export default function HomePage() {
                       value={formData.email}
                       onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
                       required
-                      className="h-11 rounded-xl bg-white/95 text-slate-900 placeholder:text-slate-400 border-white/40 focus-visible:ring-white"
+                      className="h-11 rounded-xl"
+                      style={{
+                        backgroundColor: PALETTE.white,
+                        color: PALETTE.black,
+                        borderColor: "#E3E3E3",
+                      }}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="password" className="text-white/90 text-sm">كلمة المرور</Label>
+                    <Label htmlFor="password" className="text-sm" style={{ color: PALETTE.black }}>
+                      كلمة المرور
+                    </Label>
                     <Input
                       id="password"
                       type="password"
@@ -248,18 +305,32 @@ export default function HomePage() {
                       value={formData.password}
                       onChange={(e) => setFormData((p) => ({ ...p, password: e.target.value }))}
                       required
-                      className="h-11 rounded-xl bg-white/95 text-slate-900 placeholder:text-slate-400 border-white/40 focus-visible:ring-white"
+                      className="h-11 rounded-xl"
+                      style={{
+                        backgroundColor: PALETTE.white,
+                        color: PALETTE.black,
+                        borderColor: "#E3E3E3",
+                      }}
                     />
                   </div>
 
                   {!isLogin && (
                     <div className="space-y-2">
-                      <Label htmlFor="role" className="text-white/90 text-sm">نوع المستخدم</Label>
+                      <Label htmlFor="role" className="text-sm" style={{ color: PALETTE.black }}>
+                        نوع المستخدم
+                      </Label>
                       <Select
                         value={formData.role}
                         onValueChange={(v: UserRole) => setFormData((p) => ({ ...p, role: v }))}
                       >
-                        <SelectTrigger className="h-11 rounded-xl bg-white/95 text-slate-900 border-white/40 focus:ring-white">
+                        <SelectTrigger
+                          className="h-11 rounded-xl"
+                          style={{
+                            backgroundColor: PALETTE.white,
+                            color: PALETTE.black,
+                            borderColor: "#E3E3E3",
+                          }}
+                        >
                           <SelectValue placeholder="اختر نوع المستخدم" />
                         </SelectTrigger>
                         <SelectContent>
@@ -274,17 +345,23 @@ export default function HomePage() {
 
                   <Button
                     type="submit"
-                    className="w-full h-11 rounded-full bg-[#0e2e57] hover:bg-[#0b2546] text-white font-semibold border border-white/15"
+                    className="w-full h-11 rounded-full font-semibold"
                     disabled={isLoading}
+                    style={{
+                      backgroundColor: PALETTE.red,
+                      color: "#FFFFFF",
+                    }}
                   >
                     {isLoading ? "جاري التحميل..." : isLogin ? "تسجيل الدخول" : "إنشاء الحساب"}
                   </Button>
 
                   <div className="mt-2">
                     <div className="flex items-center gap-3">
-                      <span className="flex-1 h-px bg-white/20" />
-                      <span className="text-xs text-white/80">أو المتابعة بواسطة</span>
-                      <span className="flex-1 h-px bg-white/20" />
+                      <span className="flex-1 h-px" style={{ backgroundColor: "#DDD6CD" }} />
+                      <span className="text-xs" style={{ color: "#6B6B6B" }}>
+                        أو المتابعة بواسطة
+                      </span>
+                      <span className="flex-1 h-px" style={{ backgroundColor: "#DDD6CD" }} />
                     </div>
                     <div className="mt-3 flex justify-center gap-4">
                       <IconButton src="/google.svg" alt="Google" />
@@ -293,18 +370,28 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  <p className="text-center text-xs text-white/80 pt-1">
+                  <p className="text-center text-xs pt-1" style={{ color: "#6B6B6B" }}>
                     {isLogin ? (
                       <>
                         ليس لديك حساب؟{" "}
-                        <button type="button" onClick={() => setIsLogin(false)} className="underline hover:opacity-90">
+                        <button
+                          type="button"
+                          onClick={() => setIsLogin(false)}
+                          className="underline"
+                          style={{ color: PALETTE.black }}
+                        >
                           سجّل مجانًا
                         </button>
                       </>
                     ) : (
                       <>
                         لديك حساب بالفعل؟{" "}
-                        <button type="button" onClick={() => setIsLogin(true)} className="underline hover:opacity-90">
+                        <button
+                          type="button"
+                          onClick={() => setIsLogin(true)}
+                          className="underline"
+                          style={{ color: PALETTE.black }}
+                        >
                           سجّل الدخول
                         </button>
                       </>
@@ -316,47 +403,71 @@ export default function HomePage() {
           </div>
         </main>
 
+        {/* ذيل الصفحة */}
         <FooterBar />
       </div>
     )
   );
 }
 
-
+/* زر أيقونة الشبكات */
 function IconButton({ src, alt }: { src: string; alt: string }) {
   return (
     <button
       type="button"
-      className="h-10 w-10 flex items-center justify-center rounded-full bg-white/95 hover:bg-white ring-1 ring-white/40 transition"
+      className="h-10 w-10 flex items-center justify-center rounded-full transition ring-1"
+      style={{ backgroundColor: "#FFFFFF", borderColor: "#E7E7E7" }}
     >
       <img src={src} alt={alt} className="h-5 w-5" />
     </button>
   );
 }
 
+/* ترويسة الموقع بالهوية الجديدة */
 function HeaderBar() {
   const pathname = usePathname();
-
-  const linkCls = (href: string) =>
-    `px-3 py-1 rounded-lg transition ${
-      pathname === href ? "bg-white/15 text-white" : "text-white/85 hover:text-white"
-    }`;
+  const linkActive = (href: string) => pathname === href;
 
   return (
     <header className="relative z-10">
       <div className="mx-auto max-w-6xl px-4">
-        <div className="mt-4 h-14 w-full rounded-2xl bg-white/10 backdrop-blur-xl ring-1 ring-white/20 flex items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl bg-white/20 flex items-center justify-center">
-              <Users className="h-5 w-5 text-white/90" />
+        <div
+          className="mt-4 h-14 w-full rounded-2xl flex items-center justify-between px-4"
+          style={{
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E7E2DC",
+            boxShadow: "0 6px 12px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div className="flex items-center gap-3">
+            {/* لو عندك شعار SVG/PNG حطه مكان الصورة التالية */}
+            {/* مثال: <img src="/yeu-logo.svg" alt="YEU" className="h-8 w-auto" /> */}
+            <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ background: PALETTE.white }}>
+              <Users className="h-5 w-5" color={PALETTE.black} />
             </div>
-            <Link href="/" className="text-white font-semibold">منصة الكيانات الشبابية</Link>
+            <Link href="/" className="font-semibold" style={{ color: PALETTE.black }}>
+              منصة الكيانات الشبابية
+            </Link>
           </div>
 
           <nav className="hidden sm:flex items-center gap-1 text-sm">
-            <Link href="/" className={linkCls("/")}>الرئيسية</Link>
-            <Link href="/about" className={linkCls("/about")}>عن المنصة</Link>
-            <Link href="/support" className={linkCls("/support")}>الدعم</Link>
+            {[
+              { href: "/", label: "الرئيسية" },
+              { href: "/about", label: "عن المنصة" },
+              { href: "/support", label: "الدعم" },
+            ].map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className="px-3 py-1 rounded-lg transition"
+                style={{
+                  color: linkActive(l.href) ? "#FFFFFF" : PALETTE.black,
+                  backgroundColor: linkActive(l.href) ? PALETTE.red : "transparent",
+                }}
+              >
+                {l.label}
+              </Link>
+            ))}
           </nav>
         </div>
       </div>
@@ -364,23 +475,99 @@ function HeaderBar() {
   );
 }
 
+/* شريط تعريفي بالهوية (اختياري لكنه يبرز التصميم كما في الصورة) */
+function BrandHeader() {
+  return (
+    <div className="flex items-center gap-6">
+      <div className="flex items-start gap-4">
+        {/* لوغو/صورة الهوية العامة – يمكنك استبدال src بالصورة لديك */}
+        <img
+          src="/yeu-logo.png"
+          alt="YEU"
+          className="h-14 w-14 rounded-md object-contain"
+          onError={(e) => {
+            // في حال عدم وجود الصورة، نخلي المربع فارغ
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+        />
+        <div>
+          <h2
+            className="text-2xl font-extrabold leading-7"
+            style={{ color: PALETTE.black }}
+          >
+            الكيانات الشبابية
+          </h2>
+          <p className="mt-1" style={{ color: PALETTE.black }}>
+            إتحاد تنظيم الكيانات الشبابية
+          </p>
+          <p className="mt-1 text-xs tracking-wide">
+            <span style={{ color: PALETTE.red, fontWeight: 700 }}>YEU</span>{" "}
+            <span style={{ color: "#6B6B6B" }}>| Youth Entities Union</span>
+          </p>
+        </div>
+      </div>
+
+     
+    </div>
+  );
+}
+
+function Swatch({
+  label,
+  value,
+  bg,
+  fg,
+}: {
+  label: string;
+  value: string;
+  bg: string;
+  fg: string;
+}) {
+  return (
+    <div
+      className="px-4 py-2 rounded-xl text-sm border"
+      style={{
+        backgroundColor: bg,
+        color: fg,
+        borderColor: "#D9D4CD",
+        minWidth: 120,
+        textAlign: "center",
+      }}
+      title={value}
+    >
+      <div className="font-semibold">{label}</div>
+      <div className="tracking-wide">{value}</div>
+    </div>
+  );
+}
+
 function FooterBar() {
   return (
     <footer className="relative z-10">
-      <div className="mx-auto max-w-6xl px-4 pb-4">
-        <div className="mt-6 h-12 w-full rounded-2xl bg-white/10 backdrop-blur-xl ring-1 ring-white/20 flex items-center justify-between px-4">
-          <p className="text-white/80 text-xs">
+      <div className="mx-auto max-w-6xl px-4 pb-6">
+        <div
+          className="mt-6 h-12 w-full rounded-2xl flex items-center justify-between px-4 text-xs"
+          style={{
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E7E2DC",
+            boxShadow: "0 6px 12px rgba(0,0,0,0.04)",
+            color: "#595959",
+          }}
+        >
+          <p>
             © {new Date().getFullYear()} منصة الكيانات الشبابية — كل الحقوق محفوظة
           </p>
-          <div className="flex items-center gap-3 text-xs">
-            <Link href="/privacy" className="text-white/80 hover:text-white">الخصوصية</Link>
-            <span className="text-white/30">•</span>
-            <Link href="/terms" className="text-white/80 hover:text-white">الشروط</Link>
-            <span className="text-white/30">•</span>
+          <div className="flex items-center gap-3">
+            <Link href="/privacy" className="hover:underline" style={{ color: PALETTE.black }}>
+              الخصوصية
+            </Link>
+            <span style={{ color: "#B9B9B9" }}>•</span>
+            <Link href="/terms" className="hover:underline" style={{ color: PALETTE.black }}>
+              الشروط
+            </Link>
           </div>
         </div>
       </div>
     </footer>
   );
 }
-
