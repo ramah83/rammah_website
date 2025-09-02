@@ -52,7 +52,7 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
 }
 
 export async function DELETE(_req: Request, ctx: { params: { id: string } }) {
-  // خلي الحذف للأدمن فقط
+   
   const guard = await ensureRole(["systemAdmin"]);
   if (guard) return guard;
 

@@ -6,7 +6,6 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Users, Building2, CalendarDays, ShieldCheck, FileText, BarChart3, ArrowRight, LogOut } from "lucide-react"
 
 type UserRole = "systemAdmin" | "qualitySupervisor" | "entityManager" | "youth"
@@ -67,22 +66,32 @@ export default function DashboardPage() {
       })
   }, [hydrated])
 
+  const isAdminOrManager = !!session && ["systemAdmin","entityManager"].includes(session.role)
+
   const show = useMemo(() => {
-    if (!session) {
-      return { overview: true, entities: false, members: false, events: false, iso: false, governance: false, reports: false }
-    }
-    return {
+         return {
       overview: true,
-      entities: ["systemAdmin", "entityManager"].includes(session.role),
-      members: ["systemAdmin", "entityManager"].includes(session.role),
-      events: ["systemAdmin", "entityManager", "qualitySupervisor", "youth"].includes(session.role),
-      iso: ["systemAdmin", "qualitySupervisor"].includes(session.role),
-      governance: ["systemAdmin", "qualitySupervisor"].includes(session.role),
+      entities: true,
+      members: ["systemAdmin", "entityManager"].includes(session?.role || "youth"),
+      events: ["systemAdmin", "entityManager", "qualitySupervisor", "youth"].includes(session?.role || "youth"),
+      iso: ["systemAdmin", "qualitySupervisor"].includes(session?.role || "youth"),
+      governance: ["systemAdmin", "qualitySupervisor"].includes(session?.role || "youth"),
       reports: true,
     }
   }, [session])
 
   const defaultTab = "overview"
+
+     const entitiesHref = isAdminOrManager ? "/entities" : "/dashboard/requests"
+  const entitiesTitle = isAdminOrManager ? "إدارة الكيانات (Youth Entities)" : "الانضمام إلى كيان"
+  const entitiesDesc = isAdminOrManager
+    ? "إنشاء وتحديث بيانات الكيانات، المستندات، التواصل والموقع."
+    : "استعرض الكيانات واختر كيانًا لتقديم طلب الانضمام، ثم انتظر الموافقة."
+
+  const quickEntities = {
+    label: isAdminOrManager ? "إدارة الكيانات" : "اختيار كيان وطلب انضمام",
+    href: entitiesHref,
+  }
 
   return (
     <div dir="rtl" className="relative min-h-screen overflow-hidden flex flex-col" style={{ backgroundColor: "#EFE6DE" }}>
@@ -131,11 +140,13 @@ export default function DashboardPage() {
             <Tabs defaultValue={defaultTab} className="w-full">
               <TabsList className="grid grid-cols-2 md:grid-cols-6 gap-2 rounded-full p-1" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E7E2DC" }}>
                 <Tab value="overview" label="الملخص" />
+                { }
                 {show.entities && <Tab value="entities" label="الكيانات" />}
                 {show.members && <Tab value="members" label="الأعضاء" />}
                 {show.events && <Tab value="events" label="الفعاليات" />}
                 {show.iso && <Tab value="iso" label="نماذج ISO" />}
                 {show.governance && <Tab value="governance" label="الحوكمة" />}
+                {show.reports && <Tab value="reports" label="التقارير" />}
               </TabsList>
 
               <TabsContent value="overview" className="space-y-4">
@@ -150,7 +161,7 @@ export default function DashboardPage() {
                   <CardContent className="px-5 pb-5">
                     <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap py-1">
                       {[
-                        show.entities && { label: "إدارة الكيانات", href: "/entities" },
+                        { label: quickEntities.label, href: quickEntities.href },
                         show.members && { label: "إدارة الأعضاء", href: "/members" },
                         show.events && { label: "إدارة الفعاليات", href: "/events" },
                         show.iso && { label: "نماذج ISO", href: "/iso" },
@@ -169,13 +180,14 @@ export default function DashboardPage() {
                 </SurfaceCard>
               </TabsContent>
 
+              { }
               {show.entities && (
                 <TabsContent value="entities">
                   <UnitCard
                     icon={<Building2 className="h-5 w-5" color="#1D1D1D" />}
-                    title="إدارة الكيانات (Youth Entities)"
-                    desc="إنشاء وتحديث بيانات الكيانات، المستندات، التواصل والموقع."
-                    href="/entities"
+                    title={entitiesTitle}
+                    desc={entitiesDesc}
+                    href={entitiesHref}
                   />
                 </TabsContent>
               )}
@@ -345,10 +357,7 @@ function Tab({ value, label }: { value: string; label: string }) {
     <TabsTrigger
       value={value}
       className="h-10 rounded-full data-[state=active]:shadow"
-      style={{
-        color: "#1D1D1D",
-        backgroundColor: "transparent",
-      }}
+      style={{ color: "#1D1D1D", backgroundColor: "transparent" }}
     >
       {label}
     </TabsTrigger>

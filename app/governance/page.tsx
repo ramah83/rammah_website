@@ -393,7 +393,6 @@ export default function GovernancePage() {
                           </span>
                         )}
 
-                        {/* أزرار الإجراءات */}
                         <div className="flex items-center gap-2 mt-1">
                           {editingId === g.id ? (
                             <>

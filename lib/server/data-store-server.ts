@@ -1,5 +1,5 @@
 import "server-only";
-import { getDB, uid, ensureTables } from "./sqlite";
+import { getDB, uid } from "./sqlite";
 
 export type UserRole = "systemAdmin" | "qualitySupervisor" | "entityManager" | "youth";
 export type GovernanceType = "policy" | "procedure" | "minutes" | "decision" | "inquiry" | "response";
@@ -22,13 +22,12 @@ export type Entity = {
 };
 
 export type Member = {
-  id: string; name: string; email?: string; phone?: string;
+  id: string; name: string; email?: string | null; phone?: string | null;
   entityId?: string | null; roleInEntity?: string | null; joinedAt: string;
 };
 
 export type EventItem = {
-  id: string;
-  title: string;
+  id: string; title: string; date?: string | null;
   status: "draft" | "approved" | "cancelled" | "done";
   entityId?: string | null;
 };
@@ -42,16 +41,13 @@ export type ISOForm = {
 const J = (v: any) => JSON.stringify(v ?? null);
 const P = <T = any>(s: any) => { try { return JSON.parse(s ?? "null") as T } catch { return null as any } };
 
-ensureTables();
-
-/** USERS */
-export function getUsers() {
-  const rows = getDB().prepare(`SELECT * FROM users`).all();
-  return rows.map((r: any) => ({ ...r, interests: P<string[]>(r.interests), permissions: P<string[]>(r.permissions) }));
+export function getUsers(): User[] {
+  const rows = getDB().prepare(`SELECT * FROM users`).all() as any[];
+  return rows.map(r => ({ ...r, interests: P<string[]>(r.interests), permissions: P<string[]>(r.permissions) }));
 }
 export function register(u: Omit<User, "id">) {
   const db = getDB();
-  const exists = db.prepare(`SELECT 1 FROM users WHERE email = ?`).get(u.email);
+  const exists = db.prepare(`SELECT 1 FROM users WHERE email=?`).get(u.email);
   if (exists) return null;
   const id = uid();
   db.prepare(`
@@ -61,12 +57,11 @@ export function register(u: Omit<User, "id">) {
   return { id, ...u };
 }
 export function login(email: string, password: string) {
-  const r: any = getDB().prepare(`SELECT * FROM users WHERE email = ? AND password = ?`).get(email, password);
+  const r: any = getDB().prepare(`SELECT * FROM users WHERE email=? AND password=?`).get(email, password);
   if (!r) return null;
   return { ...r, interests: P<string[]>(r.interests), permissions: P<string[]>(r.permissions) } as User;
 }
 
-/** ENTITIES */
 export function getEntity(id: string): Entity | null {
   const row: any = getDB().prepare(`SELECT * FROM entities WHERE id=?`).get(id);
   if (!row) return null;
@@ -74,7 +69,7 @@ export function getEntity(id: string): Entity | null {
 }
 export function listEntities(): Entity[] {
   const rows = getDB().prepare(`SELECT * FROM entities ORDER BY datetime(createdAt) DESC`).all();
-  return rows.map((r: any) => ({ ...r, documents: P<string[]>(r.documents) })) as Entity[];
+  return (rows as any[]).map(r => ({ ...r, documents: P<string[]>(r.documents) })) as Entity[];
 }
 export function addEntity(data: Omit<Entity, "id" | "createdAt" | "createdBy"> & { createdBy?: string | null }) {
   const id = uid(); const createdAt = new Date().toISOString();
@@ -86,7 +81,7 @@ export function addEntity(data: Omit<Entity, "id" | "createdAt" | "createdBy"> &
 }
 export function updateEntity(id: string, patch: Partial<Omit<Entity, "id" | "createdAt">>) {
   const db = getDB();
-  const row: any = db.prepare(`SELECT * FROM entities WHERE id = ?`).get(id);
+  const row: any = db.prepare(`SELECT * FROM entities WHERE id=?`).get(id);
   if (!row) return null;
   const name = patch.name ?? row.name;
   const type = patch.type ?? row.type;
@@ -103,13 +98,13 @@ export function updateEntity(id: string, patch: Partial<Omit<Entity, "id" | "cre
   return { ...after, documents: P<string[]>(after.documents) } as Entity;
 }
 export function removeEntity(id: string) {
-  const db = getDB();
-  db.prepare(`DELETE FROM entities WHERE id=?`).run(id);
+  getDB().prepare(`DELETE FROM entities WHERE id=?`).run(id);
   return { ok: true };
 }
 
-/** MEMBERS */
-export function listMembers() { return getDB().prepare(`SELECT * FROM members`).all() as Member[]; }
+export function listMembers(): Member[] {
+  return getDB().prepare(`SELECT * FROM members`).all() as Member[];
+}
 export function addMember(data: Omit<Member, "id" | "joinedAt">) {
   const id = uid(); const joinedAt = new Date().toISOString();
   getDB().prepare(`
@@ -120,33 +115,33 @@ export function addMember(data: Omit<Member, "id" | "joinedAt">) {
 }
 export function updateMember(id: string, patch: Partial<Omit<Member, "id" | "joinedAt">>) {
   const db = getDB();
-  const row: any = db.prepare(`SELECT * FROM members WHERE id = ?`).get(id);
+  const row: any = db.prepare(`SELECT * FROM members WHERE id=?`).get(id);
   if (!row) return null;
   const name = patch.name ?? row.name;
   const email = patch.email ?? row.email;
   const phone = patch.phone ?? row.phone;
   const entityId = (patch.entityId ?? row.entityId) ?? null;
   const roleInEntity = (patch.roleInEntity ?? row.roleInEntity) ?? null;
-  db.prepare(`UPDATE members SET name=?, email=?, phone=?, entityId=?, roleInEntity=? WHERE id=?`).run(name, email ?? null, phone ?? null, entityId, roleInEntity, id);
+  db.prepare(`UPDATE members SET name=?, email=?, phone=?, entityId=?, roleInEntity=? WHERE id=?`)
+    .run(name, email ?? null, phone ?? null, entityId, roleInEntity, id);
   return db.prepare(`SELECT * FROM members WHERE id=?`).get(id) as Member;
 }
 export function deleteMember(id: string) {
-  getDB().prepare(`DELETE FROM members WHERE id = ?`).run(id);
+  getDB().prepare(`DELETE FROM members WHERE id=?`).run(id);
   return { ok: true };
 }
 
-/** GOVERNANCE */
-export function listGovernance() {
-  const rows = getDB().prepare(`SELECT * FROM governance ORDER BY datetime(createdAt) DESC`).all();
-  return rows.map((r: any) => {
+export function listGovernance(): GovernanceItem[] {
+  const rows = getDB().prepare(`SELECT * FROM governance ORDER BY datetime(createdAt) DESC`).all() as any[];
+  return rows.map(r => {
     const meta = r.meta ? JSON.parse(r.meta) : {};
     return {
       id: r.id, title: r.title, type: r.type as GovernanceType,
       status: (r.status ?? "draft") as GovernanceStatus,
       entityId: r.entityId ?? null, createdAt: r.createdAt, updatedAt: r.updatedAt,
       notes: r.description ?? null, decisionDate: meta.decisionDate ?? null, attachments: meta.attachments ?? [],
-    };
-  }) as GovernanceItem[];
+    } as GovernanceItem;
+  });
 }
 export function addGovernance(input: {
   title: string; type: GovernanceType; status?: GovernanceStatus; entityId?: string | null;
@@ -158,89 +153,57 @@ export function addGovernance(input: {
     INSERT INTO governance (id, type, title, description, entityId, status, meta, createdAt, updatedAt)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, input.type, input.title, input.notes ?? null, input.entityId ?? null, input.status ?? "draft", meta, now, now);
-  return { id, title: input.title, type: input.type, status: input.status ?? "draft", entityId: input.entityId ?? null, createdAt: now, updatedAt: now, notes: input.notes ?? null, decisionDate: input.decisionDate ?? null, attachments: input.attachments ?? [] };
-}
-
-/** EVENTS */
-export function listEvents() {
-  // تجاهل عمود date تمامًا
-  const rows = getDB()
-    .prepare(`
-      SELECT id, title, status, entityId
-      FROM events
-      ORDER BY rowid DESC
-    `)
-    .all() as any[];
-
-  return rows.map((r) => ({
-    id: String(r.id),
-    title: String(r.title || ""),
-    status: (r.status ?? "draft") as EventItem["status"],
-    entityId: r.entityId ? String(r.entityId) : null,
-  })) as EventItem[];
-}
-export function getEvent(id: string) {
-  const row: any = getDB()
-    .prepare(`SELECT id, title, status, entityId FROM events WHERE id = ?`)
-    .get(id);
-  if (!row) return null;
   return {
-    id: String(row.id),
-    title: String(row.title || ""),
-    status: (row.status ?? "draft") as EventItem["status"],
-    entityId: row.entityId ? String(row.entityId) : null,
-  } as EventItem;
+    id, title: input.title, type: input.type, status: input.status ?? "draft",
+    entityId: input.entityId ?? null, createdAt: now, updatedAt: now,
+    notes: input.notes ?? null, decisionDate: input.decisionDate ?? null, attachments: input.attachments ?? []
+  };
+}
+
+export function listISO(): ISOForm[] {
+  return getDB().prepare(`SELECT * FROM iso`).all() as ISOForm[];
+}
+export function addISO(data: Omit<ISOForm, "id">) {
+  const id = uid();
+  getDB().prepare(`INSERT INTO iso (id, title, code, status, ownerEntityId) VALUES (?, ?, ?, ?, ?)`)
+    .run(id, data.title, data.code ?? null, data.status, data.ownerEntityId ?? null);
+  return { id, ...data } as ISOForm;
+}
+
+export function listEvents(): EventItem[] {
+  const rows = getDB().prepare(`SELECT id, title, date, status, entityId FROM events ORDER BY datetime(date) DESC, title ASC`).all();
+  return rows as EventItem[];
 }
 
 export function addEvent(data: Omit<EventItem, "id">) {
   const id = uid();
-  getDB()
-    .prepare(`INSERT INTO events (id, title, status, entityId) VALUES (?, ?, ?, ?)`)
-    .run(
-      id,
-      String(data.title || ""),
-      String(data.status || "draft"),
-      data.entityId ? String(data.entityId) : null
-    );
-  return getEvent(id)!;
+  getDB().prepare(`
+    INSERT INTO events (id, title, date, status, entityId)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(id, data.title, data?.date ?? null, data.status, data.entityId ?? null);
+  const row = getDB().prepare(`SELECT id, title, date, status, entityId FROM events WHERE id=?`).get(id) as EventItem;
+  return row;
 }
 
 export function updateEvent(id: string, patch: Partial<Omit<EventItem, "id">>) {
   const db = getDB();
-  const cur: any = db.prepare(`SELECT * FROM events WHERE id=?`).get(id);
-  if (!cur) return null;
+  const row: any = db.prepare(`SELECT * FROM events WHERE id=?`).get(id);
+  if (!row) return null;
 
-  const next = {
-    title: typeof patch.title === "string" ? patch.title : cur.title,
-    status: typeof patch.status === "string" ? patch.status : cur.status,
-    entityId: patch.hasOwnProperty("entityId")
-      ? (patch.entityId ? String(patch.entityId) : null)
-      : cur.entityId,
-  };
+  const title = typeof patch.title === "string" ? patch.title : row.title;
+  const date  = (patch.date === null || typeof patch.date === "string") ? (patch.date ?? null) : row.date;
+  const entityId = typeof patch.entityId === "string" ? patch.entityId : row.entityId;
+  const status = typeof patch.status === "string" ? patch.status : row.status;
 
-  db.prepare(`UPDATE events SET title=?, status=?, entityId=? WHERE id=?`)
-    .run(String(next.title || ""), String(next.status || "draft"), next.entityId, id);
+  db.prepare(`UPDATE events SET title=?, date=?, status=?, entityId=? WHERE id=?`)
+    .run(title, date, status, entityId, id);
 
-  return getEvent(id);
+  return db.prepare(`SELECT id, title, date, status, entityId FROM events WHERE id=?`).get(id) as EventItem;
 }
 
-export function removeEvent(id: string) {
+export function deleteEvent(id: string) {
   getDB().prepare(`DELETE FROM events WHERE id=?`).run(id);
   return { ok: true };
-}
-
-/** ISO */
-export function listISO() { return getDB().prepare(`SELECT * FROM iso`).all() as ISOForm[]; }
-export function addISO(data: Omit<ISOForm, "id">) {
-  const id = uid();
-  getDB().prepare(`INSERT INTO iso (id, title, code, status, ownerEntityId) VALUES (?, ?, ?, ?, ?)`).run(id, data.title, data.code ?? null, data.status, data.ownerEntityId ?? null);
-  return { id, ...data } as ISOForm;
-}
-
-/** RESET */
-export function resetAll() {
-  const db = getDB();
-  db.exec(`DELETE FROM users; DELETE FROM entities; DELETE FROM members; DELETE FROM events; DELETE FROM iso; DELETE FROM governance;`);
 }
 
 export const dataStore = {
@@ -248,7 +211,6 @@ export const dataStore = {
   listEntities, getEntity, addEntity, updateEntity, removeEntity,
   listMembers, addMember, updateMember, deleteMember,
   listGovernance, addGovernance,
-  listEvents, getEvent, addEvent, updateEvent, removeEvent,
   listISO, addISO,
-  resetAll,
+  listEvents, addEvent, updateEvent, deleteEvent,
 };

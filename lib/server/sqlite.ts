@@ -45,7 +45,24 @@ function init(d: Database.Database) {
       createdAt TEXT NOT NULL,
       createdBy TEXT
     );
+  CREATE TABLE IF NOT EXISTS join_requests (
+    id TEXT PRIMARY KEY,
+    userId TEXT NOT NULL,
+    userName TEXT NOT NULL,
+    userEmail TEXT NOT NULL,
+    entityId TEXT NOT NULL,
+    entityName TEXT NOT NULL,
+    note TEXT,
+    status TEXT NOT NULL,            -- "pending" | "approved" | "rejected"
+    createdAt TEXT NOT NULL,
+    decidedAt TEXT,
+    decidedBy TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_join_user   ON join_requests(userId);
+  CREATE INDEX IF NOT EXISTS idx_join_entity ON join_requests(entityId);
+  CREATE INDEX IF NOT EXISTS idx_join_status ON join_requests(status);
 
+  CREATE INDEX IF NOT EXISTS idx_users_entityId ON users(entityId);
     CREATE TABLE IF NOT EXISTS members (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -73,7 +90,6 @@ function init(d: Database.Database) {
     );
   `);
 
-  // ترقية المخطط لو أعمدة ناقصة
   try {
     const memberCols = d.prepare(`PRAGMA table_info(members)`).all() as any[];
     if (!memberCols.some(c => String(c?.name) === "roleInEntity")) {

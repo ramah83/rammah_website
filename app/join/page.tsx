@@ -20,13 +20,12 @@ type Entity = {
 export default function JoinEntitiesPage() {
   const router = useRouter()
   const [session, setSession] = useState<Session | null>(null)
-  const [sessionLoaded, setSessionLoaded] = useState(false) // ← عشان ما نرجعش null
+  const [sessionLoaded, setSessionLoaded] = useState(false) 
   const [entities, setEntities] = useState<Entity[]>([])
   const [search, setSearch] = useState("")
   const [submittingId, setSubmittingId] = useState<string | null>(null)
   const [myRequests, setMyRequests] = useState<Record<string, JoinRequest>>({})
 
-  // ✅ حمّل الجلسة بدون ما تعمل redirect بدري
   useEffect(() => {
     try {
       const s = localStorage.getItem("session")
@@ -41,7 +40,6 @@ export default function JoinEntitiesPage() {
     }
   }, [router])
 
-  // ✅ تحميل الكيانات
   useEffect(() => {
     const load = async () => {
       const res = await fetch("/api/entities", { cache: "no-store" })
@@ -51,11 +49,9 @@ export default function JoinEntitiesPage() {
     load()
   }, [])
 
-  // ✅ تحميل طلبات هذا المستخدم (لو المستخدم Youth فقط)
   useEffect(() => {
     const loadMine = async () => {
       if (!session) return
-      // لو الدور إداري مش هنحتاج نجيب طلباته
       if (isAdmin(session.role)) return
       const res = await fetch(`/api/join-requests?userId=${encodeURIComponent(session.id)}`, { cache: "no-store" })
       const rows: JoinRequest[] = await res.json()
@@ -75,7 +71,6 @@ export default function JoinEntitiesPage() {
     )
   }, [entities, search])
 
-  // 🚦 لسه بنحمّل الجلسة؟ اعرض Placeholder بدلاً من لا شيء
   if (!sessionLoaded) {
     return (
       <div dir="rtl" className="mx-auto max-w-5xl w-full px-4 py-8 text-white">
@@ -84,11 +79,9 @@ export default function JoinEntitiesPage() {
     )
   }
 
-  // لو مفيش Session بعد التحميل نرجّعه للهوم
   if (!session) return null
 
-  const allowJoin = isYouth(session.role) // true لليوزر الشباب فقط
-
+  const allowJoin = isYouth(session.role) 
   const statusBadge = (req?: JoinRequest) => {
     if (!req) return null
     if (req.status === "pending") return <span className="inline-flex items-center gap-1 text-amber-300 text-xs"><Clock className="h-3 w-3" />قيد المراجعة</span>
@@ -200,11 +193,9 @@ export default function JoinEntitiesPage() {
   )
 }
 
-// Helpers
 function isAdmin(role: Session["role"]) {
   return role === "systemAdmin" || role === "entityManager" || role === "qualitySupervisor"
 }
 function isYouth(role: Session["role"]) {
-  // بعض الأنظمة بتسمي الدور "user" بدل "youth"
   return role === "youth" || (role as any) === "user"
 }

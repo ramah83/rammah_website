@@ -37,7 +37,7 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
   const row: any = db.prepare("SELECT * FROM members WHERE id=?").get(id);
   if (!row) return NextResponse.json({ error: "غير موجود" }, { status: 404 });
 
-  // entityManager لا يحدّث إلا أعضاء كيانُه
+  
   if (s!.role === "entityManager") {
     const myEnt = String(s!.entityId || "");
     const targetEnt = String(row.entityId || "");
@@ -78,7 +78,7 @@ export async function DELETE(_req: Request, ctx: { params: { id: string } }) {
   const row: any = db.prepare("SELECT * FROM members WHERE id=?").get(id);
   if (!row) return NextResponse.json({ error: "غير موجود" }, { status: 404 });
 
-  // entityManager لا يحذف إلا من كيانُه
+  
   if (s!.role === "entityManager") {
     if (String(row.entityId || "") !== String(s!.entityId || "")) {
       return NextResponse.json({ error: "غير مصرح: حذف مسموح داخل كيانك فقط" }, { status: 403 });

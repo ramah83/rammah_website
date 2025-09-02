@@ -11,10 +11,10 @@ type Session = { id: string; email: string; name: string; role: UserRole; entity
 
 async function getSession(): Promise<Session | null> {
   try {
-    const jar = await cookies();                      // ← استخدم await
+    const jar = await cookies();                      
     const rawCookie = jar.get("session")?.value;
 
-    const hdrs = await headers();                     // ← استخدم await
+    const hdrs = await headers();                     
     const rawHeader = hdrs.get("x-session");
 
     const raw = rawCookie ?? rawHeader ?? null;

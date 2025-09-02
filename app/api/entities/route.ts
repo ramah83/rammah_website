@@ -9,7 +9,7 @@ export async function GET() {
   return NextResponse.json(listEntities());
 }
 
-// إيقاف الإنشاء نهائيًا
+
 export async function POST() {
   return NextResponse.json({ error: "إنشاء كيانات جديدة غير مسموح" }, { status: 405 });
 }

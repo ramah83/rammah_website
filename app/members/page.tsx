@@ -126,17 +126,19 @@ export default function MembersPage() {
   }, []);
 
   useEffect(() => {
-    // ضبط الكيان الافتراضي للفورم والفلتر حسب جلسة مدير الكيان
     if (!session || !entities.length) return;
-    const def = entities.find((e: any) => e.id === session.entityId)?.id ?? entities[0]?.id ?? "";
+    const def = String(entities.find((e: any) => String(e.id) === String(session.entityId))?.id
+              ?? entities[0]?.id ?? "");
     setForm(p => ({ ...p, entityId: p.entityId || def }));
-    if (session.role === "entityManager") setFilterEntity(session.entityId || "all");
+    if (session.role === "entityManager") {
+      setFilterEntity(session.entityId ? String(session.entityId) : "all");
+    }
   }, [session, entities]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (list || [])
-      .filter(m => (filterEntity === "all" ? true : String(m.entityId || "") === filterEntity))
+      .filter(m => (filterEntity === "all" ? true : String(m.entityId || "") === String(filterEntity)))
       .filter(m => {
         if (!q) return true;
         const hay = [m.name, m.email, m.phone, m.roleInEntity].filter(Boolean).join(" ").toLowerCase();
@@ -148,7 +150,7 @@ export default function MembersPage() {
 
   const resetForm = () =>
     setForm({
-      entityId: session?.entityId || entities[0]?.id || "",
+      entityId: session?.entityId ? String(session.entityId) : (entities[0]?.id ? String(entities[0].id) : ""),
       name: "",
       email: "",
       phone: "",
@@ -167,7 +169,7 @@ export default function MembersPage() {
     setSaving(true);
     try {
       await api.createMember({
-        entityId: form.entityId,
+        entityId: String(form.entityId),
         name: form.name.trim(),
         email: form.email.trim() || undefined,
         phone: form.phone.trim() || undefined,
@@ -192,24 +194,25 @@ export default function MembersPage() {
       email: m.email || "",
       phone: m.phone || "",
       roleInEntity: m.roleInEntity || "",
-      entityId: m.entityId || "",
+      entityId: m.entityId ? String(m.entityId) : "",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const cancelEdit = () => { setEditingId(null); setEditDraft(null); };
   const confirmEdit = async () => {
     if (!editingId || !editDraft) return;
+    if (!editDraft.entityId) return alert("اختر الكيان");
     try {
       await api.updateMember(editingId, {
         name: (editDraft.name || "").toString(),
         email: (editDraft.email || "") || null,
         phone: (editDraft.phone || "") || null,
         roleInEntity: (editDraft.roleInEntity || "") || null,
-        entityId: (editDraft.entityId || "").toString(),
+        entityId: String(editDraft.entityId),
       });
       await refreshMembers();
       cancelEdit();
-    } catch (e: any) {
+    } catch {
       alert("لم يتم التعديل");
     }
   };
@@ -267,7 +270,7 @@ export default function MembersPage() {
             <form onSubmit={editingId ? (e)=>{e.preventDefault();confirmEdit();} : onSave} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="الكيان">
                 <Select
-                  value={(editingId ? (editDraft?.entityId as string) : form.entityId) || ""}
+                  value={editingId ? String(editDraft?.entityId ?? "") : String(form.entityId ?? "")}
                   onValueChange={(v) => {
                     if (editingId) setEditDraft(p => ({ ...(p as any), entityId: v }));
                     else setForm(p => ({ ...p, entityId: v }));
@@ -279,10 +282,12 @@ export default function MembersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {(isEntityManager
-                      ? entities.filter((e) => e.id === session.entityId)
+                      ? entities.filter(e => String(e.id) === String(session.entityId))
                       : entities
-                    ).map((e) => (
-                      <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                    ).map(e => (
+                      <SelectItem key={e.id} value={String(e.id)}>
+                        {e.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -315,13 +320,13 @@ export default function MembersPage() {
 
               <Field label="رقم الهاتف">
                 <Input
-                    value={editingId ? (editDraft?.phone as string) || "" : form.phone}
-                    onChange={(e) => editingId
-                      ? setEditDraft(p => ({ ...(p as any), phone: e.target.value }))
-                      : setForm(p => ({ ...p, phone: e.target.value }))
-                    }
-                    className="h-11 rounded-xl"
-                    style={{ backgroundColor: "#FFFFFF", color: "#1D1D1D", borderColor: "#E3E3E3" }}
+                  value={editingId ? (editDraft?.phone as string) || "" : form.phone}
+                  onChange={(e) => editingId
+                    ? setEditDraft(p => ({ ...(p as any), phone: e.target.value }))
+                    : setForm(p => ({ ...p, phone: e.target.value }))
+                  }
+                  className="h-11 rounded-xl"
+                  style={{ backgroundColor: "#FFFFFF", color: "#1D1D1D", borderColor: "#E3E3E3" }}
                 />
               </Field>
 
@@ -371,17 +376,31 @@ export default function MembersPage() {
           <CardContent className="px-5 pb-5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
               <Field label="فلتر الكيان">
-                <Select value={filterEntity} onValueChange={setFilterEntity} disabled={isEntityManager}>
+                <Select
+                  value={isEntityManager ? (session.entityId ? String(session.entityId) : "all") : filterEntity}
+                  onValueChange={setFilterEntity}
+                  disabled={isEntityManager}
+                >
                   <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E3E3E3", color: "#1D1D1D" }}>
                     <SelectValue placeholder="جميع الكيانات" />
                   </SelectTrigger>
                   <SelectContent>
                     {isEntityManager ? (
-                      <SelectItem value={session.entityId || ""}>{entities.find(e => e.id === session.entityId)?.name || "كياني"}</SelectItem>
+                      session.entityId ? (
+                        <SelectItem value={String(session.entityId)}>
+                          {entities.find(e => String(e.id) === String(session.entityId))?.name || "كياني"}
+                        </SelectItem>
+                      ) : (
+                        <SelectItem value="all">جميع الكيانات</SelectItem>
+                      )
                     ) : (
                       <>
                         <SelectItem value="all">جميع الكيانات</SelectItem>
-                        {entities.map((e) => (<SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>))}
+                        {entities.map(e => (
+                          <SelectItem key={e.id} value={String(e.id)}>
+                            {e.name}
+                          </SelectItem>
+                        ))}
                       </>
                     )}
                   </SelectContent>
@@ -410,7 +429,7 @@ export default function MembersPage() {
             ) : (
               <ul className="space-y-3">
                 {filtered.map((m) => {
-                  const ent = entities.find((e) => e.id === m.entityId);
+                  const ent = entities.find((e) => String(e.id) === String(m.entityId));
                   const isEditing = editingId === m.id;
                   const canEditRow =
                     session.role === "systemAdmin" ||
@@ -430,15 +449,23 @@ export default function MembersPage() {
                               <Input value={editDraft?.email as string || ""} onChange={(e) => setEditDraft(p => ({ ...(p as any), email: e.target.value }))} className="h-10 rounded-xl" style={{ backgroundColor: "#FFFFFF", color: "#1D1D1D", borderColor: "#E3E3E3" }} />
                               <Input value={editDraft?.phone as string || ""} onChange={(e) => setEditDraft(p => ({ ...(p as any), phone: e.target.value }))} className="h-10 rounded-xl" style={{ backgroundColor: "#FFFFFF", color: "#1D1D1D", borderColor: "#E3E3E3" }} />
                               <Input value={editDraft?.roleInEntity as string || ""} onChange={(e) => setEditDraft(p => ({ ...(p as any), roleInEntity: e.target.value }))} className="h-10 rounded-xl md:col-span-2" style={{ backgroundColor: "#FFFFFF", color: "#1D1D1D", borderColor: "#E3E3E3" }} placeholder="الدور داخل الكيان" />
-                              <Select value={(editDraft?.entityId as string) || (m.entityId as string) || ""} onValueChange={(v) => setEditDraft(p => ({ ...(p as any), entityId: v }))} disabled={session.role === "entityManager"}>
+                              <Select
+                                value={String(editDraft?.entityId ?? m.entityId ?? "")}
+                                onValueChange={(v) => setEditDraft(p => ({ ...(p as any), entityId: v }))}
+                                disabled={session.role === "entityManager"}
+                              >
                                 <SelectTrigger className="h-10 rounded-xl" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E3E3E3", color: "#1D1D1D" }}>
-                                  <SelectValue />
+                                  <SelectValue placeholder="الكيان" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {(session.role === "entityManager"
-                                    ? entities.filter((e) => e.id === session.entityId)
+                                    ? entities.filter((e) => String(e.id) === String(session.entityId))
                                     : entities
-                                  ).map((e) => (<SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>))}
+                                  ).map((e) => (
+                                    <SelectItem key={e.id} value={String(e.id)}>
+                                      {e.name}
+                                    </SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                             </div>

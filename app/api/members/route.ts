@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "name و entityId مطلوبان" }, { status: 400 });
   }
 
-  // entityManager لا يضيف إلا على كيانُه
+  
   if (s!.role === "entityManager" && String(b.entityId) !== String(s!.entityId || "")) {
     return NextResponse.json({ error: "غير مصرح: لا يمكنك الإضافة خارج كيانك" }, { status: 403 });
   }

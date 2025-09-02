@@ -1,13 +1,7 @@
 {
-  "/api/entities/route": "app/api/entities/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/api/stats/route": "app/api/stats/route.js",
-  "/api/members/route": "app/api/members/route.js",
-  "/api/iso/route": "app/api/iso/route.js",
-  "/reports/page": "app/reports/page.js",
-  "/members/page": "app/members/page.js",
+  "/page": "app/page.js",
   "/events/page": "app/events/page.js",
   "/entities/page": "app/entities/page.js",
-  "/page": "app/page.js",
-  "/dashboard/page": "app/dashboard/page.js"
+  "/dashboard/page": "app/dashboard/page.js",
+  "/dashboard/requests/page": "app/dashboard/requests/page.js"
 }

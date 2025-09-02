@@ -31,7 +31,6 @@ export default function ReportsPage() {
   const [errMsg, setErrMsg] = useState<string>("")
   const [loading, setLoading] = useState<boolean>(true)
 
-  // Helpers to read API (يتحمّل تنسيقات رجوع مختلفة)
   const readArray = (data: any) =>
     Array.isArray(data)
       ? data
@@ -68,7 +67,6 @@ export default function ReportsPage() {
     },
   }
 
-  // session
   useEffect(() => {
     try {
       const s = localStorage.getItem("session")
@@ -79,7 +77,6 @@ export default function ReportsPage() {
     }
   }, [router])
 
-  // load data from server
   useEffect(() => {
     let mounted = true
     ;(async () => {
@@ -107,11 +104,10 @@ export default function ReportsPage() {
     return () => { mounted = false }
   }, [])
 
-  // إذا المستخدم منتمي لكيان وفلتر الكيان ما اتحددش، نختاره تلقائيًا
   useEffect(() => {
     if (!session || entityFilter !== "all") return
     if (session.entityId) setEntityFilter(session.entityId)
-  }, [session]) // intentional single-run after session
+  }, [session]) 
 
   const withinRange = (dateStr?: string) => {
     if (!dateStr) return true

@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { v4 as uuid } from "uuid"
 import type { Session, JoinRequest } from "@/lib/types"
 
-// ⚠️ Demo in-memory store — بدّله بقاعدة بيانات
+
 let STORE: JoinRequest[] = []
 
-// GET ?status=&entityId=&userId=
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const status = searchParams.get("status")
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(rows)
 }
 
-// POST { userId,userName,userEmail, entityId,entityName, note? }
+
 export async function POST(req: NextRequest) {
   const body = await req.json()
   const { userId, userName, userEmail, entityId, entityName, note } = body || {}
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "بيانات ناقصة" }, { status: 400 })
   }
 
-  // منع تكرار طلب Pending لنفس اليوزر والكيان
+  
   const exists = STORE.find(r => r.userId === userId && r.entityId === entityId && r.status === "pending")
   if (exists) return NextResponse.json({ error: "عندك طلب قيد المراجعة لنفس الكيان" }, { status: 409 })
 
@@ -47,7 +47,6 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(row, { status: 201 })
 }
 
-// PUT { id, action: "approve" | "reject", decidedBy }
 export async function PUT(req: NextRequest) {
   const body = await req.json()
   const { id, action, decidedBy } = body || {}

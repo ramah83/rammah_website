@@ -1,4 +1,3 @@
-// /lib/data-store.ts
 export type UserRole = "systemAdmin" | "qualitySupervisor" | "entityManager" | "youth"
 
 export type User = {
