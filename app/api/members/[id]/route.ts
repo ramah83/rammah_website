@@ -17,19 +17,26 @@ async function getSession(): Promise<Session | null> {
     const rawHeader = hdrs.get("x-session");
     const raw = rawCookie ?? rawHeader ?? null;
     return raw ? (JSON.parse(raw) as Session) : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
-function canManageMembers(s: Session | null) {
-  return !!s && (s.role === "systemAdmin" || s.role === "entityManager");
-}
-
-export async function PATCH(req: Request, ctx: { params: { id: string } }) {
+async function ensureRole(allowed: UserRole[]) {
   const s = await getSession();
-  if (!canManageMembers(s)) {
+  if (!s) return NextResponse.json({ error: "غير مصرح: لا توجد جلسة" }, { status: 401 });
+  if (!allowed.includes(s.role)) {
     return NextResponse.json({ error: "ممنوع: الصلاحيات غير كافية" }, { status: 403 });
   }
+  return null;
+}
 
+// PATCH /api/members/[id]
+export async function PATCH(req: Request, ctx: { params: { id: string } }) {
+  const guard = await ensureRole(["systemAdmin", "entityManager"]);
+  if (guard) return guard;
+
+  const s = await getSession();
   const { id } = ctx.params;
   const patch = await req.json();
   const db = getDB();
@@ -37,22 +44,23 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
   const row: any = db.prepare("SELECT * FROM members WHERE id=?").get(id);
   if (!row) return NextResponse.json({ error: "غير موجود" }, { status: 404 });
 
-  
+  // الـ Entity Manager: يعدّل داخل كيانُه فقط ولا يغيّر الكيان
   if (s!.role === "entityManager") {
     const myEnt = String(s!.entityId || "");
-    const targetEnt = String(row.entityId || "");
-    const nextEnt = patch?.entityId ? String(patch.entityId) : targetEnt;
-    if (myEnt === "" || targetEnt !== myEnt || nextEnt !== myEnt) {
+    if (!myEnt || String(row.entityId || "") !== myEnt) {
       return NextResponse.json({ error: "غير مصرح: تعديل مسموح داخل كيانك فقط" }, { status: 403 });
+    }
+    if (patch?.entityId && String(patch.entityId) !== myEnt) {
+      return NextResponse.json({ error: "غير مصرح: لا يمكنك نقل العضو لكيان آخر" }, { status: 403 });
     }
   }
 
   const fields: Record<string, any> = {};
-  if (typeof patch?.name === "string") fields.name = patch.name;
-  if (typeof patch?.email === "string") fields.email = patch.email || null;
-  if (typeof patch?.phone === "string") fields.phone = patch.phone || null;
-  if (typeof patch?.roleInEntity === "string") fields.roleInEntity = patch.roleInEntity || null;
-  if (typeof patch?.entityId === "string") fields.entityId = patch.entityId;
+  if (typeof patch?.name === "string")        fields.name = patch.name;
+  if (typeof patch?.email === "string")       fields.email = patch.email || null;
+  if (typeof patch?.phone === "string")       fields.phone = patch.phone || null;
+  if (typeof patch?.roleInEntity === "string")fields.roleInEntity = patch.roleInEntity || null;
+  if (typeof patch?.entityId === "string")    fields.entityId = patch.entityId; // الأدمن فقط عمليًا
 
   if (Object.keys(fields).length === 0) {
     return NextResponse.json({ error: "لا توجد حقول للتعديل" }, { status: 400 });
@@ -66,23 +74,21 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
   return NextResponse.json(updated);
 }
 
+// DELETE /api/members/[id]
 export async function DELETE(_req: Request, ctx: { params: { id: string } }) {
-  const s = await getSession();
-  if (!canManageMembers(s)) {
-    return NextResponse.json({ error: "ممنوع: الصلاحيات غير كافية" }, { status: 403 });
-  }
+  const guard = await ensureRole(["systemAdmin", "entityManager"]);
+  if (guard) return guard;
 
+  const s = await getSession();
   const { id } = ctx.params;
   const db = getDB();
 
   const row: any = db.prepare("SELECT * FROM members WHERE id=?").get(id);
   if (!row) return NextResponse.json({ error: "غير موجود" }, { status: 404 });
 
-  
-  if (s!.role === "entityManager") {
-    if (String(row.entityId || "") !== String(s!.entityId || "")) {
-      return NextResponse.json({ error: "غير مصرح: حذف مسموح داخل كيانك فقط" }, { status: 403 });
-    }
+  // الـ Entity Manager يحذف داخل كيانُه فقط
+  if (s!.role === "entityManager" && String(row.entityId || "") !== String(s!.entityId || "")) {
+    return NextResponse.json({ error: "غير مصرح: حذف مسموح داخل كيانك فقط" }, { status: 403 });
   }
 
   db.prepare("DELETE FROM members WHERE id=?").run(id);

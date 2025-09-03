@@ -696,10 +696,9 @@ function HeaderBar() {
           <nav className="hidden sm:flex items-center gap-1 text-sm">
             {[
               { href: "/", label: "الرئيسية" },
-              { href: "/about", label: "عن المنصة" },
-              { href: "/support", label: "الدعم" },
               { href: "/dashboard", label: "لوحة التحكم" },
-              { href: "/events", label: "الفعاليات" },
+              { href: "/support", label: "الدعم" },
+              { href: "/about", label: "عن المنصة" },
             ].map((l) => (
               <Link
                 key={l.href}

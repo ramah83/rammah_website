@@ -104,6 +104,16 @@ function init(d: Database.Database) {
       d.prepare(`CREATE INDEX IF NOT EXISTS idx_entities_createdBy ON entities(createdBy)`).run();
     }
   } catch {}
+  try {
+  const userCols = d.prepare(`PRAGMA table_info(users)`).all() as any[];
+  const has = (name: string) => userCols.some(c => String(c?.name) === name);
+
+  if (!has("phone"))   d.prepare(`ALTER TABLE users ADD COLUMN phone TEXT`).run();
+  if (!has("city"))    d.prepare(`ALTER TABLE users ADD COLUMN city TEXT`).run();
+  if (!has("bio"))     d.prepare(`ALTER TABLE users ADD COLUMN bio TEXT`).run();
+  if (!has("avatar"))  d.prepare(`ALTER TABLE users ADD COLUMN avatar TEXT`).run();
+} catch {}
+
 }
 
 export function getDB() {

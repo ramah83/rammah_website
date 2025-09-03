@@ -7,7 +7,11 @@ export type Session = {
   role: UserRole
   entityId?: string | null
 }
-
+export type User = {
+  id: string; name: string; email: string; password?: string; role: UserRole;
+  interests?: string[]; entityId?: string | null; permissions?: string[];
+  phone?: string | null; city?: string | null; bio?: string | null; avatar?: string | null;
+};
 export type JoinRequestStatus = "pending" | "approved" | "rejected"
 
 export type JoinRequest = {

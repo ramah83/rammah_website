@@ -178,7 +178,8 @@ function HeaderBar() {
 
           <nav className="hidden sm:flex items-center gap-1 text-sm">
             {[
-              { href: "/", label: "الرئيسية" },
+              { href: "/profile", label: "الملف الشخصي" },
+              { href: "/dashboard", label: "لوحة التحكم" },
               { href: "/about", label: "عن المنصة" },
               { href: "/support", label: "الدعم" },
             ].map((l) => (

@@ -22,20 +22,20 @@ const COLORS = {
 
 type EntityLite = { id: string; name: string };
 
- export default function RequestsPage() {
+export default function RequestsPage() {
   const router = useRouter();
 
-     const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
 
-     const [rows, setRows] = useState<JoinRequest[]>([]);
+  const [rows, setRows] = useState<JoinRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<string | null>(null);
 
-     const [entities, setEntities] = useState<EntityLite[]>([]);
+  const [entities, setEntities] = useState<EntityLite[]>([]);
   const [selectedEntity, setSelectedEntity] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
 
-     useEffect(() => {
+  useEffect(() => {
     try {
       const s = localStorage.getItem("session");
       if (!s) { router.push("/"); return; }
@@ -48,7 +48,7 @@ type EntityLite = { id: string; name: string };
 
   const isAdmin = !!session && ["systemAdmin", "entityManager"].includes(session.role);
 
-     const loadRequests = async (me: Session) => {
+  const loadRequests = async (me: Session) => {
     setLoading(true);
     try {
       const url = isAdmin
@@ -70,7 +70,7 @@ type EntityLite = { id: string; name: string };
         .filter((e: any) => e?.id && e?.name)
         .map((e: any) => ({ id: String(e.id), name: String(e.name) }));
       setEntities(list);
-             if (!selectedEntity && list[0]?.id) setSelectedEntity(list[0].id);
+      if (!selectedEntity && list[0]?.id) setSelectedEntity(list[0].id);
     } catch {
       setEntities([]);
     }
@@ -79,9 +79,12 @@ type EntityLite = { id: string; name: string };
   useEffect(() => {
     if (!session) return;
     loadRequests(session);
-         if (!isAdmin) loadEntities();
-  }, [session]);  
-     const grouped = useMemo(() => {
+    if (!isAdmin) loadEntities();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
+  // جرّب تجمع الطلبات حسب الحالة
+  const grouped = useMemo(() => {
     const g: Record<"pending" | "approved" | "rejected", JoinRequest[]> = {
       pending: [], approved: [], rejected: []
     };
@@ -89,12 +92,33 @@ type EntityLite = { id: string; name: string };
     return g;
   }, [rows]);
 
+  // تحقق لو فيه طلب pending لنفس الكيان المختار
   const hasPendingForSelected = useMemo(() => {
     if (!selectedEntity) return false;
     return rows.some(r => r.entityId === selectedEntity && r.status === "pending");
   }, [rows, selectedEntity]);
 
-        const act = async (id: string, action: "approve" | "reject") => {
+  // ✅ جديد: تحقق لو المستخدم "مقبول" بالفعل في الكيان المختار
+  const hasApprovedForSelected = useMemo(() => {
+    if (!selectedEntity) return false;
+    return rows.some(r => r.entityId === selectedEntity && r.status === "approved");
+  }, [rows, selectedEntity]);
+
+  // ✅ (اختياري ومفعّل): اخفي الكيانات اللي المستخدم عضو فيها بالفعل من الـ Select
+  const filteredEntities = useMemo(() => {
+    if (isAdmin) return entities;
+    const approvedIds = new Set(rows.filter(r => r.status === "approved").map(r => r.entityId));
+    const list = entities.filter(e => !approvedIds.has(e.id));
+    // لو الكيان المختار اتشال من القائمة بعد الفلترة، اختار أول متاح
+    if (selectedEntity && !list.find(e => e.id === selectedEntity)) {
+      if (list[0]?.id) setSelectedEntity(list[0].id);
+      else setSelectedEntity("");
+    }
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entities, rows, isAdmin]);
+
+  const act = async (id: string, action: "approve" | "reject") => {
     if (!isAdmin || acting) return;
     setActing(id);
     try {
@@ -126,8 +150,9 @@ type EntityLite = { id: string; name: string };
     if (!session) return;
     if (!selectedEntity) { alert("اختر كيانًا أولاً"); return; }
     if (hasPendingForSelected) { alert("لديك طلب قيد المراجعة لهذا الكيان"); return; }
+    if (hasApprovedForSelected) { alert("أنت عضو بالفعل في هذا الكيان"); return; }
 
-    const ent = entities.find(e => e.id === selectedEntity);
+    const ent = filteredEntities.find(e => e.id === selectedEntity) || entities.find(e => e.id === selectedEntity);
     if (!ent) { alert("الكيان غير موجود"); return; }
 
     setSubmitting(true);
@@ -144,7 +169,11 @@ type EntityLite = { id: string; name: string };
         }),
       });
       const data = await res.json();
-      if (!res.ok) { alert(data?.error || "تعذّر إرسال الطلب"); return; }
+      if (!res.ok) {
+        // هيعرض رسالة السيرفر (مثلاً: أنت بالفعل عضو في هذا الكيان / عندك طلب قيد المراجعة)
+        alert(data?.error || "تعذّر إرسال الطلب");
+        return;
+      }
       alert("تم إرسال طلب الانضمام");
       await loadRequests(session);
     } catch (e: any) {
@@ -154,7 +183,7 @@ type EntityLite = { id: string; name: string };
     }
   };
 
-     if (!session) {
+  if (!session) {
     return (
       <div dir="rtl" className="min-h-screen" style={{ background: COLORS.bg, color: COLORS.text }}>
         <HeaderBar />
@@ -175,7 +204,7 @@ type EntityLite = { id: string; name: string };
     <div dir="rtl" className="min-h-screen" style={{ background: COLORS.bg, color: COLORS.text }}>
       <HeaderBar />
 
-      { }
+      {/* الهيدر */}
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8">
         <div
           className="rounded-[22px] p-5 md:p-6 flex items-center justify-between"
@@ -199,9 +228,9 @@ type EntityLite = { id: string; name: string };
         </div>
       </section>
 
-      { }
+      {/* المحتوى */}
       <main className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-6 pb-10">
-        { }
+        {/* تقديم طلب (لغير الأدمن فقط) */}
         {!isAdmin && (
           <SurfaceCard className="mb-6">
             <div className="p-5 space-y-4">
@@ -213,7 +242,7 @@ type EntityLite = { id: string; name: string };
                       <SelectValue placeholder="اختر الكيان" />
                     </SelectTrigger>
                     <SelectContent>
-                      {entities.map((e) => (
+                      {filteredEntities.map((e) => (
                         <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -222,9 +251,14 @@ type EntityLite = { id: string; name: string };
                 <div className="flex gap-2">
                   <button
                     onClick={submitJoin}
-                    disabled={!selectedEntity || submitting || hasPendingForSelected}
+                    disabled={
+                      !selectedEntity ||
+                      submitting ||
+                      hasPendingForSelected ||
+                      hasApprovedForSelected
+                    }
                     className="h-11 px-5 rounded-full font-semibold"
-                    style={{ background: COLORS.primary, color: "#FFFFFF", opacity: (!selectedEntity || submitting || hasPendingForSelected) ? 0.6 : 1 }}
+                    style={{ background: COLORS.primary, color: "#FFFFFF", opacity: (!selectedEntity || submitting || hasPendingForSelected || hasApprovedForSelected) ? 0.6 : 1 }}
                   >
                     {submitting ? "جارٍ الإرسال..." : "تقديم طلب انضمام"}
                   </button>
@@ -242,11 +276,16 @@ type EntityLite = { id: string; name: string };
                   لديك طلب قيد المراجعة لهذا الكيان بالفعل.
                 </div>
               )}
+              {hasApprovedForSelected && (
+                <div className="text-sm" style={{ color: COLORS.muted }}>
+                  أنت عضو بالفعل في هذا الكيان.
+                </div>
+              )}
             </div>
           </SurfaceCard>
         )}
 
-        { }
+        {/* قائمة الطلبات */}
         <SurfaceCard>
           <div className="p-5">
             {loading ? (
@@ -280,7 +319,7 @@ type EntityLite = { id: string; name: string };
                               </div>
                             </div>
 
-                            { }
+                            {/* أزرار القرار للمسؤول */}
                             {isAdmin && r.status === "pending" ? (
                               <div className="flex items-center gap-2">
                                 <button
@@ -377,7 +416,8 @@ function SurfaceCard({ children, className = "" }: { children: React.ReactNode; 
 }
 
 function StatusPill({ status }: { status: "pending" | "approved" | "rejected" }) {
-  let bg = "#FFF8E8", bd = "#F2E7C6", txt = COLORS.text;    if (status === "approved") { bg = "#EAF8F0"; bd = "#CBEBDD"; }
+  let bg = "#FFF8E8", bd = "#F2E7C6", txt = COLORS.text;
+  if (status === "approved") { bg = "#EAF8F0"; bd = "#CBEBDD"; }
   if (status === "rejected") { bg = "#FEEDEF"; bd = "#F5C9CF"; }
   return (
     <span

@@ -1,7 +1,1 @@
-{
-  "/page": "app/page.js",
-  "/events/page": "app/events/page.js",
-  "/entities/page": "app/entities/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/dashboard/requests/page": "app/dashboard/requests/page.js"
-}
+{}
