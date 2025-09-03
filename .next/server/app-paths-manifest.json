@@ -1,1 +1,8 @@
-{}
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/members/page": "app/members/page.js",
+  "/iso/page": "app/iso/page.js",
+  "/events/page": "app/events/page.js",
+  "/governance/page": "app/governance/page.js",
+  "/reports/page": "app/reports/page.js"
+}
