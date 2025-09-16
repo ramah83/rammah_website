@@ -1,13 +1,17 @@
+// app/profile/edit/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import type { Session } from "@/lib/types";
+import { Cairo } from "next/font/google";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Users, Save, ArrowRight } from "lucide-react";
+
+const cairo = Cairo({ subsets: ["arabic"], weight: ["400", "600", "700", "800"] });
 
 const COLORS = {
   text: "#1D1D1D",
@@ -38,6 +42,10 @@ export default function ProfileEditPage() {
   const [city, setCity] = useState("");
   const [bio, setBio] = useState("");
   const [interestsStr, setInterestsStr] = useState("");
+
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
@@ -61,12 +69,30 @@ export default function ProfileEditPage() {
         setCity(u.city || "");
         setBio(u.bio || "");
         setInterestsStr((u.interests || []).join(", "));
+        setAvatarUrl(u.avatar || "");
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [session?.id]);
 
   const disabledSave = useMemo(() => !me || !name.trim() || saving, [me, name, saving]);
+
+  async function handleAvatarChange(file?: File | null) {
+    if (!file) return;
+    setUploadingAvatar(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error || "تعذر رفع الصورة");
+      setAvatarUrl(data.url);
+    } catch (e: any) {
+      alert(e?.message || "تعذر رفع الصورة");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
 
   const onSave = async () => {
     if (!me) return;
@@ -83,6 +109,7 @@ export default function ProfileEditPage() {
           city: city.trim() || null,
           bio: bio.trim() || null,
           interests,
+          avatar: avatarUrl || null,
           oldPassword: oldPassword || undefined,
           newPassword: newPassword || undefined,
         }),
@@ -107,9 +134,8 @@ export default function ProfileEditPage() {
   };
 
   return (
-    <div dir="rtl" className="min-h-screen flex flex-col" style={{ background: COLORS.bg, color: COLORS.text }}>
+    <div dir="rtl" className={`${cairo.className} min-h-screen flex flex-col`} style={{ background: COLORS.bg, color: COLORS.text }}>
       <HeaderBar />
-
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8">
         <div
           className="rounded-[22px] p-5 md:p-6 flex items-center justify-between"
@@ -149,6 +175,31 @@ export default function ProfileEditPage() {
               <div className="text-sm" style={{ color: COLORS.muted }}>لا يمكن تحميل البيانات حالياً.</div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm mb-1">الصورة الشخصية</label>
+                  <div className="flex items-center gap-3">
+                    <input type="file" accept="image/*" onChange={(e) => handleAvatarChange(e.target.files?.[0] || null)} />
+                    {uploadingAvatar && (
+                      <span className="text-xs" style={{ color: COLORS.muted }}>
+                        جاري الرفع…
+                      </span>
+                    )}
+                    {avatarUrl && (
+                      <img src={avatarUrl} alt="avatar" className="h-12 w-12 rounded-lg object-cover border" />
+                    )}
+                    {avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setAvatarUrl("")}
+                        className="text-xs underline"
+                        style={{ color: COLORS.primary }}
+                      >
+                        إزالة الصورة
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm mb-1">الاسم</label>
                   <Input value={name} onChange={e => setName(e.target.value)} className="h-11 rounded-xl" />
@@ -210,11 +261,19 @@ export default function ProfileEditPage() {
   );
 }
 
-/* ================== Header & Footer (مطابق للداشبورد) ================== */
-
 function HeaderBar() {
   const pathname = usePathname();
   const active = (href: string) => pathname === href;
+  const [displayName, setDisplayName] = useState<string>("");
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("session") || "";
+      if (!raw) { setDisplayName(""); return; }
+      const s: any = JSON.parse(raw);
+      setDisplayName((s?.name || "").trim());
+    } catch { setDisplayName(""); }
+  }, []);
 
   return (
     <header className="relative z-10">
@@ -229,22 +288,24 @@ function HeaderBar() {
             </Link>
           </div>
 
-          <nav className="hidden sm:flex items-center gap-1 text-sm">
-            {[
+          <div className="flex items-center gap-3">
+            <nav className="hidden sm:flex items-center gap-1 text-sm">
+              {[
                 { href: "/profile", label: "الملف الشخصي" },
                 { href: "/dashboard", label: "لوحة التحكم" },
                 { href: "/about", label: "عن المنصة" },
                 { href: "/support", label: "الدعم" },
-            ].map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={`px-3 py-1 rounded-lg transition ${active(l.href) ? "bg-[#EC1A24] text-white" : "text-[#1D1D1D]"}`}
-              >
-                {l.label}
-              </Link>
-            ))}
-          </nav>
+              ].map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className={`px-3 py-1 rounded-lg transition ${active(l.href) ? "bg-[#EC1A24] text-white" : "text-[#1D1D1D]"}`}
+                >
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
         </div>
       </div>
     </header>

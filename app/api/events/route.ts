@@ -1,61 +1,87 @@
-
+// app/api/events/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
-import { cookies, headers } from "next/headers";
-import { listEvents, addEvent } from "@/lib/server/data-store-server";
+import { NextRequest, NextResponse } from "next/server";
+import { getDB } from "@/lib/server/sqlite";
+import { getSession, type Session } from "@/lib/server/session";
 
-type UserRole = "systemAdmin" | "qualitySupervisor" | "entityManager" | "youth";
-type Session = { id: string; email: string; name: string; role: UserRole; entityId?: string | null };
+const SELECT_BASE = `
+  SELECT
+    e.id, e.title, e.date, e.status, e.entityId,
+    (SELECT COUNT(*) FROM event_evaluations ev WHERE ev.eventId = e.id) AS evalCount
+  FROM events e
+`;
 
-async function getSession(): Promise<Session | null> {
-  try {
-    const jar = await cookies();
-    const rawCookie = jar.get("session")?.value;
-    const hdrs = await headers();
-    const rawHeader = hdrs.get("x-session");
-    const raw = rawCookie ?? rawHeader ?? null;
-    return raw ? (JSON.parse(raw) as Session) : null;
-  } catch { return null; }
-}
+export async function GET(req: NextRequest) {
+  const db = getDB();
+  const url = new URL(req.url);
+  const entityId = url.searchParams.get("entityId");
+  const scope = url.searchParams.get("scope");
 
-function canManageEvents(s: Session | null) {
-  return !!s && (s.role === "systemAdmin" || s.role === "entityManager");
-}
-
-export async function GET() {
-  try {
-    return NextResponse.json(listEvents());
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "فشل تحميل الفعاليات" }, { status: 500 });
-  }
-}
-
-export async function POST(req: Request) {
-  const s = await getSession();
-  if (!canManageEvents(s)) {
-    return NextResponse.json({ error: "ممنوع: الصلاحيات غير كافية" }, { status: 403 });
+  if (entityId) {
+    const rows = db.prepare(
+      `${SELECT_BASE}
+        WHERE e.entityId = ?
+        ORDER BY datetime(e.date) DESC, e.id DESC`
+    ).all(entityId);
+    return NextResponse.json(rows ?? []);
   }
 
-  const b = await req.json();
-  if (!b?.title || !b?.entityId) {
-    return NextResponse.json({ error: "title و entityId مطلوبان" }, { status: 400 });
+  if (scope === "mine") {
+    const s = (await getSession(req)) as Session | null;
+    if (!s) return NextResponse.json([]);
+
+    if (s.role === "entityManager" || s.role === "unionSupervisor") {
+      const rows = db.prepare(
+        `${SELECT_BASE}
+          ORDER BY datetime(e.date) DESC, e.id DESC`
+      ).all();
+      return NextResponse.json(rows ?? []);
+    }
+
+    if (s.role === "user") {
+      if (s.entityId) {
+        const rows = db.prepare(
+          `${SELECT_BASE}
+            WHERE e.entityId = ? OR e.entityId IS NULL
+            ORDER BY datetime(e.date) DESC, e.id DESC`
+        ).all(String(s.entityId));
+        return NextResponse.json(rows ?? []);
+      }
+
+      const ents = db.prepare(
+        `SELECT entityId FROM entity_members WHERE userId=?
+         UNION
+         SELECT entityId FROM join_requests WHERE userId=? AND status='approved'`
+      ).all(s.id, s.id) as { entityId: string }[];
+
+      const ids = (ents || []).map(r => r.entityId).filter(Boolean);
+      if (!ids.length) {
+        const rows = db.prepare(
+          `${SELECT_BASE}
+            WHERE e.entityId IS NULL
+            ORDER BY datetime(e.date) DESC, e.id DESC`
+        ).all();
+        return NextResponse.json(rows ?? []);
+      }
+
+      const placeholders = ids.map(() => "?").join(",");
+      const rows = db.prepare(
+        `${SELECT_BASE}
+          WHERE e.entityId IN (${placeholders}) OR e.entityId IS NULL
+          ORDER BY datetime(e.date) DESC, e.id DESC`
+      ).all(...ids);
+      return NextResponse.json(rows ?? []);
+    }
+
+    return NextResponse.json([]);
   }
 
-  const allowed = ["draft", "approved", "cancelled", "done"];
-  const status = String(b.status ?? "draft");
-  if (!allowed.includes(status)) {
-    return NextResponse.json({ error: "status غير صالح" }, { status: 400 });
-  }
-
-  const item = addEvent({
-    title: String(b.title),
-    date: b?.date ? String(b.date) : null,
-    status: status as any,
-    entityId: String(b.entityId),
-  });
-
-  return NextResponse.json(item, { status: 201 });
+  const rows = db.prepare(
+    `${SELECT_BASE}
+      ORDER BY datetime(e.date) DESC, e.id DESC`
+  ).all();
+  return NextResponse.json(rows ?? []);
 }

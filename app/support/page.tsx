@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Mail, Phone, MessageSquare, Users, MapPin, Clock, Facebook, Github } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Cairo } from "next/font/google";
+
+const cairo = Cairo({ subsets: ["arabic"], weight: ["400", "600", "700", "800"] });
 
 export default function SupportPage() {
   return (
-    <div dir="rtl" className="relative min-h-screen overflow-hidden flex flex-col" style={{ backgroundColor: "#EFE6DE" }}>
+    <div dir="rtl" className={`${cairo.className} relative min-h-screen overflow-hidden flex flex-col`} style={{ backgroundColor: "#EFE6DE" }}>
       <HeaderBar />
-
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8 md:pt-12">
         <div className="rounded-[24px] p-6 md:p-10" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 12px 24px rgba(0,0,0,0.06)" }}>
           <h1 className="text-3xl md:text-4xl font-extrabold leading-tight" style={{ color: "#1D1D1D" }}>الدعم والمساعدة</h1>
@@ -95,11 +97,33 @@ export default function SupportPage() {
 function HeaderBar() {
   const pathname = usePathname();
   const active = (href: string) => pathname === href;
+  const [displayName, setDisplayName] = useState<string>("");
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("session") || "";
+      const s = raw ? JSON.parse(raw) : {};
+      setDisplayName((s?.name || "").trim());
+    } catch { setDisplayName(""); }
+  }, []);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "session") {
+        try {
+          const s = e.newValue ? JSON.parse(e.newValue) : {};
+          setDisplayName((s?.name || "").trim());
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   return (
     <header className="relative z-10">
       <div className="mx-auto max-w-6xl px-4">
-        <div className="mt-4 h-14 w-full rounded-2xl flex items-center justify-between px-4" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 6px 12px rgba(0,0,0,0.04)" }}>
+        <div className="mt-4 h-14 w-full rounded-٢xl flex items-center justify-between px-4" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 6px 12px rgba(0,0,0,0.04)" }}>
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>
               <Users className="h-5 w-5" color="#1D1D1D" />
@@ -109,26 +133,28 @@ function HeaderBar() {
             </Link>
           </div>
 
-          <nav className="hidden sm:flex items-center gap-1 text-sm">
-            {[
-              { href: "/profile", label: "الملف الشخصي" },
-              { href: "/dashboard", label: "لوحة التحكم" },
-              { href: "/support", label: "الدعم" },
-              { href: "/about", label: "عن المنصة" },
-            ].map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className="px-3 py-1 rounded-lg transition"
-                style={{
-                  color: active(l.href) ? "#FFFFFF" : "#1D1D1D",
-                  backgroundColor: active(l.href) ? "#EC1A24" : "transparent",
-                }}
-              >
-                {l.label}
-              </Link>
-            ))}
-          </nav>
+          <div className="flex items-center gap-3">
+            <nav className="hidden sm:flex items-center gap-1 text-sm">
+              {[
+                { href: "/profile", label: "الملف الشخصي" },
+                { href: "/dashboard", label: "لوحة التحكم" },
+                { href: "/support", label: "الدعم" },
+                { href: "/about", label: "عن المنصة" },
+              ].map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className="px-3 py-1 rounded-lg transition"
+                  style={{
+                    color: active(l.href) ? "#FFFFFF" : "#1D1D1D",
+                    backgroundColor: active(l.href) ? "#EC1A24" : "transparent",
+                  }}
+                >
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
         </div>
       </div>
     </header>
@@ -186,14 +212,8 @@ function ContactForm() {
     setState((s) => ({ ...s, sent: true }));
   };
 
-  const inputCls =
-    "w-full rounded-xl px-3 py-2 transition focus:outline-none focus:ring-2";
-  const inputStyle: React.CSSProperties = {
-    backgroundColor: "#FFFFFF",
-    border: "1px solid #E3E3E3",
-    color: "#1D1D1D",
-  };
-  const focusedStyle: React.CSSProperties = {};
+  const inputCls = "w-full rounded-xl px-3 py-2 transition focus:outline-none focus:ring-2";
+  const inputStyle: React.CSSProperties = { backgroundColor: "#FFFFFF", border: "1px solid #E3E3E3", color: "#1D1D1D" };
 
   return (
     <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-4">

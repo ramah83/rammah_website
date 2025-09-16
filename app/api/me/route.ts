@@ -1,12 +1,32 @@
 // app/api/me/route.ts
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 import { getDB } from "@/lib/server/sqlite";
+import { getSession } from "@/lib/server/session";
 
-const P = <T=any>(s:any)=>{ try{return JSON.parse(s??"null") as T}catch{return null as any} };
-const J = (v:any)=> JSON.stringify(v ?? null);
+const P = <T = any>(s: any) => {
+  try { return JSON.parse(s ?? "null") as T; } catch { return null as any; }
+};
+const J = (v: any) => JSON.stringify(v ?? null);
 
-// ===== GET /api/me?id=... أو /api/me?email=... =====
+function isNationalId(v?: string | null) {
+  return !!v && /^\d{14}$/.test(v);
+}
+
+function isBcryptHash(v?: string | null) {
+  return !!v && /^\$2[aby]\$\d{2}\$/.test(v);
+}
+
+// قاعدة بسيطة لقوة كلمة المرور (يمكنك تخفيفها إلى طول فقط إن أردت)
+function okPasswordComplexity(pwd: string) {
+  return /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(pwd);
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
@@ -24,13 +44,13 @@ export async function GET(req: NextRequest) {
 
   const user = {
     id: row.id,
+    nationalId: row.nationalId ?? null,
     name: row.name,
     email: row.email,
     role: row.role,
     entityId: row.entityId ?? null,
     interests: P<string[]>(row.interests),
     permissions: P<string[]>(row.permissions),
-    // حقول الملف الشخصي الاختيارية
     phone: row.phone ?? null,
     city: row.city ?? null,
     bio: row.bio ?? null,
@@ -40,60 +60,157 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(user, { status: 200 });
 }
 
-// ===== PATCH /api/me  (body: { id, name?, phone?, city?, bio?, interests?, avatar?, oldPassword?, newPassword? }) =====
 export async function PATCH(req: NextRequest) {
-  const body = await req.json();
-  const { id, name, phone, city, bio, interests, avatar, oldPassword, newPassword } = body || {};
-  if (!id) return NextResponse.json({ error: "missing id" }, { status: 400 });
+  try {
+    const body = await req.json();
+    const {
+      id: bodyId,
+      name,
+      phone,
+      city,
+      bio,
+      interests,
+      avatar,
+      oldPassword,
+      newPassword,
+      nationalId,
+    } = body || {};
 
-  const db = getDB();
-  const row: any = db.prepare(`SELECT * FROM users WHERE id=?`).get(id);
-  if (!row) return NextResponse.json({ error: "not found" }, { status: 404 });
+    const session = await getSession(req);
+    const effectiveId = session?.id || bodyId;
 
-  // تغيير كلمة السر (اختياري وبسيط — يفضل استخدام hashing في الإنتاج)
-  if (newPassword) {
-    const current = row.password ?? "";
-    if (!oldPassword || oldPassword !== current) {
-      return NextResponse.json({ error: "كلمة السر الحالية غير صحيحة" }, { status: 400 });
+    if (!effectiveId) {
+      return NextResponse.json({ error: "missing id" }, { status: 400 });
     }
+    if (session?.id && bodyId && session.id !== bodyId) {
+      return NextResponse.json({ error: "غير مصرح" }, { status: 403 });
+    }
+
+    const db = getDB();
+    const row: any = db.prepare(`SELECT * FROM users WHERE id=?`).get(effectiveId);
+    if (!row) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+    const nextName   = typeof name   === "string" ? (name.trim()   || row.name) : row.name;
+    const nextPhone  = typeof phone  === "string" ? (phone.trim()  || null)     : (row.phone ?? null);
+    const nextCity   = typeof city   === "string" ? (city.trim()   || null)     : (row.city ?? null);
+    const nextBio    = typeof bio    === "string" ? (bio.trim()    || null)     : (row.bio ?? null);
+    const nextAvatar = typeof avatar === "string" ? (avatar.trim() || null)     : (row.avatar ?? null);
+    const nextInterests = Array.isArray(interests) ? J(interests) : (row.interests ?? J([]));
+
+    // إدارة الرقم القومي
+    let nextNationalId = row.nationalId ?? null;
+    if (nationalId !== undefined) {
+      if (row.nationalId) {
+        return NextResponse.json({ error: "لا يمكن تعديل الرقم القومي بعد حفظه" }, { status: 400 });
+      }
+      if (!isNationalId(nationalId)) {
+        return NextResponse.json({ error: "الرقم القومي يجب أن يكون 14 رقمًا" }, { status: 400 });
+      }
+      const exists = db.prepare(`SELECT 1 FROM users WHERE nationalId=?`).get(nationalId);
+      if (exists) {
+        return NextResponse.json({ error: "هذا الرقم القومي مستخدم بالفعل" }, { status: 400 });
+      }
+      nextNationalId = nationalId;
+    }
+
+    // تغيير كلمة السر
+    let willUpdatePassword = false;
+    let newPasswordHash: string | undefined;
+
+    const hasStoredHash  = !!row.passwordHash;
+    const hasLegacyField = row.password != null && row.password !== "";
+
+    if (newPassword) {
+      if (!okPasswordComplexity(String(newPassword))) {
+        return NextResponse.json({ error: "كلمة السر الجديدة يجب أن تكون 8 أحرف على الأقل وتحتوي على حروف وأرقام" }, { status: 400 });
+      }
+
+      // هل نطلب كلمة السر الحالية؟
+      const hadAnyPassword = hasStoredHash || hasLegacyField;
+      if (hadAnyPassword) {
+        if (!oldPassword) {
+          return NextResponse.json({ error: "يرجى إدخال كلمة السر الحالية" }, { status: 400 });
+        }
+
+        let okOld = false;
+
+        // الحالة الأحدث: passwordHash
+        if (hasStoredHash && bcrypt.compareSync(String(oldPassword), String(row.passwordHash))) {
+          okOld = true;
+        } else if (hasLegacyField) {
+          // دعم أنظمة قديمة:
+          if (isBcryptHash(row.password)) {
+            // العمود legacy كان Bcrypt — قارن وهاجر إلى passwordHash
+            if (bcrypt.compareSync(String(oldPassword), String(row.password))) {
+              okOld = true;
+              db.prepare(`UPDATE users SET passwordHash=?, password=NULL WHERE id=?`).run(row.password, effectiveId);
+            }
+          } else {
+            // العمود legacy كان Plain — قارن نصيًا ثم هاش وهاجر
+            if (String(oldPassword) === String(row.password)) {
+              okOld = true;
+              const migrated = bcrypt.hashSync(String(oldPassword), 10);
+              db.prepare(`UPDATE users SET passwordHash=?, password=NULL WHERE id=?`).run(migrated, effectiveId);
+            }
+          }
+        }
+
+        if (!okOld) {
+          return NextResponse.json({ error: "كلمة السر الحالية غير صحيحة" }, { status: 400 });
+        }
+      }
+      // لو لم يكن للمستخدم كلمة سر من قبل: لا نطلب oldPassword
+
+      newPasswordHash = bcrypt.hashSync(String(newPassword), 10);
+      willUpdatePassword = true;
+    } else if (oldPassword && !newPassword) {
+      return NextResponse.json({ error: "يرجى إدخال كلمة السر الجديدة" }, { status: 400 });
+    }
+
+    // تحديث البيانات
+    const sql = `
+      UPDATE users
+         SET name=?,
+             phone=?,
+             city=?,
+             bio=?,
+             avatar=?,
+             interests=?,
+             nationalId=?
+             ${willUpdatePassword ? `, passwordHash=?, password=NULL` : ``}
+       WHERE id=?
+    `;
+    const params: any[] = [
+      nextName,
+      nextPhone,
+      nextCity,
+      nextBio,
+      nextAvatar,
+      nextInterests,
+      nextNationalId,
+    ];
+    if (willUpdatePassword) params.push(newPasswordHash);
+    params.push(effectiveId);
+
+    db.prepare(sql).run(...params);
+
+    const after: any = db.prepare(`SELECT * FROM users WHERE id=?`).get(effectiveId);
+    const user = {
+      id: after.id,
+      nationalId: after.nationalId ?? null,
+      name: after.name,
+      email: after.email,
+      role: after.role,
+      entityId: after.entityId ?? null,
+      interests: P<string[]>(after.interests),
+      permissions: P<string[]>(after.permissions),
+      phone: after.phone ?? null,
+      city: after.city ?? null,
+      bio: after.bio ?? null,
+      avatar: after.avatar ?? null,
+    };
+    return NextResponse.json(user, { status: 200 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || "Internal Server Error" }, { status: 500 });
   }
-
-  const next = {
-    name: typeof name === "string" && name.trim() ? name.trim() : row.name,
-    phone: typeof phone === "string" ? (phone.trim() || null) : (row.phone ?? null),
-    city:  typeof city  === "string" ? (city.trim()  || null) : (row.city  ?? null),
-    bio:   typeof bio   === "string" ? (bio.trim()   || null) : (row.bio   ?? null),
-    avatar: typeof avatar === "string" ? (avatar.trim() || null) : (row.avatar ?? null),
-    interests: Array.isArray(interests)
-      ? J(interests)
-      : (row.interests ?? J([])),
-    password: newPassword ? String(newPassword) : (row.password ?? null),
-  };
-
-  // نفّذ التحديث
-  db.prepare(`
-    UPDATE users
-       SET name=?, phone=?, city=?, bio=?, avatar=?, interests=?, password=?
-     WHERE id=?
-  `).run(
-    next.name, next.phone, next.city, next.bio, next.avatar, next.interests, next.password, id
-  );
-
-  // أرجع نسخة آمنة للمستخدم بعد التحديث
-  const after: any = db.prepare(`SELECT * FROM users WHERE id=?`).get(id);
-  const user = {
-    id: after.id,
-    name: after.name,
-    email: after.email,
-    role: after.role,
-    entityId: after.entityId ?? null,
-    interests: P<string[]>(after.interests),
-    permissions: P<string[]>(after.permissions),
-    phone: after.phone ?? null,
-    city: after.city ?? null,
-    bio: after.bio ?? null,
-    avatar: after.avatar ?? null,
-  };
-
-  return NextResponse.json(user, { status: 200 });
 }

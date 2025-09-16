@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter,usePathname  } from "next/navigation";
 import type { Session, JoinRequest } from "@/lib/types";
 import { BadgeCheck, XCircle, RefreshCw, Users } from "lucide-react";
-import {
-  Select, SelectTrigger, SelectContent, SelectItem, SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 
 const COLORS = {
   text: "#1D1D1D",
@@ -22,9 +20,18 @@ const COLORS = {
 
 type EntityLite = { id: string; name: string };
 
+function buildSessionHeaders(contentType = true): HeadersInit {
+  const h: Record<string, string> = { "Cache-Control": "no-store" };
+  if (contentType) h["Content-Type"] = "application/json";
+  try {
+    const raw = localStorage.getItem("session") || "";
+    if (raw) h["x-session-b64"] = btoa(unescape(encodeURIComponent(raw)));
+  } catch {}
+  return h;
+}
+
 export default function RequestsPage() {
   const router = useRouter();
-
   const [session, setSession] = useState<Session | null>(null);
 
   const [rows, setRows] = useState<JoinRequest[]>([]);
@@ -33,112 +40,139 @@ export default function RequestsPage() {
 
   const [entities, setEntities] = useState<EntityLite[]>([]);
   const [selectedEntity, setSelectedEntity] = useState<string>("");
+
   const [submitting, setSubmitting] = useState(false);
+  const [currentEntityId, setCurrentEntityId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
       const s = localStorage.getItem("session");
       if (!s) { router.push("/"); return; }
-      const parsed: Session = JSON.parse(s);
-      setSession(parsed);
+      setSession(JSON.parse(s));
     } catch {
-      router.push("/");
+      router.push("/");  // إرجاع للمسار الرئيسي في حالة حدوث خطأ في الجلسة.
     }
   }, [router]);
 
-  const isAdmin = !!session && ["systemAdmin", "entityManager"].includes(session.role);
+  const canDecide = !!session && session.role === "entityManager";
 
-  const loadRequests = async (me: Session) => {
+  const loadRequests = useCallback(async () => {
+    if (!session?.id) return;
     setLoading(true);
     try {
-      const url = isAdmin
-        ? `/api/join-requests`
-        : `/api/join-requests?userId=${encodeURIComponent(me.id)}`;
-      const res = await fetch(url, { cache: "no-store" });
-      const data: JoinRequest[] = await res.json();
+      const q =
+        canDecide && session.role === "entityManager" && session.entityId
+          ? `?entityId=${encodeURIComponent(String(session.entityId))}`
+          : `?userId=${encodeURIComponent(session.id)}`;
+
+      const res = await fetch(`/api/join-requests${q}`, {
+        cache: "no-store",
+        headers: buildSessionHeaders(false),
+        credentials: "include",
+      });
+      const data: JoinRequest[] = await res.json().catch(() => []);
       setRows(Array.isArray(data) ? data : []);
     } finally {
       setLoading(false);
     }
-  };
+  }, [session?.id, session?.role, session?.entityId, canDecide]);
 
-  const loadEntities = async () => {
+  const loadEntities = useCallback(async () => {
+    const res = await fetch("/api/entities", {
+      cache: "no-store",
+      headers: buildSessionHeaders(false),
+      credentials: "include",
+    });
+    const data = await res.json().catch(() => []);
+    const list: EntityLite[] = (Array.isArray(data) ? data : data?.entities || [])
+      .filter((e: any) => e?.id && e?.name)
+      .map((e: any) => ({ id: String(e.id), name: String(e.name) }));
+    setEntities(list);
+    setSelectedEntity(prev => prev || (list[0]?.id ?? ""));
+  }, []);
+
+  const loadMembership = useCallback(async () => {
+    if (session?.role !== "user") { setCurrentEntityId(null); return; }
     try {
-      const res = await fetch("/api/entities", { cache: "no-store" });
-      const data = await res.json();
-      const list: EntityLite[] = (Array.isArray(data) ? data : data?.entities || [])
-        .filter((e: any) => e?.id && e?.name)
-        .map((e: any) => ({ id: String(e.id), name: String(e.name) }));
-      setEntities(list);
-      if (!selectedEntity && list[0]?.id) setSelectedEntity(list[0].id);
+      const r = await fetch("/api/membership/my", {
+        cache: "no-store",
+        headers: buildSessionHeaders(false),
+        credentials: "include",
+      });
+      const j = await r.json().catch(() => null);
+      setCurrentEntityId(j?.entityId ? String(j.entityId) : null);
     } catch {
-      setEntities([]);
+      setCurrentEntityId(null);
     }
-  };
+  }, [session?.role]);
 
+  const reloadAll = useCallback(async () => {
+    await Promise.all([
+      loadRequests(),
+      canDecide ? Promise.resolve() : loadEntities(),
+      canDecide ? Promise.resolve() : loadMembership(),
+    ]);
+  }, [loadRequests, loadEntities, loadMembership, canDecide]);
+
+  useEffect(() => { if (session?.id) reloadAll(); }, [session?.id, reloadAll]);
+
+  // أعِد التحميل عند الرجوع للتاب/النافذة
   useEffect(() => {
-    if (!session) return;
-    loadRequests(session);
-    if (!isAdmin) loadEntities();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+    const onFocus = () => reloadAll();
+    const onVis = () => { if (document.visibilityState === "visible") reloadAll(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [reloadAll]);
 
-  // جرّب تجمع الطلبات حسب الحالة
   const grouped = useMemo(() => {
     const g: Record<"pending" | "approved" | "rejected", JoinRequest[]> = {
-      pending: [], approved: [], rejected: []
+      pending: [], approved: [], rejected: [],
     };
-    for (const r of rows) g[r.status].push(r);
+    const items = Array.isArray(rows) ? rows : [];
+    for (const r of items) {
+      if (!r) continue;
+      if (r.status === "pending" || r.status === "approved" || r.status === "rejected") g[r.status].push(r);
+    }
     return g;
   }, [rows]);
 
-  // تحقق لو فيه طلب pending لنفس الكيان المختار
   const hasPendingForSelected = useMemo(() => {
     if (!selectedEntity) return false;
     return rows.some(r => r.entityId === selectedEntity && r.status === "pending");
   }, [rows, selectedEntity]);
 
-  // ✅ جديد: تحقق لو المستخدم "مقبول" بالفعل في الكيان المختار
-  const hasApprovedForSelected = useMemo(() => {
-    if (!selectedEntity) return false;
-    return rows.some(r => r.entityId === selectedEntity && r.status === "approved");
-  }, [rows, selectedEntity]);
+  const isMemberNow: boolean = !!currentEntityId;
+  const isSelectedCurrent: boolean = !!selectedEntity && currentEntityId === selectedEntity;
 
-  // ✅ (اختياري ومفعّل): اخفي الكيانات اللي المستخدم عضو فيها بالفعل من الـ Select
   const filteredEntities = useMemo(() => {
-    if (isAdmin) return entities;
-    const approvedIds = new Set(rows.filter(r => r.status === "approved").map(r => r.entityId));
-    const list = entities.filter(e => !approvedIds.has(e.id));
-    // لو الكيان المختار اتشال من القائمة بعد الفلترة، اختار أول متاح
+    if (canDecide) return entities;
+    const list = entities;
     if (selectedEntity && !list.find(e => e.id === selectedEntity)) {
       if (list[0]?.id) setSelectedEntity(list[0].id);
       else setSelectedEntity("");
     }
     return list;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entities, rows, isAdmin]);
+  }, [entities, canDecide, selectedEntity]);
 
   const act = async (id: string, action: "approve" | "reject") => {
-    if (!isAdmin || acting) return;
+    if (!canDecide || acting) return;
     setActing(id);
     try {
-      const res = await fetch("/api/join-requests", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action, decidedBy: session?.name || "admin" }),
+      const res = await fetch(`/api/join-requests/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: buildSessionHeaders(true),
+        credentials: "include",
+        body: JSON.stringify({ action }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) { alert(data?.error || "تعذّر تنفيذ الإجراء"); return; }
-
-      const s = localStorage.getItem("session");
-      if (s) {
-        const me = JSON.parse(s);
-        if (me.id === data.userId && action === "approve") {
-          me.entityId = data.entityId;
-          localStorage.setItem("session", JSON.stringify(me));
-        }
-      }
-      if (session) await loadRequests(session);
+      await loadRequests();
+      // لو تم قبول طلب المستخدم الحالي، عضويته هتتغير — نحدّث
+      await loadMembership();
     } catch (e: any) {
       alert(e?.message || "حدث خطأ");
     } finally {
@@ -148,34 +182,23 @@ export default function RequestsPage() {
 
   const submitJoin = async () => {
     if (!session) return;
+    if (isMemberNow) { alert("أنت عضو حاليًا في كيان. يجب الخروج أولًا قبل تقديم طلب جديد."); return; }
     if (!selectedEntity) { alert("اختر كيانًا أولاً"); return; }
     if (hasPendingForSelected) { alert("لديك طلب قيد المراجعة لهذا الكيان"); return; }
-    if (hasApprovedForSelected) { alert("أنت عضو بالفعل في هذا الكيان"); return; }
-
-    const ent = filteredEntities.find(e => e.id === selectedEntity) || entities.find(e => e.id === selectedEntity);
-    if (!ent) { alert("الكيان غير موجود"); return; }
 
     setSubmitting(true);
     try {
       const res = await fetch("/api/join-requests", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: session.id,
-          userName: session.name,
-          userEmail: session.email,
-          entityId: ent.id,
-          entityName: ent.name,
-        }),
+        headers: buildSessionHeaders(true),
+        credentials: "include",
+        body: JSON.stringify({ entityId: selectedEntity }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        // هيعرض رسالة السيرفر (مثلاً: أنت بالفعل عضو في هذا الكيان / عندك طلب قيد المراجعة)
-        alert(data?.error || "تعذّر إرسال الطلب");
-        return;
-      }
-      alert("تم إرسال طلب الانضمام");
-      await loadRequests(session);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data?.error || "تعذّر إرسال الطلب"); return; }
+      alert("تم إرسال طلب الانضمام. بانتظار موافقة مسؤول الكيان.");
+      await loadRequests();
+      await loadMembership();
     } catch (e: any) {
       alert(e?.message || "تعذّر إرسال الطلب");
     } finally {
@@ -185,7 +208,7 @@ export default function RequestsPage() {
 
   if (!session) {
     return (
-      <div dir="rtl" className="min-h-screen" style={{ background: COLORS.bg, color: COLORS.text }}>
+      <div dir="rtl" className="min-h-screen" style={{ background: COLORS.bg, color: COLORS.text, fontFamily: "'Cairo', ui-sans-serif, system-ui" }}>
         <HeaderBar />
         <div className="mx-auto max-w-6xl w-full px-4 py-8">
           <SurfaceCard>
@@ -201,15 +224,12 @@ export default function RequestsPage() {
   }
 
   return (
-    <div dir="rtl" className="min-h-screen" style={{ background: COLORS.bg, color: COLORS.text }}>
+    <div dir="rtl" className="min-h-screen" style={{ background: COLORS.bg, color: COLORS.text, fontFamily: "'Cairo', ui-sans-serif, system-ui" }}>
       <HeaderBar />
 
-      {/* الهيدر */}
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8">
-        <div
-          className="rounded-[22px] p-5 md:p-6 flex items-center justify-between"
-          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}
-        >
+        <div className="rounded-[22px] p-5 md:p-6 flex items-center justify-between"
+             style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
           <div className="flex items-center gap-3">
             <span className="h-10 w-10 rounded-xl grid place-items-center" style={{ backgroundColor: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
               <Users className="h-5 w-5" color={COLORS.text} />
@@ -217,28 +237,45 @@ export default function RequestsPage() {
             <div>
               <h1 className="text-2xl md:text-3xl font-extrabold" style={{ color: COLORS.text }}>طلبات الانضمام</h1>
               <p className="text-sm" style={{ color: COLORS.muted }}>
-                {isAdmin ? "مراجعة الطلبات واتخاذ القرار" : "اختر كيانًا لتقديم طلب الانضمام، وتابع حالة طلباتك"}
+                {canDecide ? "مراجعة الطلبات واتخاذ القرار" : "اختر كيانًا لتقديم طلب الانضمام، وتابع حالة طلباتك"}
               </p>
             </div>
           </div>
-          <div className="h-9 px-3 rounded-full grid place-items-center"
-               style={{ backgroundColor: COLORS.soft, border: `1px solid ${COLORS.line}`, color: COLORS.text }}>
-            {rows.length} طلب
+
+          <div className="flex items-center gap-2">
+            <div className="h-9 px-3 rounded-full grid place-items-center"
+                 style={{ backgroundColor: COLORS.soft, border: `1px solid ${COLORS.line}`, color: COLORS.text }}>
+              {rows.length} طلب
+            </div>
+            <button
+              onClick={reloadAll}
+              className="h-9 px-3 rounded-full inline-flex items-center gap-2"
+              style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text }}
+            >
+              <RefreshCw className="h-4 w-4" /> تحديث
+            </button>
           </div>
         </div>
       </section>
 
-      {/* المحتوى */}
       <main className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-6 pb-10">
-        {/* تقديم طلب (لغير الأدمن فقط) */}
-        {!isAdmin && (
+        {!canDecide && (
           <SurfaceCard className="mb-6">
             <div className="p-5 space-y-4">
+              {isMemberNow && (
+                <div className="rounded-xl p-3 text-sm" style={{ background: "#FFF8E8", border: "1px solid #F2E7C6", color: "#7A7A7A" }}>
+                  أنت عضو حالياً في:{" "}
+                  <strong>{entities.find(e => e.id === currentEntityId)?.name || currentEntityId}</strong>.
+                  لا يمكنك تقديم طلب جديد إلا بعد الخروج من الكيان (من صفحة الملف الشخصي).
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
                 <div>
                   <label className="block text-sm mb-1" style={{ color: COLORS.text }}>اختر الكيان</label>
-                  <Select value={selectedEntity} onValueChange={setSelectedEntity}>
-                    <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text }}>
+                  <Select value={selectedEntity} onValueChange={setSelectedEntity} disabled={isMemberNow}>
+                    <SelectTrigger className="h-11 rounded-xl"
+                                   style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text }}>
                       <SelectValue placeholder="اختر الكيان" />
                     </SelectTrigger>
                     <SelectContent>
@@ -251,19 +288,15 @@ export default function RequestsPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={submitJoin}
-                    disabled={
-                      !selectedEntity ||
-                      submitting ||
-                      hasPendingForSelected ||
-                      hasApprovedForSelected
-                    }
+                    disabled={Boolean(isMemberNow || !selectedEntity || submitting || hasPendingForSelected || isSelectedCurrent)}
                     className="h-11 px-5 rounded-full font-semibold"
-                    style={{ background: COLORS.primary, color: "#FFFFFF", opacity: (!selectedEntity || submitting || hasPendingForSelected || hasApprovedForSelected) ? 0.6 : 1 }}
+                    style={{ background: COLORS.primary, color: "#FFFFFF",
+                             opacity: (isMemberNow || !selectedEntity || submitting || hasPendingForSelected || isSelectedCurrent) ? 0.6 : 1 }}
                   >
                     {submitting ? "جارٍ الإرسال..." : "تقديم طلب انضمام"}
                   </button>
                   <button
-                    onClick={() => session && loadRequests(session)}
+                    onClick={reloadAll}
                     className="h-11 px-4 rounded-full"
                     style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text }}
                   >
@@ -271,21 +304,16 @@ export default function RequestsPage() {
                   </button>
                 </div>
               </div>
-              {hasPendingForSelected && (
+
+              {hasPendingForSelected && !isMemberNow && (
                 <div className="text-sm" style={{ color: COLORS.muted }}>
                   لديك طلب قيد المراجعة لهذا الكيان بالفعل.
-                </div>
-              )}
-              {hasApprovedForSelected && (
-                <div className="text-sm" style={{ color: COLORS.muted }}>
-                  أنت عضو بالفعل في هذا الكيان.
                 </div>
               )}
             </div>
           </SurfaceCard>
         )}
 
-        {/* قائمة الطلبات */}
         <SurfaceCard>
           <div className="p-5">
             {loading ? (
@@ -303,11 +331,9 @@ export default function RequestsPage() {
                     ) : (
                       <ul className="space-y-3">
                         {grouped[k].map((r) => (
-                          <li
-                            key={r.id}
-                            className="rounded-2xl p-4 flex items-center justify-between"
-                            style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: "0 6px 12px rgba(0,0,0,0.04)" }}
-                          >
+                          <li key={r.id}
+                              className="rounded-2xl p-4 flex items-center justify-between"
+                              style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: "0 6px 12px rgba(0,0,0,0.04)" }}>
                             <div>
                               <div className="font-semibold" style={{ color: COLORS.text }}>
                                 {r.userName}{" "}
@@ -319,11 +345,10 @@ export default function RequestsPage() {
                               </div>
                             </div>
 
-                            {/* أزرار القرار للمسؤول */}
-                            {isAdmin && r.status === "pending" ? (
+                            {canDecide && r.status === "pending" ? (
                               <div className="flex items-center gap-2">
                                 <button
-                                  disabled={!!acting}
+                                  disabled={Boolean(acting)}
                                   onClick={() => act(r.id, "approve")}
                                   className="h-9 px-3 rounded-full flex items-center gap-2 font-medium"
                                   style={{ background: COLORS.primary, color: "#FFFFFF" }}
@@ -331,7 +356,7 @@ export default function RequestsPage() {
                                   <BadgeCheck className="h-4 w-4" /> موافقة
                                 </button>
                                 <button
-                                  disabled={!!acting}
+                                  disabled={Boolean(acting)}
                                   onClick={() => act(r.id, "reject")}
                                   className="h-9 px-3 rounded-full flex items-center gap-2"
                                   style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text }}
@@ -340,7 +365,7 @@ export default function RequestsPage() {
                                 </button>
                               </div>
                             ) : (
-                              <StatusPill status={r.status} />
+                              <StatusPill status={r.status as any} />
                             )}
                           </li>
                         ))}
@@ -358,16 +383,14 @@ export default function RequestsPage() {
 }
 
 function HeaderBar() {
-  const pathname = usePathname();
+  const pathname = usePathname();  // هذه هي الطريقة الصحيحة لاستخدام usePathname
   const active = (href: string) => pathname === href;
 
   return (
-    <header className="relative z-10">
+    <header className="relative z-10" style={{ fontFamily: "'Cairo', ui-sans-serif, system-ui" }}>
       <div className="mx-auto max-w-6xl px-4">
-        <div
-          className="mt-4 h-14 w-full rounded-2xl flex items-center justify-between px-4"
-          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: "0 6px 12px rgba(0,0,0,0.04)" }}
-        >
+        <div className="mt-4 h-14 w-full rounded-2xl flex items-center justify-between px-4"
+             style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: "0 6px 12px rgba(0,0,0,0.04)" }}>
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-lg grid place-items-center" style={{ backgroundColor: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
               <Users className="h-5 w-5" color={COLORS.text} />
@@ -377,23 +400,17 @@ function HeaderBar() {
             </Link>
           </div>
           <nav className="hidden sm:flex items-center gap-1 text-sm">
-            {[
-              { href: "/", label: "الرئيسية" },
-              { href: "/about", label: "عن المنصة" },
-              { href: "/support", label: "الدعم" },
-              { href: "/dashboard", label: "لوحة التحكم" },
-              { href: "/entities", label: "الكيانات" },
-              { href: "/dashboard/requests", label: "طلبات الانضمام" },
+            {[ 
+              { href: "/", label: "الرئيسية" }, 
+              { href: "/about", label: "عن المنصة" }, 
+              { href: "/support", label: "الدعم" }, 
+              { href: "/dashboard", label: "لوحة التحكم" }, 
+              { href: "/entities", label: "الكيانات" }, 
+              { href: "/dashboard/requests", label: "طلبات الانضمام" } 
             ].map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
+              <Link key={l.href} href={l.href}
                 className="px-3 py-1 rounded-lg transition"
-                style={{
-                  color: active(l.href) ? "#FFFFFF" : COLORS.text,
-                  backgroundColor: active(l.href) ? COLORS.primary : "transparent",
-                }}
-              >
+                style={{ color: active(l.href) ? "#FFFFFF" : COLORS.text, backgroundColor: active(l.href) ? COLORS.primary : "transparent" }}>
                 {l.label}
               </Link>
             ))}
@@ -406,24 +423,20 @@ function HeaderBar() {
 
 function SurfaceCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div
-      className={`rounded-2xl ${className}`}
-      style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}
-    >
+    <div className={`rounded-2xl ${className}`}
+         style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
       {children}
     </div>
   );
 }
 
 function StatusPill({ status }: { status: "pending" | "approved" | "rejected" }) {
-  let bg = "#FFF8E8", bd = "#F2E7C6", txt = COLORS.text;
-  if (status === "approved") { bg = "#EAF8F0"; bd = "#CBEBDD"; }
-  if (status === "rejected") { bg = "#FEEDEF"; bd = "#F5C9CF"; }
+  let bg = "#FFF8E8", bd = "#F2E7C6", txt = "#7A7A7A";
+  if (status === "approved") { bg = "#EAF8F0"; bd = "#CBEBDD"; txt = "#0F5132"; }
+  if (status === "rejected") { bg = "#FEEDEF"; bd = "#F5C9CF"; txt = "#842029"; }
   return (
-    <span
-      className="inline-flex items-center h-7 px-3 rounded-full text-xs font-medium"
-      style={{ background: bg, border: `1px solid ${bd}`, color: txt }}
-    >
+    <span className="inline-flex items-center h-7 px-3 rounded-full text-xs font-medium"
+          style={{ background: bg, border: `1px solid ${bd}`, color: txt }}>
       {status === "pending" ? "قيد المراجعة" : status === "approved" ? "مقبول" : "مرفوض"}
     </span>
   );

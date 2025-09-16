@@ -1,136 +1,183 @@
+// app/events/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Users } from "lucide-react";
+import { Cairo } from "next/font/google";
 
-import { Calendar, Search, Plus, Pencil, Trash2, Check, X, Building2 } from "lucide-react";
+const cairo = Cairo({ subsets: ["arabic", "latin"], weight: ["400", "600", "700", "800"], display: "swap" });
 
-type UserRole = "systemAdmin" | "qualitySupervisor" | "entityManager" | "youth";
-type Session = { id: string; email: string; name: string; role: UserRole; entityId?: string | null };
+type Role = "unionSupervisor" | "entityManager" | "user";
+type Session = { id: string; email: string; name: string; role: Role; entityId?: string | null };
 
-type EventItem = {
-  id: string;
-  title: string;
-  date?: string | null;
-  status: "draft" | "approved" | "cancelled" | "done";
-  entityId?: string | null;
-};
+type EventRow = { id: string; title: string; date?: string | null; status?: string; entityId?: string | null };
+type EntityLite = { id: string; name: string };
 
-type JoinRequest = {
-  id: string; userId: string; userName: string; userEmail: string;
-  entityId: string; entityName: string; status: "pending" | "approved" | "rejected";
-  createdAt: string; decidedAt?: string; decidedBy?: string;
-};
+const PALETTE = { black: "#1D1D1D", red: "#EC1A24", beige: "#EFE6DE", border: "#E7E2DC", soft:"#F6F6F6", muted:"#6B6B6B" };
 
-const ALL = "all" as const;
-const NO_ENTITY = "__no_entity__";
+function buildSessionHeaders(contentType = true): HeadersInit {
+  const h: Record<string, string> = {};
+  if (contentType) h["Content-Type"] = "application/json";
+  try {
+    const raw = localStorage.getItem("session") || "";
+    if (raw) h["x-session-b64"] = btoa(unescape(encodeURIComponent(raw)));
+  } catch {}
+  return h;
+}
+
+function isPdf(u?: string|null) { return !!u && /\.pdf($|\?)/i.test(u); }
+function isImage(u?: string|null) { return !!u && /\.(png|jpe?g|gif|webp|avif|bmp|svg)($|\?)/i.test(u); }
 
 export default function EventsPage() {
-  const router = useRouter();
-
   const [session, setSession] = useState<Session | null>(null);
-  const [entities, setEntities] = useState<any[]>([]);
-  const [list, setList] = useState<EventItem[]>([]);
+  const [mounted, setMounted] = useState(false);
+  const [msg, setMsg] = useState<{ ok?: string; err?: string }>({});
+  const [showAdd, setShowAdd] = useState(false);
 
-  const [myEntityIds, setMyEntityIds] = useState<string[]>([]);
-
-  const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>(ALL);
-  const [filterEntity, setFilterEntity] = useState<string>(ALL);
-
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [errMsg, setErrMsg] = useState("");
-
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState<Partial<EventItem> | null>(null);
-
-  const [form, setForm] = useState({
-    entityId: "",
-    title: "",
-    date: "",
-    status: "draft" as EventItem["status"],
-  });
-
-  const sessionHeader = () => localStorage.getItem("session") || "";
-
-  const api = {
-    getEntities: async () => {
-      const r = await fetch("/api/entities", { cache: "no-store" });
-      if (!r.ok) throw new Error("GET /api/entities failed");
-      return r.json();
-    },
-    getEvents: async () => {
-      const r = await fetch("/api/events", { cache: "no-store" });
-      if (!r.ok) throw new Error("GET /api/events failed");
-      return r.json();
-    },
-    getMyApprovedJoins: async (userId: string) => {
-      const r = await fetch(`/api/join-requests?status=approved&userId=${encodeURIComponent(userId)}`, { cache: "no-store" });
-      if (!r.ok) return [];
-      return (await r.json()) as JoinRequest[];
-    },
-    createEvent: async (payload: any) => {
-      const r = await fetch("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-session": sessionHeader() },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-      if (!r.ok) throw new Error(await r.text());
-      return r.json();
-    },
-    updateEvent: async (id: string, payload: any) => {
-      const r = await fetch(`/api/events/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-session": sessionHeader() },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-      if (!r.ok) throw new Error(await r.text());
-      return r.json();
-    },
-    deleteEvent: async (id: string) => {
-      const r = await fetch(`/api/events/${id}`, {
-        method: "DELETE",
-        headers: { "x-session": sessionHeader() },
-        credentials: "include",
-      });
-      if (!r.ok) throw new Error(await r.text());
-      return r.json();
-    },
-  };
-
+  useEffect(() => setMounted(true), []);
   useEffect(() => {
+    if (!mounted) return;
     try {
       const raw = localStorage.getItem("session");
-      if (!raw) { router.push("/"); return; }
-      const s: Session = JSON.parse(raw);
-      setSession(s);
-    } catch {
-      router.push("/");
-    }
-  }, [router]);
+      if (!raw) return;
+      setSession(JSON.parse(raw) as Session);
+    } catch {}
+  }, [mounted]);
+
+  const isManager = session?.role === "entityManager";
+  const isSupervisor = session?.role === "unionSupervisor";
+
+  return (
+    <div dir="rtl" className={`${cairo.className} min-h-screen flex flex-col`} style={{ backgroundColor: PALETTE.beige }}>
+      <HeaderBar />
+      <div className="mx-auto max-w-5xl w-full p-4">
+        <Card className="rounded-[22px] border" style={{ borderColor: PALETTE.border, background: "#fff" }}>
+          <CardHeader>
+            <CardTitle className="text-2xl font-extrabold" style={{ color: PALETTE.black }}>
+              {isManager ? "طلب فعالية" : "الفعاليات"}
+            </CardTitle>
+            <CardDescription style={{ color: "#6B6B6B" }}>
+              {isManager ? "قدّم طلب فعالية لِكيانك" : "عرض الفعاليات حسب صلاحياتك"}
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            {session?.role === "user" ? (
+              <div className="p-3 rounded-lg text-sm mb-4" style={{ color: "#6B6B6B", background: "#F6F6F6", border: `1px solid ${PALETTE.border}` }}>
+                إذا كنت مستخدمًا وتريد تقييم فعالية، انتقل إلى صفحة{" "}
+                <Link href="/events/evaluate" className="underline">تقييم فعالية</Link>.
+              </div>
+            ) : session?.role === "entityManager" ? (
+              <RequestForm
+                entityId={session?.entityId || ""}
+                canPublic={false}
+                onOk={(t) => setMsg({ ok: t })}
+                onErr={(e) => setMsg({ err: e })}
+              />
+            ) : isSupervisor ? (
+              <div className="mb-3">
+                <Button onClick={()=>setShowAdd(true)} className="h-10 rounded-full px-4" style={{ background: PALETTE.red, color:"#fff" }}>
+                  إضافة فعالية
+                </Button>
+              </div>
+            ) : null}
+
+            {msg.err && (
+              <div className="mt-4 p-3 rounded-lg text-sm" style={{ color: "#EC1A24", background: "#FDEBEC", border: "1px solid #EC1A2433" }}>
+                {msg.err}
+              </div>
+            )}
+            {msg.ok && (
+              <div className="mt-4 p-3 rounded-lg text-sm" style={{ color: "#0F5132", background: "#E8F7EE", border: "1px solid #CBE9D6" }}>
+                {msg.ok}
+              </div>
+            )}
+
+            <div className="mt-6">
+              <h3 className="font-semibold mb-2 flex items-center justify-between" style={{ color: PALETTE.black }}>
+                <span>قائمة الفعاليات</span>
+              </h3>
+              <EventList session={session} />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      <FooterBar />
+
+      {isSupervisor && showAdd && (
+        <div className="fixed inset-0 z-[999]">
+          <div className="absolute inset-0 bg-black/40" onClick={()=>setShowAdd(false)} />
+          <div className="absolute inset-0 grid place-items-center p-4">
+            <div className="w-full max-w-3xl max-h-[85vh] overflow-auto rounded-2xl bg-white border shadow-xl" style={{ borderColor:"#E7E2DC" }}>
+              <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3 border-b bg-white" style={{ borderColor:"#F1EEE8" }}>
+                <div className="font-semibold">إضافة فعالية عامة</div>
+                <button onClick={()=>setShowAdd(false)} className="h-8 px-3 rounded-full border text-sm">إغلاق</button>
+              </div>
+              <div className="p-5">
+                <RequestForm
+                  entityId=""
+                  canPublic={true}
+                  onOk={(t)=>{ setMsg({ ok:t }); setShowAdd(false); location.reload(); }}
+                  onErr={(e)=> setMsg({ err:e })}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EventList({ session }: { session: Session | null }) {
+  const [events, setEvents] = useState<EventRow[]>([]);
+  const [entities, setEntities] = useState<EntityLite[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState<{ id: string } | null>(null);
+  const [detail, setDetail] = useState<any>(null);
+  const isSupervisor = session?.role === "unionSupervisor";
+  const isEntityMgr  = session?.role === "entityManager";
+
+  const entName = (id?: string | null) =>
+    id == null ? "فعالية عامة" : (entities.find(e => String(e.id) === String(id || ""))?.name || "—");
+
+  const scopeText = useMemo(() => {
+    const r = session?.role;
+    if (r === "entityManager") return "فعاليات كياني";
+    if (r === "user") return "الفعاليات المتاحة لي";
+    if (r === "unionSupervisor") return "كل فعاليات الكيانات";
+    return "الفعاليات";
+  }, [session?.role]);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
-      setLoading(true); setErrMsg("");
+      setLoading(true);
       try {
-        const [ents, events] = await Promise.all([api.getEntities(), api.getEvents()]);
+        const entsRes = await fetch("/api/entities", { cache: "no-store" });
+        const entsJson = await entsRes.json().catch(() => []);
+        const ents: EntityLite[] = (Array.isArray(entsJson) ? entsJson : entsJson?.entities || [])
+          .map((e: any) => ({ id: String(e.id), name: String(e.name) }));
         if (!mounted) return;
-        setEntities(Array.isArray(ents) ? ents : []);
-        setList(Array.isArray(events) ? events : []);
-      } catch (e: any) {
+        setEntities(ents);
+
+        const r = await fetch(`/api/events?scope=mine`, {
+          cache: "no-store",
+          headers: buildSessionHeaders(false),
+        });
+        const data: EventRow[] = await r.json().catch(() => []);
         if (!mounted) return;
-        setErrMsg(e?.message || "تعذر تحميل البيانات");
+        setEvents(Array.isArray(data) ? data : []);
+      } catch {
+        if (!mounted) return;
+        setEvents([]);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -138,577 +185,475 @@ export default function EventsPage() {
     return () => { mounted = false; };
   }, []);
 
-  useEffect(() => {
-    if (!session || session.role !== "youth") return;
-    (async () => {
-      try {
-        const approved = await api.getMyApprovedJoins(session.id);
-        const ids = Array.from(new Set(approved.map(x => String(x.entityId))));
-        setMyEntityIds(ids);
-      } catch { setMyEntityIds([]); }
-    })();
-  }, [session]);
-
-  const isEntityManager = session?.role === "entityManager";
-  const isYouth = session?.role === "youth";
-  const canManage = session?.role === "systemAdmin" || session?.role === "entityManager";
-  const managerHasEntity = isEntityManager && !!session?.entityId;
-
-  const safeEntities = useMemo(
-    () => (entities || []).filter(e => e && String(e.id ?? "").trim() !== ""),
-    [entities]
-  );
-
-  const myEntities = useMemo(
-    () => safeEntities.filter(e => myEntityIds.includes(String(e.id))),
-    [safeEntities, myEntityIds]
-  );
-
-  useEffect(() => {
-    if (!session) return;
-    const firstEntityId = safeEntities[0]?.id ? String(safeEntities[0].id) : "";
-    const sessionEntityId = session.entityId ? String(session.entityId) : "";
-
-    setForm(p => ({
-      ...p,
-      entityId: p.entityId || sessionEntityId || firstEntityId || NO_ENTITY,
-    }));
-
-    if (isEntityManager) {
-      if (sessionEntityId) setFilterEntity(sessionEntityId);
-      else setFilterEntity(ALL);
-    } else if (isYouth) {
-      setFilterEntity(ALL);
-    }
-  }, [session, safeEntities, isEntityManager, isYouth]);
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-
-    let base = list || [];
-    if (isEntityManager) {
-      base = base.filter(ev => String(ev.entityId || "") === String(session?.entityId || ""));
-    } else if (isYouth) {
-      if (myEntityIds.length > 0) {
-        base = base.filter(ev => myEntityIds.includes(String(ev.entityId)));
-      } else {
-        base = []; 
-      }
-    }
-    return base
-      .filter(ev => (filterEntity === ALL ? true : String(ev.entityId || "") === String(filterEntity)))
-      .filter(ev => (filterStatus === ALL ? true : ev.status === filterStatus))
-      .filter(ev => {
-        if (!q) return true;
-        const hay = [ev.title, ev.date, ev.status].filter(Boolean).join(" ").toLowerCase();
-        return hay.includes(q);
-      });
-  }, [list, filterEntity, filterStatus, search, isEntityManager, isYouth, session?.entityId, myEntityIds]);
-
-  const refresh = async () => {
-    try { setList(await api.getEvents()); } catch { }
-  };
-
-  const resetForm = () => {
-    const fallbackEnt =
-      managerHasEntity ? String(session!.entityId) :
-      (safeEntities[0]?.id ? String(safeEntities[0].id) : NO_ENTITY);
-    setForm({ entityId: fallbackEnt, title: "", date: "", status: "draft" });
-  };
-
-  const onSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canManage) return;
-    if (!form.entityId || form.entityId === NO_ENTITY) {
-      alert("لا يمكنك الحفظ قبل ربط الحساب بكيان.");
-      return;
-    }
-    if (!form.title.trim()) return alert("العنوان مطلوب");
-    setSaving(true);
+  async function openDetails(id: string) {
+    setOpen({ id });
+    setDetail(null);
     try {
-      await api.createEvent({
-        entityId: String(form.entityId),
-        title: form.title.trim(),
-        date: form.date || null,
-        status: form.status,
-      });
-      await refresh();
-      resetForm();
-    } catch (err: any) {
-      try {
-        const parsed = JSON.parse(err.message || "{}");
-        alert(parsed?.error || "فشل الإضافة");
-      } catch {
-        alert("فشل الإضافة");
-      }
-    } finally { setSaving(false); }
-  };
-
-  const startEdit = (ev: EventItem) => {
-    const fallbackEnt =
-      ev.entityId ? String(ev.entityId) :
-      (managerHasEntity ? String(session!.entityId) :
-        (safeEntities[0]?.id ? String(safeEntities[0].id) : NO_ENTITY));
-    setEditingId(ev.id);
-    setEditDraft({
-      title: ev.title || "",
-      date: ev.date || "",
-      status: ev.status || "draft",
-      entityId: fallbackEnt,
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const cancelEdit = () => { setEditingId(null); setEditDraft(null); };
-
-  const confirmEdit = async () => {
-    if (!canManage) return;
-    if (!editingId || !editDraft) return;
-    if (!editDraft.entityId || editDraft.entityId === NO_ENTITY) {
-      alert("اختر الكيان قبل الحفظ.");
-      return;
-    }
-    if (!editDraft.title?.toString().trim()) return alert("العنوان مطلوب");
-    try {
-      await api.updateEvent(editingId, {
-        entityId: String(editDraft.entityId),
-        title: String(editDraft.title).trim(),
-        date: (editDraft.date as string) || null,
-        status: (editDraft.status as EventItem["status"]) || "draft",
-      });
-      await refresh();
-      cancelEdit();
+      const r = await fetch(`/api/events/${encodeURIComponent(id)}`, { cache: "no-store", headers: buildSessionHeaders(false) });
+      const d = await r.json();
+      setDetail(d);
     } catch {
-      alert("فشل التعديل");
+      setDetail({ error: "تعذر جلب التفاصيل" });
     }
-  };
+  }
 
-  const removeEvent = async (id: string) => {
-    if (!canManage) return;
-    if (!confirm("تأكيد حذف الفعالية؟")) return;
-    try { await api.deleteEvent(id); await refresh(); }
-    catch { alert("فشل الحذف"); }
-  };
-
-  if (!session) return null;
+  if (loading) {
+    return (
+      <div className="rounded-xl p-3 flex items-center justify-between" style={{ background: "#FFFFFF", border: `1px solid ${PALETTE.border}` }}>
+        <span className="text-sm" style={{ color: PALETTE.muted }}>{scopeText}</span>
+        <span className="h-8 w-20 rounded-full animate-pulse" style={{ background: "#0001" }} />
+      </div>
+    );
+  }
 
   return (
-    <div dir="rtl" className="min-h-screen flex flex-col" style={{ background: "#EFE6DE", color: "#1D1D1D" }}>
-      <HeaderBar />
+    <>
+      <div className="rounded-xl p-3 mb-3 flex items-center justify-between"
+           style={{ background: "#FFFFFF", border: `1px solid ${PALETTE.border}`, boxShadow:"0 6px 12px rgba(0,0,0,0.04)" }}>
+        <span className="text-sm" style={{ color: PALETTE.muted }}>{scopeText}</span>
+        <span className="h-8 px-3 rounded-full grid place-items-center text-sm"
+              style={{ background: PALETTE.soft, border: `1px solid ${PALETTE.border}`, color: PALETTE.black }}>
+          {events.length} فعالية
+        </span>
+      </div>
 
-      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8">
-        <div
-          className="rounded-[22px] p-5 md:p-6 flex items-center justify-between"
-          style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}
-        >
-          <div className="flex items-center gap-3">
-            <span className="h-10 w-10 rounded-xl grid place-items-center" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>
-              <Calendar className="h-5 w-5" color="#1D1D1D" />
-            </span>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-extrabold">الفعاليات</h1>
-              <p className="text-sm" style={{ color: "#6B6B6B" }}>
-                {canManage ? "إنشاء وإدارة الفعاليات وربطها بالكيانات" : "استعراض فعاليات كياناتك"}
-              </p>
-            </div>
-          </div>
-          <div className="h-9 px-3 rounded-full grid place-items-center" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>
-            {filtered.length} فعالية
-          </div>
+      {!events.length ? (
+        <div className="rounded-xl p-3 text-sm" style={{ background: "#F6F6F6", border: `1px solid ${PALETTE.border}`, color: PALETTE.muted }}>
+          لا توجد فعاليات متاحة للعرض.
         </div>
-      </section>
-
-      <main className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-6 space-y-6 pb-10">
-        {errMsg && (
-          <div className="mx-3 sm:mx-[1cm] rounded-2xl p-3" style={{ backgroundColor: "#FFF8E8", border: "1px solid #F2E7C6", color: "#6B6B6B" }}>
-            {errMsg}
-          </div>
-        )}
-
-        {isYouth && myEntityIds.length === 0 && (
-          <div className="mx-3 sm:mx-[1cm] rounded-2xl p-3 text-sm"
-               style={{ background:"#FFF8E8", border:"1px solid #F2E7C6", color:"#6B6B6B" }}>
-            لا تظهر فعاليات لأنك غير منضم لأي كيان بعد. يمكنك <Link href="/dashboard/requests" className="underline">تقديم طلب انضمام</Link>.
-          </div>
-        )}
-
-        {canManage && (
-          <SurfaceCard className="mx-3 sm:mx-[1cm]">
-            <CardHeader className="pb-0 px-5 pt-5">
-              <CardTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5" color="#1D1D1D" />
-                {editingId ? "تعديل فعالية" : "إضافة فعالية"}
-              </CardTitle>
-              <CardDescription style={{ color: "#6B6B6B" }}>
-                {editingId ? "عدّل بيانات الفعالية ثم احفظ" : "أدخل بيانات الفعالية واختر الكيان"}
-              </CardDescription>
-            </CardHeader>
-
-            <div className="mx-5 my-4 h-px" style={{ backgroundColor: "#EDE8E1" }} />
-
-            <CardContent className="px-5 pb-5">
-              <form onSubmit={editingId ? (e)=>{e.preventDefault();confirmEdit();} : onSave} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Field label="الكيان">
-                  <Select
-                    value={
-                      editingId
-                        ? String(editDraft?.entityId ?? (managerHasEntity ? session!.entityId : NO_ENTITY))
-                        : (managerHasEntity
-                            ? String(session!.entityId)
-                            : (form.entityId || (safeEntities[0]?.id ? String(safeEntities[0].id) : NO_ENTITY)))
-                    }
-                    onValueChange={(v) => {
-                      if (editingId) setEditDraft(p => ({ ...(p as any), entityId: v }));
-                      else setForm(p => ({ ...p, entityId: v }));
-                    }}
-                    disabled={isEntityManager && managerHasEntity}
-                  >
-                    <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E3E3E3" }}>
-                      <SelectValue placeholder="اختر الكيان" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {isEntityManager ? (
-                        managerHasEntity ? (
-                          <SelectItem value={String(session!.entityId)}>
-                            {safeEntities.find(e => String(e.id) === String(session!.entityId))?.name || "كياني"}
-                          </SelectItem>
-                        ) : (
-                          <SelectItem value={NO_ENTITY} disabled>لا يوجد كيان مرتبط بحسابك</SelectItem>
-                        )
-                      ) : (
-                        safeEntities.map(e => (
-                          <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </Field>
-
-                <Field label="عنوان الفعالية">
-                  <Input
-                    value={editingId ? (editDraft?.title as string) || "" : form.title}
-                    onChange={(e) => editingId
-                      ? setEditDraft(p => ({ ...(p as any), title: e.target.value }))
-                      : setForm(p => ({ ...p, title: e.target.value }))
-                    }
-                    className="h-11 rounded-xl"
-                    style={{ backgroundColor: "#FFFFFF", borderColor: "#E3E3E3" }}
-                  />
-                </Field>
-
-                <Field label="التاريخ">
-                  <Input
-                    type="date"
-                    value={editingId ? (editDraft?.date as string) || "" : form.date}
-                    onChange={(e) => editingId
-                      ? setEditDraft(p => ({ ...(p as any), date: e.target.value }))
-                      : setForm(p => ({ ...p, date: e.target.value }))
-                    }
-                    className="h-11 rounded-xl"
-                    style={{ backgroundColor: "#FFFFFF", borderColor: "#E3E3E3" }}
-                  />
-                </Field>
-
-                <Field label="الحالة">
-                  <Select
-                    value={editingId ? String(editDraft?.status || "draft") : form.status}
-                    onValueChange={(v) => editingId
-                      ? setEditDraft(p => ({ ...(p as any), status: v as EventItem["status"] }))
-                      : setForm(p => ({ ...p, status: v as EventItem["status"] }))
-                    }
-                  >
-                    <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E3E3E3" }}>
-                      <SelectValue placeholder="اختر الحالة" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="draft">مسودة</SelectItem>
-                      <SelectItem value="approved">معتمدة</SelectItem>
-                      <SelectItem value="cancelled">ملغاة</SelectItem>
-                      <SelectItem value="done">منتهية</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-
-                <div className="md:col-span-2 flex items-center gap-3 pt-1">
-                  {editingId ? (
-                    <>
-                      <Button
-                        type="button"
-                        onClick={confirmEdit}
-                        className="gap-2 h-11 rounded-full font-semibold"
-                        style={{ backgroundColor: "#EC1A24", color: "#FFFFFF" }}
-                      >
-                        <Check className="h-4 w-4" /> حفظ
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={cancelEdit}
-                        className="h-11 rounded-full"
-                        style={{ backgroundColor: "#FFFFFF", borderColor: "#E0E0E0" }}
-                      >
-                        <X className="h-4 w-4" /> إلغاء
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        type="submit"
-                        disabled={!canManage || saving || (isEntityManager && !managerHasEntity)}
-                        className="gap-2 h-11 rounded-full font-semibold"
-                        style={{ backgroundColor: "#EC1A24", color: "#FFFFFF" }}
-                      >
-                        {saving ? "جارٍ الحفظ..." : "إضافة"}
-                      </Button>
-                      <button
-                        type="button"
-                        onClick={resetForm}
-                        className="h-11 px-5 rounded-full"
-                        style={{ backgroundColor: "#FFFFFF", border: "1px solid #E3E3E3" }}
-                      >
-                        مسح الحقول
-                      </button>
-                    </>
-                  )}
-                </div>
-              </form>
-            </CardContent>
-          </SurfaceCard>
-        )}
-
-        <SurfaceCard className="mx-3 sm:mx-[1cm]">
-          <CardHeader className="pb-0 px-5 pt-5">
-            <CardTitle>قائمة الفعاليات</CardTitle>
-            <CardDescription style={{ color: "#6B6B6B" }}>
-              فلترة حسب الكيان/الحالة أو البحث بالعنوان/التاريخ
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="px-5 pb-5">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-              <Field label={isYouth ? "كياناتي" : "فلتر الكيان"}>
-                <Select
-                  value={filterEntity}
-                  onValueChange={setFilterEntity}
-                  disabled={isEntityManager && managerHasEntity}
-                >
-                  <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E3E3E3" }}>
-                    <SelectValue placeholder={isYouth ? "جميع كياناتي" : "جميع الكيانات"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL}>{isYouth ? "جميع كياناتي" : "جميع الكيانات"}</SelectItem>
-                    {(isYouth ? myEntities : safeEntities).map(e => (
-                      <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <Field label="فلتر الحالة">
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E3E3E3" }}>
-                    <SelectValue placeholder="كل الحالات" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL}>كل الحالات</SelectItem>
-                    <SelectItem value="draft">مسودة</SelectItem>
-                    <SelectItem value="approved">معتمدة</SelectItem>
-                    <SelectItem value="cancelled">ملغاة</SelectItem>
-                    <SelectItem value="done">منتهية</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <div className="md:col-span-1">
-                <Label className="text-sm">بحث</Label>
-                <div className="relative">
-                  <Search className="absolute top-1/2 -translate-y-1/2 right-3 h-4 w-4" color="#7A7A7A" />
-                  <Input
-                    placeholder="ابحث بالعنوان/التاريخ..."
-                    className="pr-9 h-11 rounded-xl"
-                    style={{ backgroundColor: "#FFFFFF", borderColor: "#E3E3E3" }}
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
+      ) : (
+        <ul className="space-y-3">
+          {events.map(ev => (
+            <li
+              key={ev.id}
+              className="rounded-2xl p-4 flex items-center justify-between cursor-pointer"
+              style={{ background:"#fff", border:`1px solid ${PALETTE.border}`, boxShadow:"0 6px 12px rgba(0,0,0,0.04)" }}
+              onClick={() => openDetails(ev.id)}
+              title="عرض تفاصيل الفعالية"
+            >
+              <div>
+                <div className="font-semibold" style={{ color: PALETTE.black }}>{ev.title || "فعالية بدون عنوان"}</div>
+                <div className="text-sm" style={{ color: PALETTE.muted }}>
+                  {ev.date ? new Date(ev.date).toLocaleDateString("ar-EG") : "بدون تاريخ"} •
+                  {" "}الكيان: {entName(ev.entityId ?? null)} •
+                  {" "}الحالة: {ev.status || "—"}
                 </div>
               </div>
-            </div>
+              <div className="flex items-center gap-2" onClick={(e)=>e.stopPropagation()}>
+                {session?.role !== "unionSupervisor" && (
+                  <Link
+                    href={`/events/evaluate?eventId=${encodeURIComponent(ev.id)}`}
+                    className="h-9 px-3 rounded-full text-sm"
+                    style={{ background: PALETTE.soft, border:`1px solid ${PALETTE.border}`, color: PALETTE.black }}
+                  >
+                    تقييم
+                  </Link>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
 
-            {loading ? (
-              <div className="text-center py-10" style={{ color: "#7A7A7A" }}>جارٍ التحميل...</div>
-            ) : filtered.length === 0 ? (
-              <div className="text-center py-10" style={{ color: "#7A7A7A" }}>لا توجد فعاليات</div>
+      {open && (
+        <EventDetailsModal
+          id={open.id}
+          detail={detail}
+          onClose={()=>setOpen(null)}
+          canEdit={Boolean(isSupervisor || isEntityMgr)}
+        />
+      )}
+    </>
+  );
+}
+
+function EventDetailsModal({
+  id, detail, onClose, canEdit
+}: { id: string; detail: any; onClose: ()=>void; canEdit: boolean }) {
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    title: detail?.title || "",
+    date: detail?.date || "",
+    status: detail?.status || "draft",
+  });
+
+  useEffect(() => {
+    if (!detail) return;
+    setForm({
+      title: detail?.title || "",
+      date: detail?.date || "",
+      status: detail?.status || "draft",
+    });
+  }, [detail]);
+
+  async function patchEvent() {
+    setSaving(true);
+    try {
+      const r = await fetch(`/api/events/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: buildSessionHeaders(true),
+        body: JSON.stringify(form),
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        throw new Error(t || "فشل التعديل");
+      }
+      onClose();
+      location.reload();
+    } catch (e:any) {}
+    finally { setSaving(false); }
+  }
+
+  async function deleteEvent() {
+    if (!confirm("هل أنت متأكد من حذف الفعالية؟ لا يمكن التراجع.")) return;
+    setSaving(true);
+    try {
+      const r = await fetch(`/api/events/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: buildSessionHeaders(false),
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        throw new Error(t || "فشل الحذف");
+      }
+      onClose();
+      location.reload();
+    } catch (e:any) {}
+    finally { setSaving(false); }
+  }
+
+  const req = detail?.details || {};
+  const files = req?.files || {};
+
+  return (
+    <div className="fixed inset-0 z-[999]">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 grid place-items-center p-4">
+        <div className="w-full max-w-3xl max-h-[85vh] overflow-auto rounded-2xl bg-white border shadow-xl" style={{ borderColor:"#E7E2DC" }}>
+          <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3 border-b bg-white" style={{ borderColor:"#F1EEE8" }}>
+            <div className="font-semibold">تفاصيل الفعالية</div>
+            <button onClick={onClose} className="h-8 px-3 rounded-full border text-sm">إغلاق</button>
+          </div>
+
+          <div className="p-5 space-y-4">
+            {!detail ? (
+              <div className="text-sm text-[#666]">جارِ التحميل…</div>
+            ) : detail?.error ? (
+              <div className="text-sm text-red-600">{detail.error}</div>
             ) : (
-              <ul className="space-y-3">
-                {filtered.map(ev => {
-                  const ent = safeEntities.find(e => String(e.id) === String(ev.entityId));
-                  const canEditRow =
-                    canManage &&
-                    (session!.role === "systemAdmin" ||
-                     (session!.role === "entityManager" && String(session!.entityId || "") === String(ev.entityId || "")));
-                  const isEditingRow = editingId === ev.id;
+              <>
+                <div className="rounded-xl border p-4" style={{ borderColor:"#EDE8E1", background:"#FAFAFA" }}>
+                  <div className="font-semibold">{detail.title || "—"}</div>
+                  <div className="text-sm text-[#666]">
+                    {detail.date ? new Date(detail.date).toLocaleDateString("ar-EG") : "بدون تاريخ"} •
+                    {" "}الحالة: {detail.status || "—"} •
+                    {" "}عدد التقييمات: {detail.evalCount ?? 0}
+                  </div>
+                </div>
 
-                  return (
-                    <li key={ev.id} className="rounded-2xl p-4" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 6px 12px rgba(0,0,0,0.04)" }}>
-                      <div className="flex items-start gap-3">
-                        <div className="h-10 w-10 rounded-xl grid place-items-center shrink-0" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>
-                          <Calendar className="h-5 w-5" color="#1D1D1D" />
-                        </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  {req?.venue &&   <Field label="عنوان/مقر الفعالية" value={req.venue} />}
+                  {req?.supportType && <Field label="نوع الدعم" value={req.supportType} />}
+                  {req?.attendeesTarget != null && <Field label="العدد المستهدف" value={String(req.attendeesTarget)} />}
+                  {req?.goals &&    <Field label="الأهداف الرئيسية" value={req.goals} wide />}
+                  {req?.audience && <Field label="الجمهور المستهدف" value={req.audience} wide />}
+                  {req?.speakers && <Field label="المتحدثون" value={req.speakers} wide />}
+                </div>
 
-                        <div className="flex-1 space-y-2">
-                          {isEditingRow ? (
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                              <Input
-                                value={(editDraft?.title as string) || ""}
-                                onChange={(e) => setEditDraft(p => ({ ...(p as any), title: e.target.value }))}
-                                className="h-10 rounded-xl md:col-span-2"
-                                style={{ backgroundColor: "#FFFFFF", borderColor: "#E3E3E3" }}
-                                placeholder="العنوان"
-                              />
-                              <Input
-                                type="date"
-                                value={(editDraft?.date as string) || ""}
-                                onChange={(e) => setEditDraft(p => ({ ...(p as any), date: e.target.value }))}
-                                className="h-10 rounded-xl"
-                                style={{ backgroundColor: "#FFFFFF", borderColor: "#E3E3E3" }}
-                              />
-                              <Select
-                                value={String(editDraft?.status || "draft")}
-                                onValueChange={(v) => setEditDraft(p => ({ ...(p as any), status: v as EventItem["status"] }))}
-                              >
-                                <SelectTrigger className="h-10 rounded-xl" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E3E3E3" }}>
-                                  <SelectValue placeholder="الحالة" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="draft">مسودة</SelectItem>
-                                  <SelectItem value="approved">معتمدة</SelectItem>
-                                  <SelectItem value="cancelled">ملغاة</SelectItem>
-                                  <SelectItem value="done">منتهية</SelectItem>
-                                </SelectContent>
-                              </Select>
+                {(files?.budgetPdf || files?.miniPlanPdf || files?.programPdf) && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <FileBox title="ميزانية تقديرية" url={files?.budgetPdf} />
+                    <FileBox title="خطة ترويج مختصرة" url={files?.miniPlanPdf} />
+                    <FileBox title="برنامج الفعالية" url={files?.programPdf} />
+                  </div>
+                )}
 
-                              <Select
-                                value={String(
-                                  editDraft?.entityId
-                                  ?? ev.entityId
-                                  ?? (managerHasEntity ? session!.entityId : (safeEntities[0]?.id ?? NO_ENTITY))
-                                )}
-                                onValueChange={(v) => setEditDraft(p => ({ ...(p as any), entityId: v }))}
-                                disabled={isEntityManager && managerHasEntity}
-                              >
-                                <SelectTrigger className="h-10 rounded-xl" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E3E3E3" }}>
-                                  <SelectValue placeholder="الكيان" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {isEntityManager ? (
-                                    managerHasEntity ? (
-                                      <SelectItem value={String(session!.entityId)}>
-                                        {safeEntities.find(e => String(e.id) === String(session!.entityId))?.name || "كياني"}
-                                      </SelectItem>
-                                    ) : (
-                                      <SelectItem value={NO_ENTITY} disabled>لا يوجد كيان</SelectItem>
-                                    )
-                                  ) : (
-                                    safeEntities.map(e => (
-                                      <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
-                                    ))
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          ) : (
-                            <>
-                              <div className="font-semibold">{ev.title}</div>
-                              <div className="text-xs" style={{ color: "#6B6B6B" }}>{ev.date || "—"} • {renderStatus(ev.status)}</div>
-                              <div className="text-xs flex items-center gap-1" style={{ color: "#6B6B6B" }}>
-                                <Building2 className="h-3 w-3" color="#6B6B6B" />
-                                <span>{ent?.name || "بدون كيان"}</span>
-                              </div>
-                            </>
-                          )}
-                        </div>
-
-                        {canEditRow && (
-                          <div className="flex flex-col gap-2 items-end">
-                            {isEditingRow ? (
-                              <div className="flex gap-2">
-                                <Button onClick={confirmEdit} className="h-9 w-9 p-0 rounded-full" style={{ backgroundColor: "#EC1A24", color: "#FFFFFF" }}>
-                                  <Check className="h-4 w-4" />
-                                </Button>
-                                <Button onClick={cancelEdit} variant="secondary" className="h-9 w-9 p-0 rounded-full" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E3E3E3", color: "#1D1D1D" }}>
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="flex gap-2">
-                                <Button onClick={() => removeEvent(ev.id)} className="h-9 w-9 p-0 rounded-full" style={{ backgroundColor: "#EC1A24", color: "#FFFFFF" }}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                                <Button onClick={() => startEdit(ev)} variant="secondary" className="h-9 w-9 p-0 rounded-full" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E3E3E3", color: "#1D1D1D" }}>
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                {canEdit && (
+                  <div className="mt-4 rounded-xl border p-4 space-y-3" style={{ borderColor:"#EDE8E1" }}>
+                    <div className="font-semibold mb-2">تحرير سريع</div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-xs text-[#777]">العنوان</label>
+                        <input
+                          className="w-full h-10 rounded-lg border px-3"
+                          value={form.title}
+                          onChange={e=>setForm(p=>({...p, title:e.target.value}))}
+                        />
                       </div>
-                    </li>
-                  );
-                })}
-              </ul>
+                      <div>
+                        <label className="text-xs text-[#777]">التاريخ</label>
+                        <input
+                          type="date"
+                          className="w-full h-10 rounded-lg border px-3"
+                          value={form.date || ""}
+                          onChange={e=>setForm(p=>({...p, date:e.target.value}))}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-[#777]">الحالة</label>
+                        <select
+                          className="w-full h-10 rounded-lg border px-3"
+                          value={form.status}
+                          onChange={e=>setForm(p=>({...p, status:e.target.value}))}
+                        >
+                          {["requested","draft","approved","rejected","cancelled","done","evaluated"].map(s=>
+                            <option key={s} value={s}>{s}</option>
+                          )}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        disabled={saving}
+                        onClick={patchEvent}
+                        className="h-10 px-4 rounded-full text-white"
+                        style={{ background: PALETTE.red }}
+                      >
+                        {saving ? "جارِ الحفظ..." : "حفظ التعديلات"}
+                      </button>
+                      <button
+                        disabled={saving}
+                        onClick={deleteEvent}
+                        className="h-10 px-4 rounded-full border"
+                        style={{ borderColor: PALETTE.border }}
+                      >
+                        حذف الفعالية
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
-          </CardContent>
-        </SurfaceCard>
-      </main>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-function renderStatus(s: EventItem["status"]) {
-  switch (s) {
-    case "draft": return "مسودة";
-    case "approved": return "معتمدة";
-    case "cancelled": return "ملغاة";
-    case "done": return "منتهية";
-    default: return s;
+function Field({ label, value, wide=false }: { label: string; value: string; wide?: boolean }) {
+  return (
+    <div className={wide ? "md:col-span-2" : ""}>
+      <div className="text-[12px] text-[#888] mb-1">{label}</div>
+      <div className="rounded-lg border px-3 py-2 bg-white" style={{ borderColor:"#EDE8E1" }}>{value}</div>
+    </div>
+  );
+}
+
+function FileBox({ title, url }: { title: string; url?: string|null }) {
+  if (!url) {
+    return <div className="rounded-lg border p-3 bg-white text-[#999]" style={{ borderColor:"#EDE8E1" }}>{title}: لا يوجد</div>;
   }
+  return (
+    <div className="rounded-lg border p-3 bg-white" style={{ borderColor:"#EDE8E1" }}>
+      <div className="text-sm mb-2">{title}</div>
+      {isPdf(url) ? (
+        <iframe src={url} className="w-full h-48 rounded border" style={{ borderColor:"#F1EEE8" }} />
+      ) : isImage(url) ? (
+        <img src={url} alt={title} className="w-full h-48 object-cover rounded border" style={{ borderColor:"#F1EEE8" }} />
+      ) : (
+        <div className="text-xs break-all text-[#666]">{url}</div>
+      )}
+      <a href={url} target="_blank" rel="noreferrer" className="inline-block mt-2 text-xs underline">فتح</a>
+    </div>
+  );
+}
+
+function RequestForm({
+  entityId,
+  canPublic,
+  onOk,
+  onErr,
+}: {
+  entityId: string;
+  canPublic: boolean;
+  onOk: (t: string) => void;
+  onErr: (t: string) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [makePublic, setMakePublic] = useState(canPublic);
+  const [form, setForm] = useState({
+    name: "",
+    date: "",
+    attendeesTarget: "",
+    venue: "",
+    goals: "",
+    audience: "",
+    speakers: "",
+    supportType: "",
+    planPdf: null as File | null,
+    timelinePdf: null as File | null,
+    budgetPdf: null as File | null,
+    briefPlanPdf: null as File | null,
+  });
+
+  async function uploadOne(file?: File | null): Promise<string | null> {
+    if (!file) return null;
+    const fd = new FormData();
+    fd.append("file", file);
+    const r = await fetch("/api/upload", {
+      method: "POST",
+      headers: buildSessionHeaders(false),
+      body: fd,
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data?.error || "فشل رفع الملف");
+    return data?.url || null;
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    onOk(""); onErr("");
+    if (!form.name.trim()) return onErr("اسم الفعالية مطلوب");
+    if (!makePublic && !entityId) return onErr("كيان غير معروف");
+
+    setSaving(true);
+    try {
+      const planUrl     = await uploadOne(form.planPdf);
+      const timelineUrl = await uploadOne(form.timelinePdf);
+      const budgetUrl   = await uploadOne(form.budgetPdf);
+      const briefUrl    = await uploadOne(form.briefPlanPdf);
+
+      const payload: any = {
+        name: form.name.trim(),
+        date: form.date || null,
+        attendeesTarget: Number(form.attendeesTarget || 0),
+        venue: form.venue || "",
+        goals: form.goals || "",
+        audience: form.audience || "",
+        speakers: form.speakers || "",
+        supportType: form.supportType || "",
+        files: [
+          planUrl && { label: "خطة النشاط", url: planUrl },
+          timelineUrl && { label: "برنامج الفعالية", url: timelineUrl },
+          budgetUrl && { label: "ميزانية تقديرية", url: budgetUrl },
+          briefUrl && { label: "خطة ترويج مختصرة", url: briefUrl },
+        ].filter(Boolean),
+      };
+
+      if (makePublic) payload.public = true;
+      else payload.entityId = entityId;
+
+      const r = await fetch("/api/events/requests", {
+        method: "POST",
+        headers: buildSessionHeaders(true),
+        body: JSON.stringify(payload),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || "تعذر إرسال الطلب");
+
+      onOk("تم إرسال طلب الفعالية بنجاح.");
+      setForm({
+        name: "", date: "", attendeesTarget: "", venue: "", goals: "",
+        audience: "", speakers: "", supportType: "",
+        planPdf: null, timelinePdf: null, budgetPdf: null, briefPlanPdf: null,
+      });
+    } catch (e: any) {
+      onErr(e?.message || "فشل إرسال الطلب");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {canPublic && (
+        <div className="md:col-span-2">
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={makePublic} onChange={(e)=>setMakePublic(e.target.checked)} />
+            <span>فعالية عامة لكل الكيانات</span>
+          </label>
+        </div>
+      )}
+      <div className="space-y-2">
+        <Label>اسم الفعالية *</Label>
+        <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      </div>
+      <div className="space-y-2">
+        <Label>تاريخ الفعالية</Label>
+        <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+      </div>
+      <div className="space-y-2">
+        <Label>عدد الحضور</Label>
+        <Input type="number" value={form.attendeesTarget} onChange={(e) => setForm({ ...form, attendeesTarget: e.target.value })} />
+      </div>
+      <div className="space-y-2">
+        <Label>عنوان/مقر الفعالية</Label>
+        <Input value={form.venue} onChange={(e) => setForm({ ...form, venue: e.target.value })} />
+      </div>
+      <div className="space-y-2 md:col-span-2">
+        <Label>الأهداف الرئيسية للفعالية</Label>
+        <Textarea value={form.goals} onChange={(e) => setForm({ ...form, goals: e.target.value })} />
+      </div>
+      <div className="space-y-2 md:col-span-2">
+        <Label>الجمهور المستهدف</Label>
+        <Textarea value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })} />
+      </div>
+      <div className="space-y-2 md:col-span-2">
+        <Label>المتحدثون</Label>
+        <Textarea value={form.speakers} onChange={(e) => setForm({ ...form, speakers: e.target.value })} />
+      </div>
+      <div className="space-y-2 md:col-span-2">
+        <Label>نوع الدعم المطلوب *</Label>
+        <select
+          className="h-11 w-full rounded-xl border px-3"
+          value={form.supportType}
+          onChange={(e) => setForm({ ...form, supportType: e.target.value })}
+        >
+          <option value="">اختر نوع الدعم</option>
+          <option value="لوجيستي">لوجيستي</option>
+          <option value="إعلامي">إعلامي</option>
+        </select>
+      </div>
+      <div className="space-y-2">
+        <Label>خطة الفعالية (PDF)</Label>
+        <Input type="file" accept="application/pdf" onChange={(e) => setForm({ ...form, planPdf: e.target.files?.[0] || null })} />
+      </div>
+      <div className="space-y-2">
+        <Label>ميزانية تقديرية (PDF)</Label>
+        <Input type="file" accept="application/pdf" onChange={(e) => setForm({ ...form, budgetPdf: e.target.files?.[0] || null })} />
+      </div>
+      <div className="space-y-2">
+        <Label>برنامج الفعالية (PDF)</Label>
+        <Input type="file" accept="application/pdf" onChange={(e) => setForm({ ...form, timelinePdf: e.target.files?.[0] || null })} />
+      </div>
+      <div className="space-y-2">
+        <Label>خطة ترويج مختصرة (PDF)</Label>
+        <Input type="file" accept="application/pdf" onChange={(e) => setForm({ ...form, briefPlanPdf: e.target.files?.[0] || null })} />
+      </div>
+      <div className="md:col-span-2">
+        <Button disabled={saving} className="rounded-full" style={{ backgroundColor: "#EC1A24", color: "#fff" }}>
+          {saving ? "جارٍ الإرسال..." : "إرسال النموذج"}
+        </Button>
+      </div>
+    </form>
+  );
 }
 
 function HeaderBar() {
   const pathname = usePathname();
   const active = (href: string) => pathname === href;
-
   return (
     <header className="relative z-10">
       <div className="mx-auto max-w-6xl px-4">
-        <div
-          className="mt-4 h-14 w-full rounded-2xl flex items-center justify-between px-4"
-          style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 6px 12px rgba(0,0,0,0.04)" }}
-        >
+        <div className="mt-4 h-14 w-full rounded-2xl flex items-center justify-between px-4 bg-white border shadow-[0_6px_12px_rgba(0,0,0,0.04)]" style={{ borderColor: PALETTE.border }}>
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg grid place-items-center" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>
-              <Calendar className="h-5 w-5" color="#1D1D1D" />
+            <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ background: PALETTE.soft, border: "1px solid #E5E5E5" }}>
+              <Users className="h-5 w-5" color={PALETTE.black} />
             </div>
-            <Link href="/" className="font-semibold" style={{ color: "#1D1D1D" }}>
+            <Link href="/" className="font-semibold" style={{ color: PALETTE.black }}>
               منصة الكيانات الشبابية
             </Link>
           </div>
           <nav className="hidden sm:flex items-center gap-1 text-sm">
             {[
-              { href: "/", label: "الرئيسية" },
+              { href: "/profile", label: "الملف الشخصي" },
               { href: "/dashboard", label: "لوحة التحكم" },
               { href: "/support", label: "الدعم" },
               { href: "/about", label: "عن المنصة" },
-            ].map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className="px-3 py-1 rounded-lg transition"
-                style={{
-                  color: active(l.href) ? "#FFFFFF" : "#1D1D1D",
-                  backgroundColor: active(l.href) ? "#EC1A24" : "transparent",
-                }}
-              >
+            ].map(l => (
+              <Link key={l.href} href={l.href} className={`px-3 py-1 rounded-lg transition ${active(l.href) ? "bg-[#EC1A24] text-white" : "text-[#1D1D1D]"}`}>
                 {l.label}
               </Link>
             ))}
@@ -719,19 +664,19 @@ function HeaderBar() {
   );
 }
 
-function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
+function FooterBar() {
   return (
-    <label className={`block space-y-1 ${className}`}>
-      <span className="text-sm" style={{ color: "#1D1D1D" }}>{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function SurfaceCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-2xl ${className}`} style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
-      {children}
-    </div>
+    <footer className="relative z-10">
+      <div className="mx-auto max-w-6xl px-4 pb-6">
+        <div className="mt-6 h-12 w-full rounded-2xl flex items-center justify-between px-4 text-xs" style={{ backgroundColor: "#FFFFFF", border: `1px solid ${PALETTE.border}`, boxShadow: "0 6px 12px rgba(0,0,0,0.04)", color: "#595959" }}>
+          <p>© {new Date().getFullYear()} منصة الكيانات الشبابية — كل الحقوق محفوظة</p>
+          <div className="flex items-center gap-3">
+            <Link href="/privacy" className="hover:underline" style={{ color: PALETTE.black }}>الخصوصية</Link>
+            <span style={{ color: "#B9B9B9" }}>•</span>
+            <Link href="/terms" className="hover:underline" style={{ color: PALETTE.black }}>الشروط</Link>
+          </div>
+        </div>
+      </div>
+    </footer>
   );
 }

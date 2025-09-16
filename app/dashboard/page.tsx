@@ -1,126 +1,216 @@
-"use client"
+// app/dashboard/page.tsx
+"use client";
 
-import { useEffect, useMemo, useState } from "react"
-import { useRouter, usePathname } from "next/navigation"
-import Link from "next/link"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, Building2, CalendarDays, ShieldCheck, FileText, BarChart3, ArrowRight, LogOut, Check } from "lucide-react"
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Users,
+  Building2,
+  CalendarDays,
+  ShieldCheck,
+  FileText,
+  BarChart3,
+  ArrowRight,
+  LogOut,
+  Check,
+} from "lucide-react";
+import { Cairo } from "next/font/google";
 
-type UserRole = "systemAdmin" | "qualitySupervisor" | "entityManager" | "youth"
+const cairo = Cairo({ subsets: ["arabic", "latin"], weight: ["400", "500", "600", "700", "800"], display: "swap" });
 
+type UserRole = "unionSupervisor" | "entityManager" | "user";
 type Session = {
-  id: string
-  email: string
-  name: string
-  role: UserRole
-  entityId?: string | null
-  permissions?: string[]
-}
-
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  entityId?: string | null;
+  permissions?: string[];
+};
 const roleLabel: Record<UserRole, string> = {
-  systemAdmin: "مدير النظام",
-  qualitySupervisor: "مشرف جودة",
+  unionSupervisor: "مسؤول اتحاد الكيانات",
   entityManager: "مسؤول كيان",
-  youth: "مستخدم",
+  user: "مستخدم",
+};
+type EntityLite = { id: string; name: string; managerUserId?: string | null };
+
+const sessionHeaderB64 = () => {
+  const raw = typeof window !== "undefined" ? localStorage.getItem("session") || "" : "";
+  if (!raw) return "";
+  return btoa(unescape(encodeURIComponent(raw)));
+};
+
+async function safeJson<T>(res: Response, fallback: T): Promise<T> {
+  const text = await res.text();
+  if (!res.ok) throw new Error(text || res.statusText);
+  if (!text) return fallback;
+  try { return JSON.parse(text) as T; } catch { return fallback; }
+}
+async function safeFetch(url: string, init: RequestInit = {}) {
+  const h = new Headers(init.headers || {});
+  const s = sessionHeaderB64();
+  if (s) h.set("x-session-b64", s);
+  return fetch(url, { ...init, headers: h, credentials: "include", cache: "no-store" });
+}
+async function fetchCount(url: string): Promise<number> {
+  const r = await safeFetch(url);
+  const data = await safeJson<any>(r, []);
+  return Array.isArray(data) ? data.length : Number(data?.count ?? 0);
 }
 
 export default function DashboardPage() {
-  const router = useRouter()
+  const router = useRouter();
 
-  const [hydrated, setHydrated] = useState(false)
-  const [session, setSession] = useState<Session | null>(null)
-  const [stats, setStats] = useState({ entities: 0, members: 0, events: 0, iso: 0 })
-  const [approvedCount, setApprovedCount] = useState<number>(0)
+  const [hydrated, setHydrated] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
 
-  useEffect(() => { setHydrated(true) }, [])
+  const [entitiesCount, setEntitiesCount] = useState(0);
+  const [membersCount, setMembersCount] = useState(0);
+  const [eventsCount, setEventsCount] = useState(0);
+  const [isoCount, setIsoCount] = useState(0);
 
+  const [managedEntities, setManagedEntities] = useState<EntityLite[]>([]);
+  const managedEntity = managedEntities[0];
+  const managedEntityName = managedEntity?.name || "";
+
+  useEffect(() => setHydrated(true), []);
   useEffect(() => {
-    if (!hydrated) return
+    if (!hydrated) return;
     try {
-      const s = localStorage.getItem("session")
-      if (!s) {
-        router.replace("/")
-        return
-      }
-      setSession(JSON.parse(s))
-    } catch {
-      router.replace("/")
-    }
-  }, [hydrated, router])
+      const s = localStorage.getItem("session");
+      if (!s) { router.replace("/"); return; }
+      setSession(JSON.parse(s));
+    } catch { router.replace("/"); }
+  }, [hydrated, router]);
+
+  const [refreshedSession, setRefreshedSession] = useState(false);
+  useEffect(() => {
+    if (!hydrated || !session?.id || refreshedSession) return;
+    safeFetch(`/api/me?id=${encodeURIComponent(session.id)}`)
+      .then((r) => safeJson<Session>(r, session))
+      .then((fresh) => {
+        setSession(fresh);
+        try { localStorage.setItem("session", JSON.stringify(fresh)); } catch {}
+      })
+      .catch(() => {})
+      .finally(() => setRefreshedSession(true));
+  }, [hydrated, session?.id, refreshedSession]);
 
   useEffect(() => {
-    if (!hydrated) return
-    fetch("/api/stats", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((data) => {
-        setStats({
-          entities: Number(data?.entities) || 0,
-          members: Number(data?.members) || 0,
-          events: Number(data?.events) || 0,
-          iso: Number(data?.iso) || 0,
-        })
-      })
-      .catch(() => {
-        setStats({ entities: 0, members: 0, events: 0, iso: 0 })
-      })
-  }, [hydrated])
+    if (!hydrated || !session?.id || !session.role) return;
+    const url = `/api/entities?viewerId=${encodeURIComponent(session.id)}&role=${encodeURIComponent(session.role)}&scope=mine`;
+    safeFetch(url)
+      .then((r) => safeJson<EntityLite[]>(r, []))
+      .then((list) => setManagedEntities(Array.isArray(list) ? list : []))
+      .catch(() => setManagedEntities([]));
+  }, [hydrated, session?.id, session?.role]);
+
+  const [approvedEntityIds, setApprovedEntityIds] = useState<string[]>([]);
+  const approvedCount = approvedEntityIds.length;
 
   useEffect(() => {
-    if (!hydrated || !session?.id) return
-    const url = `/api/join-requests?userId=${encodeURIComponent(session.id)}&status=approved`
-    fetch(url, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((rows: Array<{ entityId: string }>) => {
-        const distinct = new Set<string>()
-        for (const r of rows || []) {
-          if (r?.entityId) distinct.add(r.entityId)
+    if (!hydrated || !session?.id) return;
+    if (session.role !== "user") { setApprovedEntityIds([]); return; }
+    safeFetch(`/api/membership/my`)
+      .then((r) => safeJson<any>(r, { entityId: null }))
+      .then((res) => {
+        const eid = res?.entityId ? String(res.entityId) : null;
+        setApprovedEntityIds(eid ? [eid] : []);
+      })
+      .catch(() => setApprovedEntityIds([]));
+  }, [hydrated, session?.id, session?.role]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    (async () => {
+      try {
+        if (session?.role === "entityManager") {
+          const entityId = (session.entityId || managedEntity?.id || "").toString();
+          setEntitiesCount(entityId ? 1 : 0);
+
+          let m = 0, e = 0, i = 0;
+          try { m = await fetchCount(`/api/members?entityId=${encodeURIComponent(entityId)}`); }
+          catch {
+            const all = await safeJson(await safeFetch("/api/members"), [] as any[]);
+            m = (Array.isArray(all) ? all : []).filter((x: any) => String(x?.entityId || "") === entityId).length;
+          }
+          try { e = await fetchCount(`/api/events?scope=mine`); }
+          catch {
+            const all = await safeJson(await safeFetch("/api/events"), [] as any[]);
+            e = (Array.isArray(all) ? all : []).filter((x: any) => String(x?.entityId || "") === entityId).length;
+          }
+          try { i = await fetchCount(`/api/iso?entityId=${encodeURIComponent(entityId)}`); }
+          catch {
+            const all = await safeJson(await safeFetch(`/api/iso?entityId=${encodeURIComponent(entityId)}`), [] as any[]);
+            i = Array.isArray(all) ? all.length : 0;
+          }
+
+          setMembersCount(m); setEventsCount(e); setIsoCount(i);
+          return;
         }
-        setApprovedCount(distinct.size)
-      })
-      .catch(() => setApprovedCount(0))
-  }, [hydrated, session?.id])
 
-  const isAdminOrManager = !!session && ["systemAdmin","entityManager"].includes(session.role)
+        if (session?.role === "unionSupervisor") {
+          const s = await safeJson(await safeFetch("/api/stats"), { entities: 0, members: 0, events: 0, iso: 0 });
+          setEntitiesCount(Number(s?.entities) || 0);
+          setMembersCount(Number(s?.members) || 0);
+          setEventsCount(Number(s?.events) || 0);
+          try { setIsoCount(await fetchCount(`/api/iso`)); } catch { setIsoCount(Number(s?.iso) || 0); }
+          return;
+        }
 
-  const show = useMemo(() => {
+        if (session?.role === "user") {
+          setEntitiesCount(approvedCount);
+
+          let totalMembers = 0;
+          for (const eid of approvedEntityIds) {
+            try { totalMembers += await fetchCount(`/api/members?entityId=${encodeURIComponent(eid)}`); }
+            catch {
+              const all = await safeJson(await safeFetch(`/api/members?entityId=${encodeURIComponent(eid)}`), [] as any[]);
+              totalMembers += (Array.isArray(all) ? all : []).length;
+            }
+          }
+          setMembersCount(totalMembers);
+
+          try { setEventsCount(await fetchCount(`/api/events?scope=mine`)); }
+          catch { setEventsCount(0); }
+
+          // ISO للمستخدم: اعرض عدد النماذج المعتمدة فقط
+          try { setIsoCount(await fetchCount(`/api/iso?status=approved`)); }
+          catch { setIsoCount(0); }
+          return;
+        }
+
+        setEntitiesCount(0); setMembersCount(0); setEventsCount(0); setIsoCount(0);
+      } catch {
+        setEntitiesCount(0); setMembersCount(0); setEventsCount(0); setIsoCount(0);
+      }
+    })();
+  }, [hydrated, session?.role, session?.entityId, managedEntity?.id, approvedCount, approvedEntityIds]);
+
+  // ✅ التعديل 1: خلى تبويب الأعضاء ظاهر للجميع
+  const visible = useMemo(() => {
+    const isManager = session?.role === "entityManager";
+    const isUnion = session?.role === "unionSupervisor";
+    const isUser = session?.role === "user";
     return {
       overview: true,
       entities: true,
-      members: ["systemAdmin", "entityManager"].includes(session?.role || "youth"),
-      events: ["systemAdmin", "entityManager", "qualitySupervisor", "youth"].includes(session?.role || "youth"),
-      iso: ["systemAdmin", "qualitySupervisor"].includes(session?.role || "youth"),
-      governance: ["systemAdmin", "qualitySupervisor"].includes(session?.role || "youth"),
+      members: true, // الجميع يشوفه
+      events: isUnion || isManager || isUser,
+      iso: isUnion || isManager || isUser,
+      governance: true,
       reports: true,
-    }
-  }, [session])
+    };
+  }, [session?.role]);
 
-  const defaultTab = "overview"
+  const showAcceptedBadge = session?.role === "user";
+  const isManager = session?.role === "entityManager";
 
-  const entitiesHref = isAdminOrManager ? "/entities" : "/dashboard/requests"
-  const entitiesTitle = isAdminOrManager ? "إدارة الكيانات (Youth Entities)" : "الانضمام إلى كيان"
-  const entitiesDesc = isAdminOrManager
-    ? "إنشاء وتحديث بيانات الكيانات، المستندات، التواصل والموقع."
-    : "استعرض الكيانات واختر كيانًا لتقديم طلب الانضمام، ثم انتظر الموافقة."
-
-  const quickEntities = {
-    label: isAdminOrManager ? "إدارة الكيانات" : "اختيار كيان وطلب انضمام",
-    href: entitiesHref,
-  }
-const [refreshedSession, setRefreshedSession] = useState(false);
-useEffect(() => {
-  if (!hydrated || !session?.id || refreshedSession) return;
-  fetch(`/api/me?id=${encodeURIComponent(session.id)}`, { cache: "no-store" })
-    .then(r => (r.ok ? r.json() : Promise.reject()))
-    .then((fresh) => {
-      setSession(fresh);
-      try { localStorage.setItem("session", JSON.stringify(fresh)); } catch {}
-    })
-    .catch(() => {})
-    .finally(() => setRefreshedSession(true));
-}, [hydrated, session?.id, refreshedSession]);
   return (
-    <div dir="rtl" className="relative min-h-screen overflow-hidden flex flex-col bg-[#EFE6DE]">
+    <div className={`${cairo.className} relative min-h-screen overflow-hidden flex flex-col bg-[#EFE6DE]`}>
       <HeaderBar />
 
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-6">
@@ -135,25 +225,22 @@ useEffect(() => {
             {session && (
               <>
                 <span className="inline-flex items-center rounded-full px-3 h-8 text-sm bg-[#F6F6F6] text-[#1D1D1D] border border-[#E5E5E5]">
-                  {roleLabel[session.role]}
+                  {session.role === "entityManager" && managedEntityName
+                    ? <>مسؤول كيان — <span className="font-semibold ms-1">{managedEntityName}</span></>
+                    : roleLabel[session.role]}
                 </span>
-                {session && !isAdminOrManager && (
-  <span
-    className="inline-flex items-center gap-1 rounded-full px-3 h-8 text-sm bg-[#E8F7EE] text-[#0F5132] border border-[#CBE9D6]"
-    title="عدد الكيانات التي تم قبولك فيها"
-  >
-    <Check className="h-4 w-4" />
-    مقبول في {approvedCount} كيان
-  </span>
-)}
+                {showAcceptedBadge && (
+                  <span className="inline-flex items-center gap-1 rounded-full px-3 h-8 text-sm bg-[#E8F7EE] text-[#0F5132] border border-[#CBE9D6]">
+                    <Check className="h-4 w-4" /> مقبول في {approvedCount} كيان
+                  </span>
+                )}
               </>
             )}
             <button
-              onClick={() => { try { localStorage.removeItem("session") } catch {} ; router.replace("/") }}
+              onClick={() => { try { localStorage.removeItem("session"); } catch {} router.replace("/"); }}
               className="inline-flex items-center gap-2 h-9 px-3 rounded-full font-semibold bg-[#EC1A24] text-white"
             >
-              <LogOut className="h-4 w-4" />
-              تسجيل الخروج
+              <LogOut className="h-4 w-4" /> تسجيل الخروج
             </button>
           </div>
         </div>
@@ -161,148 +248,212 @@ useEffect(() => {
 
       <main className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-6 space-y-6 pb-10">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-<StatCard
-  title="الكيانات"
-  icon={<Building2 className="h-5 w-5 text-[#1D1D1D]" />}
-  value={isAdminOrManager ? stats.entities : approvedCount}
-  extra={
-    !isAdminOrManager ? <>إجمالي الكيانات • {stats.entities}</> : undefined
-  }
-/>
-          <StatCard title="الأعضاء" icon={<Users className="h-5 w-5 text-[#1D1D1D]" />} value={stats.members} />
-          <StatCard title="الفعاليات" icon={<CalendarDays className="h-5 w-5 text-[#1D1D1D]" />} value={stats.events} />
-          <StatCard title="نماذج ISO" icon={<ShieldCheck className="h-5 w-5 text-[#1D1D1D]" />} value={stats.iso} />
-          {/*
-          لو حابب كارت ضمن الإحصائيات:
-          <StatCard title="كياناتي المعتمدة" icon={<Building2 className="h-5 w-5 text-[#1D1D1D]" />} value={approvedCount} />
-          */}
+          <StatCard title="الكيانات" icon={<Building2 className="h-5 w-5 text-[#1D1D1D]" />} value={entitiesCount}
+                    extra={session?.role === "entityManager" ? <>كيانك</> : session?.role === "user" ? <>الكيانات المقبول بها</> : <>إجمالي الكيانات</>} />
+          <StatCard title="الأعضاء" icon={<Users className="h-5 w-5 text-[#1D1D1D]" />} value={membersCount}
+                    extra={session?.role === "entityManager" ? <>أعضاء كيانك</> : session?.role === "user" ? <>أعضاء كياناتك</> : <>إجمالي الأعضاء</>} />
+          <StatCard title="الفعاليات" icon={<CalendarDays className="h-5 w-5 text-[#1D1D1D]" />} value={eventsCount}
+                    extra={session?.role === "entityManager" ? <>فعاليات كيانك</> : session?.role === "user" ? <>فعاليات كياناتك</> : <>إجمالي الفعاليات</>} />
+          <StatCard title="نماذج ISO" icon={<ShieldCheck className="h-5 w-5 text-[#1D1D1D]" />} value={isoCount}
+                    extra={session?.role === "entityManager" ? <>نماذج كيانك</> : session?.role === "user" ? <>النماذج المعتمدة</> : <>إجمالي النماذج</>} />
         </div>
 
         <Card className="rounded-[22px] bg-white border border-[#E7E2DC] text-[#1D1D1D] shadow-[0_8px_18px_rgba(0,0,0,0.05)]">
           <CardHeader className="pb-0">
             <CardTitle className="text-lg">الوحدات</CardTitle>
-            <CardDescription className="text-sm text-[#6B6B6B]">اختَر وحدة للإدارة أو الاستعراض</CardDescription>
+            <CardDescription className="text-sm text-[#6B6B6B]">اختر وحدة للإدارة أو الاستعراض</CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
-            <Tabs defaultValue={defaultTab} className="w-full">
+            <Tabs defaultValue="events" className="w-full">
+              {/* شبكة التابات */}
               <TabsList className="grid grid-cols-2 md:grid-cols-6 gap-2 rounded-full p-1 bg-[#F6F6F6] border border-[#E7E2DC]">
                 <Tab value="overview" label="الملخص" />
-                {show.entities && <Tab value="entities" label="الكيانات" />}
-                {show.members && <Tab value="members" label="الأعضاء" />}
-                {show.events && <Tab value="events" label="الفعاليات" />}
-                {show.iso && <Tab value="iso" label="نماذج ISO" />}
-                {show.governance && <Tab value="governance" label="الحوكمة" />}
-                {show.reports && <Tab value="reports" label="التقارير" />}
+                <Tab value="entities" label="الكيانات" />
+                {/* ✅ التعديل 2: إظهار تاب الأعضاء للجميع */}
+                {visible.members && <Tab value="members" label="الأعضاء" />}
+                <Tab value="events" label="الفعاليات" />
+                {visible.iso && <Tab value="iso" label="نماذج ISO" />}
+                <Tab value="governance" label="الحوكمة" />
+                <Tab value="reports" label="التقارير" />
               </TabsList>
 
+              {/* الملخص */}
               <TabsContent value="overview" className="space-y-4">
                 <SurfaceCard>
                   <CardHeader className="pb-0 px-5 pt-5 space-y-2">
                     <CardTitle className="text-xl leading-snug">اختصارات سريعة</CardTitle>
-                    <CardDescription className="leading-relaxed text-[#6B6B6B]">
-                      روابط مباشرة لأكثر المهام استخدامًا
-                    </CardDescription>
+                    <CardDescription className="leading-relaxed text-[#6B6B6B]">روابط مباشرة لأكثر المهام استخدامًا</CardDescription>
                   </CardHeader>
-
                   <CardContent className="px-5 pb-5">
                     <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap py-1">
                       {[
-                        { label: quickEntities.label, href: quickEntities.href },
-                        show.members && { label: "إدارة الأعضاء", href: "/members" },
-                        show.events && { label: "إدارة الفعاليات", href: "/events" },
-                        show.iso && { label: "نماذج ISO", href: "/iso" },
-                        show.governance && { label: "الحوكمة", href: "/governance" },
-                        show.reports && { label: "التقارير ولوحات البيانات", href: "/reports" },
-                      ]
-                        .filter(Boolean)
-                        .map((it) => (
-                          <QuickButton key={(it as any)!.href} onClick={() => router.push((it as any)!.href)}>
-                            {(it as any)!.label}
-                            <ArrowRight className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-                          </QuickButton>
-                        ))}
+                        (session?.role === "unionSupervisor" || session?.role === "entityManager") && { label: "إدارة الكيانات", href: "/entities" },
+                        // تحسين اختياري: اختصار للأعضاء للمستخدم العادي
+                        session?.role === "user" && { label: "أعضاء كياني", href: "/members" },
+                        session?.role === "user" && { label: "اختيار كيان وطلب انضمام", href: "/dashboard/requests" },
+                        { label: "الحوكمة", href: "/governance" },
+                        visible.iso && { label: "نماذج ISO", href: "/iso" },
+                        (session?.role === "unionSupervisor" || session?.role === "entityManager") && { label: "إدارة الأعضاء", href: "/members" },
+                        { label: "التقارير ولوحات البيانات", href: "/reports" },
+                      ].filter(Boolean).map((it) => (
+                        <QuickButton key={(it as any)!.href} onClick={() => router.push((it as any)!.href)}>
+                          {(it as any)!.label}
+                          <ArrowRight className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+                        </QuickButton>
+                      ))}
                     </div>
                   </CardContent>
                 </SurfaceCard>
               </TabsContent>
 
-              {show.entities && (
-                <TabsContent value="entities">
-                  <UnitCard
-                    icon={<Building2 className="h-5 w-5 text-[#1D1D1D]" />}
-                    title={entitiesTitle}
-                    desc={entitiesDesc}
-                    href={entitiesHref}
-                  />
-                </TabsContent>
-              )}
+              {/* الكيانات */}
+              <TabsContent value="entities" className="space-y-3">
+                <UnitCard
+                  icon={<Building2 className="h-5 w-5 text-[#1D1D1D]" />}
+                  title="إدارة الكيانات (Youth Entities)"
+                  desc={session?.role === "entityManager" ? "تعديل بيانات كيانك ومستنداته" : "إنشاء وتحديث بيانات الكيانات، المستندات، التواصل والموقع."}
+                  href="/entities"
+                />
+                {session?.role !== "unionSupervisor" && (
+                  <Link
+                    href="/dashboard/promotion-request"
+                    className="inline-flex items-center gap-2 h-10 px-4 rounded-full font-semibold bg-[#EC1A24] text-white"
+                  >
+                    <ShieldCheck className="h-4 w-4" /> طلب ترقية لمسؤول اتحاد
+                  </Link>
+                )}
+              </TabsContent>
 
-              {show.members && (
-                <TabsContent value="members">
+              {/* ✅ تبويب الأعضاء — ظاهر للجميع بمحتوى مناسب للدور */}
+              <TabsContent value="members" className="space-y-3">
+                <UnitCard
+                  icon={<Users className="h-5 w-5 text-[#1D1D1D]" />}
+                  title="الأعضاء (Members)"
+                  desc={
+                    session?.role === "unionSupervisor"
+                      ? "تسجيل وربط الأعضاء بكل الكيانات"
+                      : session?.role === "entityManager"
+                      ? "أعضاء كيانك فقط"
+                      : "أعضاء كيانك — عرض فقط"
+                  }
+                  href="/members"
+                />
+
+                {/* لمسؤول الاتحاد: طلبات المديرين + الترقية */}
+                {session?.role === "unionSupervisor" && (
+                  <>
+                    <UnitCard
+                      icon={<ShieldCheck className="h-5 w-5 text-[#1D1D1D]" />}
+                      title="طلبات تعيين مديري الكيانات"
+                      desc="راجع ووافق/ارفض طلبات تعيين المديرين المرسلة من المستخدمين."
+                      href="/dashboard/manager-requests"
+                    />
+                    <UnitCard
+                      icon={<Users className="h-5 w-5 text-[#1D1D1D]" />}
+                      title="طلبات الترقية لمسؤول اتحاد"
+                      desc="إدارة طلبات الترقية لمستوى مسؤول اتحاد الكيانات."
+                      href="/dashboard/promotion-request"
+                    />
+                  </>
+                )}
+
+                {/* لمدير الكيان: طلبات الانضمام */}
+                {session?.role === "entityManager" && (
                   <UnitCard
                     icon={<Users className="h-5 w-5 text-[#1D1D1D]" />}
-                    title="إدارة الأعضاء (Members)"
-                    desc="تسجيل وربط الأعضاء بالكيانات."
-                    href="/members"
+                    title="طلبات الانضمام إلى كيانك"
+                    desc="مراجعة طلبات انضمام الأفراد والموافقة/الرفض."
+                    href="/dashboard/entity-requests"
                   />
-                </TabsContent>
-              )}
+                )}
+              </TabsContent>
 
-              {show.events && (
-                <TabsContent value="events">
-                  <UnitCard
-                    icon={<CalendarDays className="h-5 w-5 text-[#1D1D1D]" />}
-                    title="إدارة الفعاليات (Events)"
-                    desc="جدولة الفعاليات، إدارة الحضور والتقارير."
-                    href="/events"
-                  />
-                </TabsContent>
-              )}
+              {/* الفعاليات */}
+              <TabsContent value="events" className="space-y-3">
+                <UnitCard
+                  icon={<CalendarDays className="h-5 w-5 text-[#1D1D1D]" />}
+                  title={session?.role === "user" ? "تقييم فعالية" : "الفعاليات (Events)"}
+                  desc={session?.role === "entityManager" ? "فعاليات كيانك فقط (طلبات)" : session?.role === "user" ? "قيّم فعالية حضرتها" : "جدولة/متابعة الفعاليات والتقارير"}
+                  href={session?.role === "user" ? "/evaluations/new" : "/events"}
+                />
 
-              {show.iso && (
+                <div
+                  className="rounded-xl px-3 py-3 flex items-center justify-between bg-[#F6F6F6] border border-[#E7E2DC]"
+                  style={{ boxShadow: "0 6px 12px rgba(0,0,0,0.04)" }}
+                >
+                  <span className="text-sm text-[#6B6B6B]">إجراءات سريعة على الفعاليات</span>
+                  <div className="flex items-center gap-2">
+                    {session?.role === "user" && (
+                      <button
+                        onClick={() => router.push("/evaluations/new")}
+                        className="inline-flex items-center h-10 px-4 rounded-full font-semibold bg-[#EC1A24] text-white"
+                        title="قيّم فعالية حضرتها داخل كيانك"
+                      >
+                        تقييم فعالية
+                        <CalendarDays className="h-4 w-4 ms-2" />
+                      </button>
+                    )}
+                    {isManager && (
+                      <button
+                        onClick={() => router.push("/manager/evaluations")}
+                        className="inline-flex items-center h-10 px-4 rounded-full font-semibold bg-[#EC1A24] text-white"
+                        title="عرض كل تقييمات الفعاليات التابعة لكيانك"
+                      >
+                        عرض تقييمات الكيان
+                        <ArrowRight className="h-4 w-4 ms-2" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* ISO */}
+              {visible.iso && (
                 <TabsContent value="iso">
                   <UnitCard
                     icon={<ShieldCheck className="h-5 w-5 text-[#1D1D1D]" />}
                     title="نماذج ISO (إجراءات وسياسات)"
-                    desc="مكتبة النماذج، سير الاعتماد، وسجل التدقيق."
+                    desc={
+                      session?.role === "unionSupervisor"
+                        ? "مكتبة النماذج، سير الاعتماد، وسجل التدقيق."
+                        : session?.role === "entityManager"
+                        ? "استعراض وإنشاء نماذج لسياسات كيانك وإرسالها للاعتماد."
+                        : "استعراض النماذج المعتمدة والسياسات المنشورة."
+                    }
                     href="/iso"
                   />
                 </TabsContent>
               )}
 
-              {show.governance && (
-                <TabsContent value="governance">
-                  <UnitCard
-                    icon={<FileText className="h-5 w-5 text-[#1D1D1D]" />}
-                    title="الحوكمة (Governance)"
-                    desc="اللوائح، محاضر الاجتماعات، القرارات، واعتمادات النماذج."
-                    href="/governance"
-                  />
-                </TabsContent>
-              )}
+              {/* الحوكمة */}
+              <TabsContent value="governance">
+                <UnitCard
+                  icon={<FileText className="h-5 w-5 text-[#1D1D1D]" />}
+                  title="الحوكمة (Governance)"
+                  desc={session?.role === "unionSupervisor"
+                    ? "اللوائح، محاضر الاجتماعات، القرارات — إنشاء/تعديل/حذف السجلات."
+                    : session?.role === "entityManager"
+                    ? "عرض سجل الحوكمة لكيانك (الكتابة حسب صلاحيات الواجهة الخلفية)."
+                    : "عرض اللوائح، المحاضر والقرارات (قراءة فقط)."}
+                  href="/governance"
+                />
+              </TabsContent>
 
-              {show.reports && (
-                <TabsContent value="reports">
-                  <UnitCard
-                    icon={<BarChart3 className="h-5 w-5 text-[#1D1D1D]" />}
-                    title="التقارير ولوحات البيانات (Dashboards)"
-                    desc="ملخصات بالأرقام والرسوم البيانية عن الكيانات والأعضاء والفعاليات و ISO."
-                    href="/reports"
-                  />
-                </TabsContent>
-              )}
+              {/* التقارير */}
+              <TabsContent value="reports">
+                <UnitCard icon={<BarChart3 className="h-5 w-5 text-[#1D1D1D]" />} title="التقارير ولوحات البيانات (Dashboards)" desc={session?.role === "entityManager" ? "تقارير كيانك" : "ملخصات عامة للأرقام والرسوم البيانية"} href="/reports" />
+              </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
       </main>
     </div>
-  )
+  );
 }
 
 function HeaderBar() {
-  const pathname = usePathname()
-  const active = (href: string) => pathname === href
-
+  const pathname = usePathname();
+  const active = (href: string) => pathname === href;
   return (
     <header className="relative z-10">
       <div className="mx-auto max-w-6xl px-4">
@@ -311,11 +462,8 @@ function HeaderBar() {
             <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-[#F6F6F6] border border-[#E5E5E5]">
               <Users className="h-5 w-5 text-[#1D1D1D]" />
             </div>
-            <Link href="/" className="font-semibold text-[#1D1D1D]">
-              منصة الكيانات الشبابية
-            </Link>
+            <Link href="/" className="font-semibold text-[#1D1D1D]">منصة الكيانات الشبابية</Link>
           </div>
-
           <nav className="hidden sm:flex items-center gap-1 text-sm">
             {[
               { href: "/profile", label: "الملف الشخصى" },
@@ -323,11 +471,7 @@ function HeaderBar() {
               { href: "/support", label: "الدعم" },
               { href: "/about", label: "عن المنصة" },
             ].map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={`px-3 py-1 rounded-lg transition ${active(l.href) ? "bg-[#EC1A24] text-white" : "text-[#1D1D1D]"}`}
-              >
+              <Link key={l.href} href={l.href} className={`px-3 py-1 rounded-lg transition ${active(l.href) ? "bg-[#EC1A24] text-white" : "text-[#1D1D1D]"}`}>
                 {l.label}
               </Link>
             ))}
@@ -335,7 +479,7 @@ function HeaderBar() {
         </div>
       </div>
     </header>
-  )
+  );
 }
 
 function StatCard({ title, icon, value, extra }: { title: string; icon: React.ReactNode; value: number; extra?: React.ReactNode }) {
@@ -343,70 +487,54 @@ function StatCard({ title, icon, value, extra }: { title: string; icon: React.Re
     <div className="rounded-2xl p-4 bg-white border border-[#E7E2DC] shadow text-[#1D1D1D]">
       <div className="flex items-center justify-between">
         <span className="text-sm text-[#6B6B6B]">{title}</span>
-        <span className="h-8 w-8 rounded-xl flex items-center justify-center bg-[#F6F6F6] border border-[#E5E5E5]">
-          {icon}
-        </span>
+        <span className="h-8 w-8 rounded-xl flex items-center justify-center bg-[#F6F6F6] border border-[#E5E5E5]">{icon}</span>
       </div>
       <div className="mt-2 text-2xl font-extrabold">{value}</div>
-      <div className="text-xs mt-1 text-[#7A7A7A]">
-        {extra ? extra : <>إجمالي {title}</>}
-      </div>
+      <div className="text-xs mt-1 text-[#7A7A7A]">{extra ? extra : <>إجمالي {title}</>}</div>
     </div>
-  )
+  );
 }
 
-
 function SurfaceCard({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl bg-white border border-[#E7E2DC] shadow-[0_8px_18px_rgba(0,0,0,0.05)] text-[#1D1D1D]">
-      {children}
-    </div>
-  )
+  return <div className="rounded-2xl bg-white border border-[#E7E2DC] shadow-[0_8px_18px_rgba(0,0,0,0.05)] text-[#1D1D1D]">{children}</div>;
 }
 
 function QuickButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
-    <button
-      onClick={onClick}
-      className="inline-flex items-center justify-between w-full h-11 rounded-xl px-4 transition group
-                 bg-white text-[#1D1D1D] border border-[#E7E2DC] shadow-[0_4px_10px_rgba(0,0,0,0.04)]"
-    >
+    <button onClick={onClick} className="inline-flex items-center justify-between w-full h-11 rounded-xl px-4 transition group bg-white text-[#1D1D1D] border border-[#E7E2DC] shadow-[0_4px_10px_rgba(0,0,0,0.04)]">
       {children}
     </button>
-  )
+  );
 }
 
-function UnitCard({ icon, title, desc, href }: { icon: React.ReactNode; title: string; desc: string; href: string }) {
-  const router = useRouter()
+function UnitCard({ icon, title, desc, href, adminActions }: { icon: React.ReactNode; title: string; desc: string; href: string; adminActions?: { label: string; href: string }[] }) {
+  const router = useRouter();
   return (
     <div className="rounded-2xl p-5 flex items-start justify-between gap-4 bg-white border border-[#E7E2DC] shadow-[0_8px_18px_rgba(0,0,0,0.05)] text-[#1D1D1D]">
-      <div className="space-y-1">
+      <div className="space-y-2">
         <div className="flex items-center gap-2 font-semibold">
-          <span className="h-9 w-9 rounded-xl flex items-center justify-center bg-[#F6F6F6] border border-[#E5E5E5]">
-            {icon}
-          </span>
+          <span className="h-9 w-9 rounded-xl flex items-center justify-center bg-[#F6F6F6] border border-[#E5E5E5]">{icon}</span>
           <span className="text-base md:text-lg">{title}</span>
         </div>
         <p className="text-sm text-[#595959]">{desc}</p>
+        {adminActions && adminActions.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {adminActions.map((a) => (
+              <Link key={a.href} href={a.href} className="inline-flex items-center h-9 px-3 rounded-full border border-[#E7E2DC] text-sm hover:bg-[#F6F6F6]">
+                {a.label}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
-      <button
-        onClick={() => router.push(href)}
-        className="shrink-0 inline-flex items-center h-10 px-4 rounded-full font-semibold bg-[#EC1A24] text-white"
-      >
+      <button onClick={() => router.push(href)} className="shrink-0 inline-flex items-center h-10 px-4 rounded-full font-semibold bg-[#EC1A24] text-white">
         فتح الصفحة
         <ArrowRight className="h-4 w-4 ms-2" />
       </button>
     </div>
-  )
+  );
 }
 
 function Tab({ value, label }: { value: string; label: string }) {
-  return (
-    <TabsTrigger
-      value={value}
-      className="h-10 rounded-full data-[state=active]:shadow text-[#1D1D1D] bg-transparent"
-    >
-      {label}
-    </TabsTrigger>
-  )
+  return <TabsTrigger value={value} className="h-10 rounded-full data-[state=active]:shadow text-[#1D1D1D] bg-transparent">{label}</TabsTrigger>;
 }

@@ -12,6 +12,6 @@ export async function GET() {
   const iso      = (db.prepare('SELECT COUNT(*) AS c FROM iso').get()      as any).c ?? 0
 
   return NextResponse.json({ entities, members, events, iso }, {
-    headers: { 'Cache-Control': 'no-store, max-age=0' } 
+    headers: { 'Cache-Control': 'no-store, max-age=0' }
   })
 }

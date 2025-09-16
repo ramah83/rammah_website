@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Users, FileText, Shield, Scale, AlertTriangle, CheckCircle2, Globe2, Mail } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Cairo } from "next/font/google";
+
+const cairo = Cairo({ subsets: ["arabic"], weight: ["400", "600", "700", "800"] });
 
 export default function TermsPage() {
   return (
-    <div dir="rtl" className="relative min-h-screen overflow-hidden flex flex-col" style={{ backgroundColor: "#EFE6DE" }}>
+    <div dir="rtl" className={`${cairo.className} relative min-h-screen overflow-hidden flex flex-col`} style={{ backgroundColor: "#EFE6DE" }}>
       <HeaderBar />
-
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8 md:pt-12">
         <div className="rounded-[24px] p-6 md:p-10" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 12px 24px rgba(0,0,0,0.06)" }}>
           <div className="flex items-center gap-3 mb-4">
@@ -162,6 +165,28 @@ export default function TermsPage() {
 function HeaderBar() {
   const pathname = usePathname();
   const active = (href: string) => pathname === href;
+  const [displayName, setDisplayName] = useState<string>("");
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("session") || "";
+      const s = raw ? JSON.parse(raw) : {};
+      setDisplayName((s?.name || "").trim());
+    } catch { setDisplayName(""); }
+  }, []);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "session") {
+        try {
+          const s = e.newValue ? JSON.parse(e.newValue) : {};
+          setDisplayName((s?.name || "").trim());
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   return (
     <header className="relative z-10">
@@ -176,26 +201,29 @@ function HeaderBar() {
             </Link>
           </div>
 
-          <nav className="hidden sm:flex items-center gap-1 text-sm">
-            {[
-              { href: "/profile", label: "الملف الشخصي" },
-              { href: "/dashboard", label: "لوحة التحكم" },
-              { href: "/about", label: "عن المنصة" },
-              { href: "/support", label: "الدعم" },
-            ].map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className="px-3 py-1 rounded-lg transition"
-                style={{
-                  color: active(l.href) ? "#FFFFFF" : "#1D1D1D",
-                  backgroundColor: active(l.href) ? "#EC1A24" : "transparent",
-                }}
-              >
-                {l.label}
-              </Link>
-            ))}
-          </nav>
+          <div className="flex items-center gap-3">
+            {displayName ? <span className="hidden sm:inline text-sm" style={{ color: "#1D1D1D" }}>أهلاً، {displayName}</span> : null}
+            <nav className="hidden sm:flex items-center gap-1 text-sm">
+              {[
+                { href: "/profile", label: "الملف الشخصي" },
+                { href: "/dashboard", label: "لوحة التحكم" },
+                { href: "/support", label: "الدعم" },
+                { href: "/about", label: "عن المنصة" },
+              ].map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className="px-3 py-1 rounded-lg transition"
+                  style={{
+                    color: active(l.href) ? "#FFFFFF" : "#1D1D1D",
+                    backgroundColor: active(l.href) ? "#EC1A24" : "transparent",
+                  }}
+                >
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
         </div>
       </div>
     </header>

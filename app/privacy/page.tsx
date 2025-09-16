@@ -1,15 +1,20 @@
+// /app/privacy/page.tsx
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, ShieldCheck, Lock, Database, Cookie, Mail, FileText, Globe2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Cairo } from "next/font/google";
+import { Users, ShieldCheck, Lock, Database, Cookie, Mail, FileText, Globe2 } from "lucide-react";
+
+const cairo = Cairo({ subsets: ["arabic"], weight: ["400", "500", "600", "700", "800"] });
+
+type Session = { id: string; email: string; name: string; role?: string; entityId?: string | null };
 
 export default function PrivacyPage() {
   return (
-    <div dir="rtl" className="relative min-h-screen overflow-hidden flex flex-col" style={{ backgroundColor: "#EFE6DE" }}>
+    <div dir="rtl" className={`${cairo.className} relative min-h-screen overflow-hidden flex flex-col`} style={{ backgroundColor: "#EFE6DE" }}>
       <HeaderBar />
-
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8 md:pt-12">
         <div className="rounded-[24px] p-6 md:p-10" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 12px 24px rgba(0,0,0,0.06)" }}>
           <div className="flex items-center gap-3 mb-4">
@@ -34,16 +39,16 @@ export default function PrivacyPage() {
             <li>بيانات الحساب: الاسم، البريد الإلكتروني، كلمة المرور المشفرة، الدور/الكيان.</li>
             <li>بيانات الاستخدام: الصفحات التي تزورها، نوع الجهاز والمتصفح، عنوان الـ IP بشكل مقنع.</li>
             <li>بيانات تفاعلية: التسجيل في البرامج، الحضور، الاستبيانات، الرسائل للدعم.</li>
-            <li>ملفات ارتباط (Cookies) لأغراض التخصيص والإحصاء (انظر قسم الكوكيز).</li>
+            <li>ملفات ارتباط (Cookies) لأغراض التخصيص والإحصاء.</li>
           </ul>
         </CardGlass>
 
         <CardGlass>
           <SectionTitle icon={<FileText className="h-5 w-5" color="#1D1D1D" />} title="أغراض الاستخدام والأسس القانونية" />
           <ul className="list-disc pr-5 space-y-2" style={{ color: "#595959" }}>
-            <li>تشغيل المنصة وتقديم الخدمات الأساسية (تنفيذ عقد الاستخدام/المصلحة المشروعة).</li>
-            <li>تحسين الأداء وتجربة المستخدم وإحصاءات مجهولة (المصلحة المشروعة/الموافقة).</li>
-            <li>التواصل بخصوص التحديثات والدعم الفني (المصلحة المشروعة/الموافقة).</li>
+            <li>تشغيل المنصة وتقديم الخدمات الأساسية.</li>
+            <li>تحسين الأداء وتجربة المستخدم وإحصاءات مجهولة.</li>
+            <li>التواصل بخصوص التحديثات والدعم الفني.</li>
             <li>الامتثال للالتزامات القانونية وحماية الحقوق.</li>
           </ul>
         </CardGlass>
@@ -52,16 +57,16 @@ export default function PrivacyPage() {
           <SectionTitle icon={<Lock className="h-5 w-5" color="#1D1D1D" />} title="المشاركة والحفظ والأمان" />
           <ul className="list-disc pr-5 space-y-2" style={{ color: "#595959" }}>
             <li>لا نبيع بياناتك لأي طرف ثالث.</li>
-            <li>قد نشارك بياناتًا عند الضرورة مع مزودي خدمة ملتزمين بعقود معالجة بيانات (استضافة/تحليلات/إرسال بريد).</li>
-            <li>نحتفظ بالبيانات طوال مدة الحساب أو حسب ما تقتضيه أغراض الجمع والقانون، ثم نقوم بحذفها أو إخفاء هويتها.</li>
-            <li>نطبّق ضوابط أمان تقنية وتنظيمية (تشفير، صلاحيات، سجلات وصول).</li>
+            <li>قد نشارك بياناتًا عند الضرورة مع مزودي خدمة ملتزمين بعقود معالجة بيانات.</li>
+            <li>نحتفظ بالبيانات طوال مدة الحساب أو حسب ما تقتضيه أغراض الجمع والقانون، ثم نحذفها أو نخفي هويتها.</li>
+            <li>نطبّق ضوابط أمان تقنية وتنظيمية.</li>
           </ul>
         </CardGlass>
 
         <CardGlass>
           <SectionTitle icon={<Globe2 className="h-5 w-5" color="#1D1D1D" />} title="حقوقك على بياناتك" />
           <p style={{ color: "#595959" }}>
-            لديك حقوق الوصول، والتصحيح، والحذف، وتقييد أو الاعتراض على المعالجة، وسحب الموافقة متى شئت، وطلب نسخة قابلة للنقل من بياناتك. لممارسة هذه الحقوق، تواصل معنا عبر القنوات أدناه.
+            لديك حقوق الوصول والتصحيح والحذف وتقييد أو الاعتراض على المعالجة وسحب الموافقة وطلب نسخة قابلة للنقل من بياناتك. لممارسة هذه الحقوق، تواصل معنا عبر القنوات أدناه.
           </p>
         </CardGlass>
 
@@ -101,6 +106,16 @@ export default function PrivacyPage() {
 function HeaderBar() {
   const pathname = usePathname();
   const active = (href: string) => pathname === href;
+  const [displayName, setDisplayName] = useState<string>("");
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("session") || "";
+      if (!raw) { setDisplayName(""); return; }
+      const s: Session = JSON.parse(raw);
+      setDisplayName((s?.name || "").trim());
+    } catch { setDisplayName(""); }
+  }, []);
 
   return (
     <header className="relative z-10">
@@ -115,26 +130,30 @@ function HeaderBar() {
             </Link>
           </div>
 
-          <nav className="hidden sm:flex items-center gap-1 text-sm">
-            {[
-              { href: "/profile", label: "الملف الشخصي" },
-              { href: "/dashboard", label: "لوحة التحكم" },
-              { href: "/about", label: "عن المنصة" },
-              { href: "/support", label: "الدعم" },
-            ].map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className="px-3 py-1 rounded-lg transition"
-                style={{
-                  color: active(l.href) ? "#FFFFFF" : "#1D1D1D",
-                  backgroundColor: active(l.href) ? "#EC1A24" : "transparent",
-                }}
-              >
-                {l.label}
-              </Link>
-            ))}
-          </nav>
+          <div className="flex items-center gap-3">
+
+            <nav className="hidden sm:flex items-center gap-1 text-sm">
+              {[
+                { href: "/profile", label: "الملف الشخصي" },
+                { href: "/dashboard", label: "لوحة التحكم" },
+                { href: "/support", label: "الدعم" },
+                { href: "/about", label: "عن المنصة" },
+                { href: "/privacy", label: "الخصوصية" },
+              ].map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className="px-3 py-1 rounded-lg transition"
+                  style={{
+                    color: active(l.href) ? "#FFFFFF" : "#1D1D1D",
+                    backgroundColor: active(l.href) ? "#EC1A24" : "transparent",
+                  }}
+                >
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
         </div>
       </div>
     </header>
@@ -190,7 +209,6 @@ function CookiesCard() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
     try {
       const raw = localStorage.getItem("cookiePrefs");
       if (raw) setPrefs(JSON.parse(raw));
@@ -198,12 +216,7 @@ function CookiesCard() {
   }, []);
 
   const toggle = (key: keyof CookiePrefs) => setPrefs((p) => ({ ...p, [key]: key === "necessary" ? true : !p[key] }));
-
-  const save = () => {
-    localStorage.setItem("cookiePrefs", JSON.stringify(prefs));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
+  const save = () => { localStorage.setItem("cookiePrefs", JSON.stringify(prefs)); setSaved(true); setTimeout(() => setSaved(false), 2000); };
 
   return (
     <div className="rounded-2xl p-6" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
