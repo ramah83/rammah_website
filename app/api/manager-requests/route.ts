@@ -1,4 +1,3 @@
-// /app/api/manager-requests/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -7,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/server/sqlite";
 import { getSession } from "@/lib/server/session";
 
-// GET /api/manager-requests?status=pending|approved|rejected|all
+
 export async function GET(req: NextRequest) {
   const s = await getSession(req);
   if (!s?.id) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
@@ -15,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   const db = getDB();
 
-  // احتياط: ضمن وجود الجدول
+  
   db.exec(`
     CREATE TABLE IF NOT EXISTS manager_requests (
       id TEXT PRIMARY KEY,
@@ -55,7 +54,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(rows ?? []);
 }
 
-// PATCH { id, decision:"approve"|"reject", note? }
+
 export async function PATCH(req: NextRequest) {
   const s = await getSession(req);
   if (!s?.id) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
@@ -85,15 +84,15 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const tx = (db as any).transaction(() => {
-      // قبول الطلب
+      
       db.prepare(`UPDATE manager_requests SET status='approved', decidedAt=datetime('now'), decidedBy=?, note=? WHERE id=?`)
         .run(s.id, note, id);
 
-      // ترقية المستخدم لمدير كيان + ربطه بالكيان
+      
       db.prepare(`UPDATE users SET role='entityManager', entityId=? WHERE id=?`)
         .run(reqRow.entityId, reqRow.applicantUserId);
 
-      // لو الكيان بدون مدير، عينّه الآن
+      
       const cur = db.prepare(`SELECT managerUserId FROM entities WHERE id=?`).get(reqRow.entityId) as any;
       if (!cur?.managerUserId) {
         db.prepare(`UPDATE entities SET managerUserId=? WHERE id=?`).run(reqRow.applicantUserId, reqRow.entityId);

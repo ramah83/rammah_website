@@ -1,4 +1,3 @@
-// app/iso/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -90,7 +89,7 @@ export default function ISOPage() {
   const api = {
     getEntities: async () => {
       const res = await fetch("/api/entities", { cache: "no-store" });
-      if (!res.ok) return []; // ما نوقفش الصفحة لو رجعت فاضية
+      if (!res.ok) return []; 
       const data = await res.json();
       return Array.isArray(data) ? data : Array.isArray(data?.entities) ? data.entities : [];
     },
@@ -140,7 +139,7 @@ export default function ISOPage() {
     },
   };
 
-  // حمّل الـ session
+  
   useEffect(() => {
     try {
       const s = localStorage.getItem("session");
@@ -148,14 +147,14 @@ export default function ISOPage() {
       const parsed = JSON.parse(s) as Session;
       setSession(parsed);
 
-      // ✅ اضبط مالك النموذج فورًا لمدير الكيان بدون انتظار الكيانات
+      
       if (parsed.role === "entityManager" && parsed.entityId) {
         setForm(p => ({ ...p, ownerEntityId: String(parsed.entityId) }));
       }
     } catch { router.push("/"); }
   }, [router]);
 
-  // حمّل الكيانات + قائمة ISO حسب الفلاتر
+  
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -168,7 +167,7 @@ export default function ISOPage() {
         if (!mounted) return;
         setEntities(Array.isArray(ents) ? ents : []);
         setList(Array.isArray(isoItems) ? isoItems : []);
-        // لو المدير لسه ما اتحددش ownerEntityId لأي سبب وsession فيها entityId
+        
         if (session?.role === "entityManager" && session.entityId && !form.ownerEntityId) {
           setForm(p => ({ ...p, ownerEntityId: String(session.entityId) }));
         }
@@ -181,7 +180,7 @@ export default function ISOPage() {
       }
     })();
     return () => { mounted = false; };
-  }, [filterEntity, filterStatus, search, session?.role, session?.entityId]); // refetch on filters / session
+  }, [filterEntity, filterStatus, search, session?.role, session?.entityId]); 
 
   const filtered = useMemo(() => list, [list]);
 
@@ -211,7 +210,7 @@ export default function ISOPage() {
     if (!form.ownerEntityId) return alert("اختر الكيان");
     setSaving(true);
     try {
-      // لو مدير كيان، تأكد أن الـ ownerEntityId يساوي كيان المدير حتى لو الواجهة فيها قيمة أخرى
+      
       const payload = session.role === "entityManager"
         ? { ...form, ownerEntityId: String(session.entityId || "") }
         : form;
@@ -250,7 +249,7 @@ export default function ISOPage() {
   const confirmEdit = async () => {
     if (!editingId || !editDraft) return;
     try {
-      // مدير الكيان: لا يسمح بتغيير المالك؛ سيرفرًا كمان محمي
+      
       const payload: Partial<FormState> = {
         title: (editDraft.title || "").trim(),
         code: (editDraft.code || "").trim(),
@@ -260,7 +259,7 @@ export default function ISOPage() {
         description: (editDraft.description || "").trim(),
         fileUrl: (editDraft.fileUrl || "").trim(),
       };
-      // فقط المشرف نرسل معه ownerEntityId
+      
       if (session.role === "unionSupervisor" && editDraft.ownerEntityId) {
         payload.ownerEntityId = String(editDraft.ownerEntityId);
       }
@@ -384,7 +383,7 @@ export default function ISOPage() {
                   <Select
                     value={String(form.ownerEntityId)}
                     onValueChange={(v) => setForm((p) => ({ ...p, ownerEntityId: v }))}
-                    disabled={session.role === "entityManager"} // مدير الكيان لا يغيرها
+                    disabled={session.role === "entityManager"} 
                   >
                     <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E3E3E3", color: "#1D1D1D" }}>
                       <SelectValue placeholder={session.role === "entityManager" ? "كيانك" : "اختر الكيان"} />

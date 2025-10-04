@@ -1,4 +1,3 @@
-// app/manager/evaluations/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";

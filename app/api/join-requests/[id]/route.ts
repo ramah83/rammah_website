@@ -5,7 +5,7 @@ export const revalidate = 0;
 
 import { NextRequest, NextResponse } from "next/server";
 import { getDB, uid } from "@/lib/server/sqlite";
-import { getSession, Session } from "@/lib/server/session";
+import { getSession, type Session } from "@/lib/server/session";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const s = (await getSession(req)) as Session | null;

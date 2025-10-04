@@ -1,4 +1,3 @@
-// app/api/events/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -7,9 +6,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/server/sqlite";
 import { getSession, type Session } from "@/lib/server/session";
 
+/**
+ * ملاحظة: SELECT_BASE يُرجع organizerName محسوباً:
+ * - إن كان هناك اعتماد: approvedByName
+ * - وإلا: createdByName
+ */
 const SELECT_BASE = `
   SELECT
     e.id, e.title, e.date, e.status, e.entityId,
+    e.createdBy, e.createdByName, e.createdByRole,
+    e.approvedBy, e.approvedByName, e.approvedAt,
+    COALESCE(e.approvedByName, e.createdByName) AS organizerName,
     (SELECT COUNT(*) FROM event_evaluations ev WHERE ev.eventId = e.id) AS evalCount
   FROM events e
 `;
@@ -33,47 +40,58 @@ export async function GET(req: NextRequest) {
     const s = (await getSession(req)) as Session | null;
     if (!s) return NextResponse.json([]);
 
+    // المشرف أو مدير الكيان يرى الكل
     if (s.role === "entityManager" || s.role === "unionSupervisor") {
       const rows = db.prepare(
         `${SELECT_BASE}
           ORDER BY datetime(e.date) DESC, e.id DESC`
       ).all();
+      // لا حاجة لـ canEvaluate لهم
       return NextResponse.json(rows ?? []);
     }
 
+    // المستخدم
     if (s.role === "user") {
+      const baseQuery = (extraWhere = "", params: any[] = []) =>
+        db.prepare(
+          `${SELECT_BASE}
+            ${extraWhere}
+            ORDER BY datetime(e.date) DESC, e.id DESC`
+        ).all(...params) as any[];
+
+      let rows: any[] = [];
       if (s.entityId) {
-        const rows = db.prepare(
-          `${SELECT_BASE}
-            WHERE e.entityId = ? OR e.entityId IS NULL
-            ORDER BY datetime(e.date) DESC, e.id DESC`
-        ).all(String(s.entityId));
-        return NextResponse.json(rows ?? []);
+        rows = baseQuery(
+          `WHERE e.entityId = ? OR e.entityId IS NULL`,
+          [String(s.entityId)]
+        );
+      } else {
+        const ents = db.prepare(
+          `SELECT entityId FROM entity_members WHERE userId=?
+           UNION
+           SELECT entityId FROM join_requests WHERE userId=? AND status='approved'`
+        ).all(s.id, s.id) as { entityId: string }[];
+
+        const ids = (ents || []).map(r => r.entityId).filter(Boolean);
+        if (!ids.length) {
+          rows = baseQuery(`WHERE e.entityId IS NULL`);
+        } else {
+          const placeholders = ids.map(() => "?").join(",");
+          rows = baseQuery(
+            `WHERE e.entityId IN (${placeholders}) OR e.entityId IS NULL`,
+            ids
+          );
+        }
       }
 
-      const ents = db.prepare(
-        `SELECT entityId FROM entity_members WHERE userId=?
-         UNION
-         SELECT entityId FROM join_requests WHERE userId=? AND status='approved'`
-      ).all(s.id, s.id) as { entityId: string }[];
+      const out = rows.map(r => {
+        const att = db.prepare(
+          `SELECT 1 FROM event_attendance WHERE eventId=? AND userId=? AND attended=1`
+        ).get(r.id, s.id);
+        return { ...r, canEvaluate: !!att };
+      });
 
-      const ids = (ents || []).map(r => r.entityId).filter(Boolean);
-      if (!ids.length) {
-        const rows = db.prepare(
-          `${SELECT_BASE}
-            WHERE e.entityId IS NULL
-            ORDER BY datetime(e.date) DESC, e.id DESC`
-        ).all();
-        return NextResponse.json(rows ?? []);
-      }
-
-      const placeholders = ids.map(() => "?").join(",");
-      const rows = db.prepare(
-        `${SELECT_BASE}
-          WHERE e.entityId IN (${placeholders}) OR e.entityId IS NULL
-          ORDER BY datetime(e.date) DESC, e.id DESC`
-      ).all(...ids);
-      return NextResponse.json(rows ?? []);
+      return NextResponse.json(out ?? []);
     }
 
     return NextResponse.json([]);

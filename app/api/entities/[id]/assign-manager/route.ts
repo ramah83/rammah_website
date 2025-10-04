@@ -1,4 +1,3 @@
-// /app/api/entities/[id]/assign-manager/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getDB, uid } from "@/lib/server/sqlite";
 import { getSession } from "@/lib/server/session";

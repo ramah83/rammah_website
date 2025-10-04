@@ -1,4 +1,3 @@
-// app/api/iso/[id]/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -136,7 +135,7 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
     if (typeof body?.description === "string") fields.description = body.description.trim();
     if (typeof body?.fileUrl === "string") fields.fileUrl = body.fileUrl.trim();
     if (typeof body?.ownerEntityId === "string") {
-      // فقط المشرف العام يقدر ينقل الملكية
+      
       if (!isSupervisor) {
         return NextResponse.json({ error: "غير مصرح: لا يمكنك تغيير الكيان المالك" }, { status: 403 });
       }
@@ -145,7 +144,7 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
     if (typeof body?.status === "string") {
       const next = body.status as ISOStatus;
       if (!ALLOWED.includes(next)) return NextResponse.json({ error: "status غير صالح" }, { status: 400 });
-      // entityManager لا يغيّر إلا ضمن السلسلة المسموحة
+      
       if (isEntityMgr) {
         const allowedNext = new Set(CAN_TRANSITION[before.status as ISOStatus] || []);
         if (!allowedNext.has(next)) {
@@ -164,7 +163,7 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
     const values = Object.keys(fields).map(k => fields[k]);
     db.prepare(`UPDATE iso SET ${setSql} WHERE id=?`).run(...values, id);
 
-    // سجل تدقيق عند تغيير الحالة أو العنوان/الملكية/النسخة/الملف
+    
     const changedStatus = typeof fields.status !== "undefined";
     const noteParts: string[] = [];
     ["title", "code", "version", "tags", "description", "fileUrl", "ownerEntityId"].forEach(k => {

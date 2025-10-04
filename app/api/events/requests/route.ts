@@ -1,4 +1,3 @@
-// app/api/events/requests/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -34,21 +33,6 @@ function normalizeFiles(files: any): FilesObj {
     return out;
   }
   return {};
-}
-
-function normalizePayload(raw: any) {
-  const p = raw || {};
-  return {
-    name: p.name ?? p.title ?? "",
-    date: p.date || null,
-    attendeesTarget: Number.isFinite(Number(p.attendeesTarget)) ? Number(p.attendeesTarget) : null,
-    venue: p.venue || "",
-    goals: p.goals || "",
-    audience: p.audience || "",
-    speakers: p.speakers || "",
-    supportType: p.supportType || "",
-    files: normalizeFiles(p.files),
-  };
 }
 
 function canSee(sess: Session | null, entId: string) {
@@ -113,9 +97,17 @@ export async function POST(req: NextRequest) {
 
   const eventId = uid();
   db.prepare(`
-    INSERT INTO events (id, title, date, status, entityId)
-    VALUES (?, ?, ?, 'requested', ?)
-  `).run(eventId, payload.name, payload.date || null, isPublic ? null : entityId);
+    INSERT INTO events (id, title, date, status, entityId, createdBy, createdByName, createdByRole)
+    VALUES (?, ?, ?, 'requested', ?, ?, ?, ?)
+  `).run(
+    eventId,
+    payload.name,
+    payload.date || null,
+    isPublic ? null : entityId,
+    s.id,
+    (s.name || s.email || "—"),
+    String(s.role)
+  );
 
   db.prepare(`UPDATE event_requests SET eventId=? WHERE id=?`).run(eventId, requestId);
 
@@ -158,7 +150,17 @@ export async function GET(req: NextRequest) {
 
     let payload: any = {};
     try { payload = JSON.parse(row.payload || "{}"); } catch {}
-    const normalized = normalizePayload(payload);
+    const normalized = {
+      name: payload?.name ?? payload?.title ?? "",
+      date: payload?.date || null,
+      attendeesTarget: Number.isFinite(Number(payload?.attendeesTarget)) ? Number(payload?.attendeesTarget) : null,
+      venue: payload?.venue || "",
+      goals: payload?.goals || "",
+      audience: payload?.audience || "",
+      speakers: payload?.speakers || "",
+      supportType: payload?.supportType || "",
+      files: normalizeFiles(payload?.files),
+    };
 
     return NextResponse.json({ ...row, payload: normalized });
   }
@@ -179,7 +181,20 @@ export async function GET(req: NextRequest) {
     const mapped = (rows || []).map(r => {
       let payload: any = {};
       try { payload = JSON.parse(r.payload || "{}"); } catch {}
-      return { ...r, payload: normalizePayload(payload) };
+      return {
+        ...r,
+        payload: {
+          name: payload?.name ?? payload?.title ?? "",
+          date: payload?.date || null,
+          attendeesTarget: Number.isFinite(Number(payload?.attendeesTarget)) ? Number(payload?.attendeesTarget) : null,
+          venue: payload?.venue || "",
+          goals: payload?.goals || "",
+          audience: payload?.audience || "",
+          speakers: payload?.speakers || "",
+          supportType: payload?.supportType || "",
+          files: normalizeFiles(payload?.files),
+        }
+      };
     });
 
     return NextResponse.json(mapped ?? []);

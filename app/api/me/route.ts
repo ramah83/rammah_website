@@ -1,4 +1,3 @@
-// app/api/me/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -22,7 +21,7 @@ function isBcryptHash(v?: string | null) {
   return !!v && /^\$2[aby]\$\d{2}\$/.test(v);
 }
 
-// قاعدة بسيطة لقوة كلمة المرور (يمكنك تخفيفها إلى طول فقط إن أردت)
+
 function okPasswordComplexity(pwd: string) {
   return /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(pwd);
 }
@@ -97,7 +96,7 @@ export async function PATCH(req: NextRequest) {
     const nextAvatar = typeof avatar === "string" ? (avatar.trim() || null)     : (row.avatar ?? null);
     const nextInterests = Array.isArray(interests) ? J(interests) : (row.interests ?? J([]));
 
-    // إدارة الرقم القومي
+    
     let nextNationalId = row.nationalId ?? null;
     if (nationalId !== undefined) {
       if (row.nationalId) {
@@ -113,7 +112,7 @@ export async function PATCH(req: NextRequest) {
       nextNationalId = nationalId;
     }
 
-    // تغيير كلمة السر
+    
     let willUpdatePassword = false;
     let newPasswordHash: string | undefined;
 
@@ -125,7 +124,7 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: "كلمة السر الجديدة يجب أن تكون 8 أحرف على الأقل وتحتوي على حروف وأرقام" }, { status: 400 });
       }
 
-      // هل نطلب كلمة السر الحالية؟
+      
       const hadAnyPassword = hasStoredHash || hasLegacyField;
       if (hadAnyPassword) {
         if (!oldPassword) {
@@ -134,19 +133,19 @@ export async function PATCH(req: NextRequest) {
 
         let okOld = false;
 
-        // الحالة الأحدث: passwordHash
+        
         if (hasStoredHash && bcrypt.compareSync(String(oldPassword), String(row.passwordHash))) {
           okOld = true;
         } else if (hasLegacyField) {
-          // دعم أنظمة قديمة:
+          
           if (isBcryptHash(row.password)) {
-            // العمود legacy كان Bcrypt — قارن وهاجر إلى passwordHash
+            
             if (bcrypt.compareSync(String(oldPassword), String(row.password))) {
               okOld = true;
               db.prepare(`UPDATE users SET passwordHash=?, password=NULL WHERE id=?`).run(row.password, effectiveId);
             }
           } else {
-            // العمود legacy كان Plain — قارن نصيًا ثم هاش وهاجر
+            
             if (String(oldPassword) === String(row.password)) {
               okOld = true;
               const migrated = bcrypt.hashSync(String(oldPassword), 10);
@@ -159,7 +158,7 @@ export async function PATCH(req: NextRequest) {
           return NextResponse.json({ error: "كلمة السر الحالية غير صحيحة" }, { status: 400 });
         }
       }
-      // لو لم يكن للمستخدم كلمة سر من قبل: لا نطلب oldPassword
+      
 
       newPasswordHash = bcrypt.hashSync(String(newPassword), 10);
       willUpdatePassword = true;
@@ -167,7 +166,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "يرجى إدخال كلمة السر الجديدة" }, { status: 400 });
     }
 
-    // تحديث البيانات
+    
     const sql = `
       UPDATE users
          SET name=?,

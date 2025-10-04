@@ -31,7 +31,7 @@ export function updateUserProfile(input: {
   bio?: string | null,
   interests?: string[] | null,
   avatar?: string | null,
-  // اختياري: تغيير كلمة السر
+  
   oldPassword?: string,
   newPassword?: string
 }) {
@@ -39,7 +39,7 @@ export function updateUserProfile(input: {
   const row: any = db.prepare(`SELECT * FROM users WHERE id=?`).get(input.id);
   if (!row) return { ok: false, error: "المستخدم غير موجود" };
 
-  // لو عايز تغيّر كلمة السر
+  
   if (input.newPassword) {
     if (!input.oldPassword || input.oldPassword !== (row.password ?? "")) {
       return { ok: false, error: "كلمة السر الحالية غير صحيحة" };

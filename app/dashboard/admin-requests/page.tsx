@@ -34,7 +34,7 @@ async function readJSON<T>(res: Response, fallback: T): Promise<T> {
       try { const j = JSON.parse(text); throw new Error(j?.error || res.statusText); }
       catch { throw new Error(res.statusText); }
     }
-    throw new Error(res.statusText); // ما نرجّعش HTML
+    throw new Error(res.statusText); 
   }
   if (!text) return fallback;
   try { return JSON.parse(text) as T; } catch { return fallback; }

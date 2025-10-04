@@ -12,15 +12,38 @@ export async function GET(req: NextRequest) {
 
   const db = getDB();
   try {
-    const row = db
-      .prepare(
+    // هات دوري
+    const me = db.prepare(`SELECT role FROM users WHERE id=?`).get(s.id) as any;
+
+    // باراميترات اختيارية
+    const url = new URL(req.url);
+    const scope = url.searchParams.get("scope") || "mine";        // mine | all
+    const status = url.searchParams.get("status") || "pending";   // pending | approved | rejected
+    const limit = Math.min(parseInt(url.searchParams.get("limit") || "100", 10), 200);
+
+    // لو أنا مشرف وبطلب غير "mine" -> رجّع قائمة بحسب الحالة
+    if (me?.role === "unionSupervisor" && scope !== "mine") {
+      const rows = db.prepare(
         `SELECT apr.*, u.name AS applicantName, u.email AS applicantEmail
            FROM admin_promotion_requests apr
            LEFT JOIN users u ON u.id = apr.applicantUserId
-          WHERE apr.applicantUserId=? 
-       ORDER BY datetime(apr.createdAt) DESC LIMIT 1`
-      )
-      .get(s.id);
+          WHERE apr.status = ?
+       ORDER BY datetime(apr.createdAt) DESC
+          LIMIT ?`
+      ).all(status, limit);
+      return NextResponse.json(rows, { status: 200 });
+    }
+
+    // السلوك القديم: آخر طلب ليا أنا
+    const row = db.prepare(
+      `SELECT apr.*, u.name AS applicantName, u.email AS applicantEmail
+         FROM admin_promotion_requests apr
+         LEFT JOIN users u ON u.id = apr.applicantUserId
+        WHERE apr.applicantUserId = ?
+     ORDER BY datetime(apr.createdAt) DESC
+        LIMIT 1`
+    ).get(s.id);
+
     return NextResponse.json(row || null, { status: 200 });
   } catch {
     return NextResponse.json({ error: "تعذر التحميل" }, { status: 500 });

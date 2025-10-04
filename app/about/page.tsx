@@ -13,7 +13,7 @@ export default function AboutPage() {
     >
       <HeaderBar />
 
-      {/* Hero */}
+      {}
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8 md:pt-12">
         <div
           className="rounded-[24px] p-6 md:p-10"
@@ -56,7 +56,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* المزايا */}
+      {}
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-8 md:mt-12">
         <h2
           className="text-2xl md:text-3xl font-bold mb-2"
@@ -96,7 +96,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* أرقام سريعة */}
+      {}
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-8 md:mt-12">
         <div
           className="rounded-2xl p-5 md:p-7"
@@ -115,7 +115,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* لماذا نحن */}
+      {}
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-8 md:mt-12">
         <h2
           className="text-2xl md:text-3xl font-bold mb-4"
@@ -143,7 +143,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* CTA */}
+      {}
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-10 mb-10">
         <div
           className="rounded-[22px] p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
@@ -188,8 +188,6 @@ export default function AboutPage() {
     </div>
   );
 }
-
-/* ======================= UI Helpers ======================= */
 
 function HeaderBar() {
   const pathname = usePathname();

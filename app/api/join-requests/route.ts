@@ -1,44 +1,90 @@
-// app/api/join-requests/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { getDB, uid } from "@/lib/server/sqlite";
-import { getSession } from "@/lib/server/session";
-
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+import { NextRequest, NextResponse } from "next/server";
+import { getDB, uid } from "@/lib/server/sqlite";
+import { getSession, type Session } from "@/lib/server/session";
+
+/**
+ * GET:
+ * - userId → طلبات مستخدم
+ * - entityId → طلبات كيان
+ * - لو role=entityManager بدون entityId → طلبات كل الكيانات التي يديرها (managerUserId = session.id)
+ * - لو role=unionSupervisor و ?status=... → فلترة بالحالة وإلا كل الطلبات
+ */
 export async function GET(req: NextRequest) {
   const db = getDB();
+  const s = (await getSession(req)) as Session | null;
+
   const { searchParams } = new URL(req.url);
-  const userId = searchParams.get("userId");
-  const entityId = searchParams.get("entityId");
-  const status = searchParams.get("status");
+  const userId   = (searchParams.get("userId")   || "").trim();
+  const entityId = (searchParams.get("entityId") || "").trim();
+  const status   = (searchParams.get("status")   || "").trim(); // pending | approved | rejected | joined_elsewhere | left ...
+
+  // 1) حسب userId
   if (userId) {
     const rows = db.prepare(`
       SELECT * FROM join_requests
-      WHERE userId = ?
-      ${status ? `AND status = ?` : ``}
-      ORDER BY createdAt DESC
+       WHERE userId = ?
+         ${status ? `AND status = ?` : ``}
+   ORDER BY datetime(createdAt) DESC
     `).all(...(status ? [userId, status] : [userId])) as any[];
     return NextResponse.json(rows, { status: 200 });
   }
+
+  // 2) حسب entityId
   if (entityId) {
     const rows = db.prepare(`
       SELECT * FROM join_requests
-      WHERE entityId = ?
-      ${status ? `AND status = ?` : ``}
-      ORDER BY createdAt DESC
+       WHERE entityId = ?
+         ${status ? `AND status = ?` : ``}
+   ORDER BY datetime(createdAt) DESC
     `).all(...(status ? [entityId, status] : [entityId])) as any[];
     return NextResponse.json(rows, { status: 200 });
   }
-  const rows = db.prepare(`SELECT * FROM join_requests ORDER BY createdAt DESC`).all() as any[];
-  return NextResponse.json(rows, { status: 200 });
+
+  // 3) entityManager بدون entityId → كل الكيانات التي يديرها
+  if (s?.role === "entityManager") {
+    const managed = db.prepare(`SELECT id FROM entities WHERE managerUserId = ?`).all(s.id) as { id: string }[];
+    if (managed.length === 0) return NextResponse.json([], { status: 200 });
+
+    const ids = managed.map(r => r.id);
+    const placeholders = ids.map(() => "?").join(",");
+    const rows = db.prepare(`
+      SELECT * FROM join_requests
+       WHERE entityId IN (${placeholders})
+         ${status ? `AND status = ?` : ``}
+   ORDER BY datetime(createdAt) DESC
+    `).all(...(status ? [...ids, status] : ids)) as any[];
+    return NextResponse.json(rows, { status: 200 });
+  }
+
+  // 4) unionSupervisor
+  if (s?.role === "unionSupervisor") {
+    if (status) {
+      const rows = db.prepare(`
+        SELECT * FROM join_requests
+         WHERE status = ?
+     ORDER BY datetime(createdAt) DESC
+      `).all(status) as any[];
+      return NextResponse.json(rows, { status: 200 });
+    }
+    const rows = db.prepare(`SELECT * FROM join_requests ORDER BY datetime(createdAt) DESC`).all() as any[];
+    return NextResponse.json(rows, { status: 200 });
+  }
+
+  // 5) باقي الأدوار بدون محددات
+  return NextResponse.json([], { status: 200 });
 }
 
+/**
+ * POST: إنشاء طلب انضمام (مثل ما كان)
+ */
 export async function POST(req: NextRequest) {
   try {
     const db = getDB();
-    const session = await getSession(req);
+    const session = (await getSession(req)) as Session | null;
     if (!session?.id) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
@@ -52,6 +98,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "أنت عضو حاليًا في كيان. اخرج أولًا ثم قدّم طلبًا جديدًا." }, { status: 400 });
     }
 
+    // تنظيف حالات سابقة موافَقة لم تُسجّل كعضوية
     db.prepare(`
       UPDATE join_requests
          SET status = 'left',

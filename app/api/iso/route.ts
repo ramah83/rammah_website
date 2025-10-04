@@ -1,4 +1,3 @@
-// app/api/iso/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -119,49 +118,49 @@ export async function GET(req: Request) {
     const q = (searchParams.get("q") || "").trim();
     const entityIdParam = searchParams.get("entityId");
     const statusRaw = searchParams.get("status");
-    const scope = searchParams.get("scope") || "all"; // all | mine | public
+    const scope = searchParams.get("scope") || "all"; 
 
     const where: string[] = [];
     const params: any[] = [];
 
-    // صلاحيات الرؤية
+    
     if (!ses) {
-      // زائر: يرى المعتمد فقط
+      
       where.push(`status = 'approved'`);
     } else if (ses.role === "user") {
-      // مستخدم: يرى المعتمد فقط لِكيانه فقط
-      // حاول تحديد كيان المستخدم من entity_members أولاً، ثم من session.entityId
+      
+      
       const row = db.prepare(`SELECT entityId FROM entity_members WHERE userId=? LIMIT 1`).get(ses.id) as { entityId?: string } | undefined;
       const userEntityId = row?.entityId || (ses.entityId ? String(ses.entityId) : null);
       if (!userEntityId) {
-        // لا ينتمي لكيان -> لا شيء
+        
         return ok([]);
       }
       where.push(`status = 'approved'`);
       where.push(`ownerEntityId = ?`);
       params.push(String(userEntityId));
     } else if (ses.role === "entityManager") {
-      // مدير كيان: يرى كل الحالات لكن داخل كيانه فقط
+      
       where.push(`ownerEntityId = ?`);
       params.push(String(ses.entityId || ""));
     } else {
-      // unionSupervisor: يرى الكل
+      
     }
 
-    // فلتر كيان (للمشرف فقط)
+    
     if (entityIdParam && entityIdParam !== "all" && ses?.role === "unionSupervisor") {
       where.push(`ownerEntityId = ?`);
       params.push(entityIdParam);
     }
 
-    // فلتر حالة
+    
     const allowed = new Set(["draft", "submitted", "review", "approved", "rejected"]);
     if (statusRaw && statusRaw !== "all" && allowed.has(statusRaw)) {
       where.push(`status = ?`);
       params.push(statusRaw);
     }
 
-    // فلتر scope
+    
     if (scope === "mine" && ses?.role && ses.role !== "unionSupervisor") {
       where.push(`ownerEntityId = ?`);
       params.push(String(ses?.entityId || ""));
@@ -169,7 +168,7 @@ export async function GET(req: Request) {
       where.push(`status = 'approved'`);
     }
 
-    // بحث
+    
     if (q) {
       where.push(`(code LIKE ? OR title LIKE ? OR COALESCE(tags,'') LIKE ? OR COALESCE(description,'') LIKE ?)`);
       params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
@@ -206,13 +205,13 @@ export async function POST(req: Request) {
     if (ses.role === "unionSupervisor") {
       ownerEntityId = b?.ownerEntityId ? String(b.ownerEntityId) : (ses?.entityId ?? null);
     } else {
-      // مدير الكيان: ثابت على كيانه
+      
       ownerEntityId = String(ses.entityId || "");
     }
 
     const statusStr = String(b?.status || "draft");
     const allowed: ISOStatus[] = ["draft", "submitted", "review", "approved", "rejected"];
-    // Managers can only create as draft or submitted
+    
     const status: ISOStatus =
       ses.role === "entityManager"
         ? (["draft", "submitted"].includes(statusStr) ? (statusStr as ISOStatus) : "draft")
@@ -226,7 +225,7 @@ export async function POST(req: Request) {
       return err("غير مصرح: يمكنك الإضافة على كيانك فقط", 403);
     }
 
-    // منع تكرار الكود داخل نفس الكيان
+    
     const dup = db.prepare(`SELECT 1 FROM iso WHERE code = ? AND ownerEntityId = ? LIMIT 1`).get(code, ownerEntityId);
     if (dup) return err("الكود مستخدم مسبقًا داخل نفس الكيان", 409);
 

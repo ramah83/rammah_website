@@ -1,4 +1,3 @@
-// app/api/membership/my/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/server/sqlite";
 import { getSession } from "@/lib/server/session";
@@ -43,7 +42,7 @@ export async function GET(req: NextRequest) {
       { status: 200 }
     );
   } catch {
-    // لا تكشف تفاصيل زيادة هنا
+    
     return NextResponse.json(
       { entityId: null, entityName: null, status: null },
       { status: 200 }

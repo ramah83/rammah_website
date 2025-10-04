@@ -1,4 +1,4 @@
-// /app/dashboard/admin-requests/page.tsx
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -89,7 +89,7 @@ export default function AdminRequestsPage() {
     }
   };
 
-  // مهم: استنى لحد ما السيشن يتأكد
+  
   useEffect(() => {
     if (session?.role === "unionSupervisor") load();
   }, [session?.role]);

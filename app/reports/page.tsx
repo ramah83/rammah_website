@@ -300,7 +300,7 @@ export default function ReportsPage() {
 const daysFromNowText = (dateStr?: string | null) => {
   const t = parseDate(dateStr)
   if (t == null) return "بدون تاريخ"
-  const diff = Math.floor((t - today0) / day_Ms) // يستخدم dayMs المعرّف أعلى الملف
+  const diff = Math.floor((t - today0) / day_Ms) 
   if (diff === 0) return "اليوم"
   if (diff === 1) return "غدًا"
   if (diff > 1) return `بعد ${diff} يوم`

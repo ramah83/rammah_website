@@ -65,14 +65,14 @@ export default function EvaluationsForManagerPage() {
     (async () => {
       setLoading(true);
       try {
-        // كل تقييمات كياني
+        
         const r = await fetch("/api/events/evaluations", { cache:"no-store", headers: buildSessionHeaders(false) });
         const data = await r.json().catch(() => []);
         if (!live) return;
         const arr: EvalRow[] = Array.isArray(data) ? data : [];
         setRows(arr);
 
-        // نجلب عناوين الفعاليات المستخدمة فقط
+        
         const ids: string[] = Array.from(
           new Set<string>((arr || []).map(d => String(d?.eventId || "")))
         ).filter(Boolean);

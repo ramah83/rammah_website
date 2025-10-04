@@ -1,4 +1,3 @@
-// /app/join/page.tsx
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -33,11 +32,11 @@ export default function JoinRequestPage() {
     note: "",
   });
 
-  // ملفات الهوية (لو API بتدعم multipart)
+  
   const [idFront, setIdFront] = useState<File | null>(null);
   const [idBack,  setIdBack]  = useState<File | null>(null);
 
-  // العضوية الحالية الفعلية
+  
   const [currentEntityId, setCurrentEntityId] = useState<string | null>(null);
 
   const isUser = session?.role === "user";
@@ -51,7 +50,7 @@ export default function JoinRequestPage() {
 
   useEffect(() => { setHydrated(true); }, []);
 
-  // تحميل الجلسة
+  
   useEffect(() => {
     if (!hydrated) return;
     try {
@@ -69,7 +68,7 @@ export default function JoinRequestPage() {
     }
   }, [hydrated, router]);
 
-  // تحميل الكيانات + معرفة العضوية الحالية
+  
   useEffect(() => {
     if (!hydrated) return;
     let mounted = true;
@@ -78,7 +77,7 @@ export default function JoinRequestPage() {
       setLoading(true); setErrMsg("");
 
       try {
-        // الكيانات كلها للمستخدم العادي
+        
         const res = await fetch("/api/entities", {
           cache: "no-store",
           headers: b64() ? { "x-session-b64": b64() } as HeadersInit : undefined,
@@ -97,7 +96,7 @@ export default function JoinRequestPage() {
       }
 
       try {
-        // العضوية الحالية (تعتمد جدول entity_members)
+        
         const mr = await fetch("/api/membership/my", {
           cache: "no-store",
           headers: b64() ? { "x-session-b64": b64() } as HeadersInit : undefined,
@@ -116,20 +115,20 @@ export default function JoinRequestPage() {
     return () => { mounted = false; };
   }, [hydrated]);
 
-  // هل المستخدم عضو الآن؟
+  
   const isMemberNow = !!currentEntityId;
 
-  // هل اختار نفس الكيان الحالي؟
+  
   const isSelectedCurrent = !!form.entityId && !!currentEntityId && form.entityId === currentEntityId;
 
-  // لا نسمح بالإرسال لو عضو قائم أو اختار نفس الكيان الحالي أو حقول ناقصة
+  
   const isSubmitDisabled = useMemo(() => {
     if (saving || loading) return true;
-    if (!isUser) return true; // الصفحة للمستخدم العادي فقط
+    if (!isUser) return true; 
     if (!form.entityId || !form.fullName.trim() || !form.position.trim() || !form.phone.trim() || !form.email.trim()) return true;
     if (isMemberNow) return true;
     if (isSelectedCurrent) return true;
-    // لو API بتتطلب صور رقم قومي بالضرورة:
+    
     if (!idFront || !idBack) return true;
     return false;
   }, [saving, loading, isUser, form, isMemberNow, isSelectedCurrent, idFront, idBack]);
@@ -157,7 +156,7 @@ export default function JoinRequestPage() {
     try {
       setSaving(true); setErrMsg("");
 
-      // نرسل Multipart لو الـ API عندك بتدعمه (شائع لما يكون فيه ملفات)
+      
       const fd = new FormData();
       fd.append("entityId", form.entityId);
       fd.append("fullName", form.fullName.trim());
@@ -198,7 +197,7 @@ export default function JoinRequestPage() {
               <div className="text-center py-8 text-sm" style={{ color:"#6B6B6B" }}>جارٍ التحميل…</div>
             ) : (
               <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4">
-                {/* رسائل توضيحية */}
+                {}
                 {!isUser && (
                   <div className="rounded-xl p-3 text-sm" style={{ background:"#FFF8E8", border:"1px solid #F2E7C6", color:"#7A7A7A" }}>
                     هذه الصفحة مخصصة للمستخدمين فقط. لا يمكن للمشرف أو مسؤول الكيان تقديم طلب انضمام من هنا.

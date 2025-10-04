@@ -1,4 +1,3 @@
-// app/profile/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
@@ -7,7 +6,7 @@ import Link from "next/link";
 import type { Session } from "@/lib/types";
 import { Cairo } from "next/font/google";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Users, Pencil, Mail, Phone, MapPin, User, Hash, Layers, Tag, Clock, X } from "lucide-react";
+import { Users, Pencil, Mail, Phone, MapPin, User, Hash, Layers, Tag, Clock, X, AlertTriangle, IdCard } from "lucide-react";
 
 const cairo = Cairo({ subsets: ["arabic"], weight: ["400", "600", "700", "800"] });
 
@@ -36,7 +35,7 @@ type Me = {
   avatar?: string | null;
 };
 
-type EntityLite = { id: string; name: string };
+type EntityLite = { id: string; name: string; status?: string };
 
 function sessionHeaderB64() {
   try {
@@ -60,22 +59,30 @@ export default function ProfilePage() {
 
   const [entities, setEntities] = useState<EntityLite[]>([]);
   const [currentEntityId, setCurrentEntityId] = useState<string | null>(null);
-  const [leaving, setLeaving] = useState(false);
 
-  // معاينة الصورة
+  // حالات طلب المغادرة (بدل الخروج الفوري)
+  const [leaving, setLeaving] = useState(false);
+  const [leaveRequested, setLeaveRequested] = useState(false);
+
+  const [managedEntities, setManagedEntities] = useState<EntityLite[]>([]);
+  const managedEntity = managedEntities[0] || null;
+  const managerSuspended = me?.role === "entityManager" && managedEntity?.status === "suspended";
+
+  const [myEntityMine, setMyEntityMine] = useState<EntityLite | null>(null);
+  const userSuspended = me?.role === "user" && myEntityMine?.status === "suspended";
+
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const openAvatarModal = useCallback(() => setShowAvatarModal(true), []);
   const closeAvatarModal = useCallback(() => setShowAvatarModal(false), []);
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") closeAvatarModal();
-    }
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") closeAvatarModal(); }
     if (showAvatarModal) {
       window.addEventListener("keydown", onKey);
       return () => window.removeEventListener("keydown", onKey);
     }
   }, [showAvatarModal, closeAvatarModal]);
 
+  // load session from localStorage
   useEffect(() => {
     try {
       const s = localStorage.getItem("session");
@@ -86,6 +93,7 @@ export default function ProfilePage() {
     }
   }, [router]);
 
+  // fetch /api/me
   useEffect(() => {
     if (!session?.id) return;
     setLoading(true);
@@ -96,26 +104,45 @@ export default function ProfilePage() {
       .finally(() => setLoading(false));
   }, [session?.id]);
 
+  // load entities list (names map)
   useEffect(() => {
     fetch("/api/entities", { cache: "no-store" })
       .then(r => (r.ok ? r.json() : []))
       .then((rows: any) => {
         const arr: EntityLite[] = Array.isArray(rows) ? rows : Array.isArray(rows?.entities) ? rows.entities : [];
-        setEntities(arr.map((e: any) => ({ id: String(e.id), name: String(e.name || "") })));
+        setEntities(arr.map((e: any) => ({ id: String(e.id), name: String(e.name || ""), status: String(e.status || "") })));
       })
       .catch(() => setEntities([]));
   }, []);
 
+  // current membership (user)
   useEffect(() => {
     if (!me?.id || me.role !== "user") { setCurrentEntityId(null); return; }
     fetch("/api/membership/my", withSession())
       .then(r => (r.ok ? r.json() : null))
-      .then((res: any) => {
-        const eid = res?.entityId ? String(res.entityId) : null;
-        setCurrentEntityId(eid);
-      })
+      .then((res: any) => setCurrentEntityId(res?.entityId ? String(res.entityId) : null))
       .catch(() => setCurrentEntityId(null));
   }, [me?.id, me?.role]);
+
+  // my entity (user scope=mine)
+  useEffect(() => {
+    if (!session?.id || me?.role !== "user") { setMyEntityMine(null); return; }
+    const url = `/api/entities?viewerId=${encodeURIComponent(session.id)}&scope=mine`;
+    fetch(url, withSession())
+      .then(r => (r.ok ? r.json() : []))
+      .then((list: any[]) => setMyEntityMine(Array.isArray(list) && list.length ? list[0] : null))
+      .catch(() => setMyEntityMine(null));
+  }, [session?.id, me?.role]);
+
+  // managed entity (manager scope=mine)
+  useEffect(() => {
+    if (!session?.id || me?.role !== "entityManager") { setManagedEntities([]); return; }
+    const url = `/api/entities?viewerId=${encodeURIComponent(session.id)}&role=entityManager&scope=mine`;
+    fetch(url, { cache: "no-store" })
+      .then(r => (r.ok ? r.json() : []))
+      .then((list: any[]) => setManagedEntities(Array.isArray(list) ? list : []))
+      .catch(() => setManagedEntities([]));
+  }, [session?.id, me?.role]);
 
   const roleLabel: Record<string, string> = {
     unionSupervisor: "مسؤول اتحاد الكيانات",
@@ -125,54 +152,145 @@ export default function ProfilePage() {
 
   const byId = useMemo(() => new Map(entities.map(e => [String(e.id), e.name])), [entities]);
 
-  const leaveEntity = async () => {
-    if (!currentEntityId || !me || me.role !== "user") return;
-    if (!confirm("هل تريد الخروج من الكيان الحالي؟")) return;
-    try {
-      setLeaving(true);
-      const r = await fetch("/api/membership/leave", withSession({ method: "POST" }));
-      if (!r.ok) throw new Error(await r.text());
-      setCurrentEntityId(null);
-      alert("تم الخروج من الكيان بنجاح.");
-    } catch (e: any) {
-      alert("تعذر إتمام العملية: " + String(e?.message || e));
-    } finally {
-      setLeaving(false);
+  // إرسال "طلب مغادرة" بدلاً من الخروج الفوري
+const requestLeaveEntity = async () => {
+  if (!currentEntityId || !me || me.role !== "user") return;
+  if (!confirm("هل تريد إرسال طلب مغادرة الكيان الحالي؟ سيتم مراجعته من مدير الكيان ثم من مسؤول الاتحاد.")) return;
+
+  try {
+    setLeaving(true);
+    // ✅ تصحيح المسار: /api/membership/leave (مفرد) وليس /api/memberships/leave
+    const r = await fetch("/api/membership/leave", withSession({
+      method: "POST",
+      body: JSON.stringify({ entityId: currentEntityId }) // reason اختياري
+    }));
+
+    const data = await r.json().catch(() => ({} as any));
+
+    if (r.status === 202) {
+      setLeaveRequested(true);
+      alert(data?.message || "تم إرسال طلب المغادرة. بانتظار موافقة مدير الكيان ثم مسؤول الاتحاد.");
+    } else if (!r.ok) {
+      throw new Error(data?.error || "تعذر إرسال طلب المغادرة");
+    } else {
+      // لو رجع 200 لأي سبب
+      setLeaveRequested(true);
+      alert(data?.message || "تم استلام طلبك.");
     }
-  };
+  } catch (e: any) {
+    alert("تعذر إتمام العملية: " + String(e?.message || e));
+  } finally {
+    setLeaving(false);
+  }
+};
 
   const entityField: React.ReactNode = useMemo(() => {
     if (!me) return "غير منضم لكيان";
+
     if (me.role === "unionSupervisor") return <Chip>كل الكيانات</Chip>;
+
     if (me.role === "entityManager") {
-      const name = (me.entityId && byId.get(String(me.entityId))) || (me.entityId ? String(me.entityId) : "غير منضم لكيان");
-      return <Chip>{name}</Chip>;
-    }
-    if (me.role === "user") {
-      if (!currentEntityId) return "غير منضم لكيان";
-      const name = byId.get(currentEntityId) || currentEntityId;
+      const name =
+        managedEntity?.name ||
+        (me.entityId && byId.get(String(me.entityId))) ||
+        (me.entityId ? String(me.entityId) : "غير منضم لكيان");
       return (
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <Chip>{name}</Chip>
-          <button
-            onClick={leaveEntity}
-            disabled={leaving}
-            className="h-8 px-3 rounded-full inline-flex items-center gap-2 font-semibold"
-            style={{ background: COLORS.primary, color: "#FFFFFF" }}
-          >
-            {leaving ? "جارٍ التنفيذ..." : "الخروج من الكيان"}
-          </button>
+          {managerSuspended && (
+            <span className="text-xs rounded-full px-3 h-7 inline-flex items-center"
+                  style={{ background: "#FFF0F0", border: "1px solid #F5C2C7", color: "#7A0010" }}>
+              موقوف مؤقتًا
+            </span>
+          )}
         </div>
       );
     }
-    return "غير منضم لكيان";
-  }, [me, byId, currentEntityId, leaving]);
+
+    if (!currentEntityId) return "غير منضم لكيان";
+    const name =
+      myEntityMine?.name ||
+      byId.get(currentEntityId) ||
+      currentEntityId;
+    return (
+      <div className="flex flex-wrap items-center gap-3">
+        <Chip>{name}</Chip>
+        {userSuspended && (
+          <span className="text-xs rounded-full px-3 h-7 inline-flex items-center"
+                style={{ background: "#FFF0F0", border: "1px solid #F5C2C7", color: "#7A0010" }}>
+            موقوف مؤقتًا
+          </span>
+        )}
+        <button
+          onClick={requestLeaveEntity}
+          disabled={leaving || leaveRequested}
+          className="h-8 px-3 rounded-full inline-flex items-center gap-2 font-semibold disabled:opacity-60"
+          style={{ background: COLORS.primary, color: "#FFFFFF" }}
+          title={leaveRequested ? "تم إرسال طلب المغادرة بالفعل" : "إرسال طلب مغادرة"}
+        >
+          {leaving ? "جارٍ الإرسال..." : (leaveRequested ? "تم إرسال طلب المغادرة" : "طلب مغادرة")}
+        </button>
+      </div>
+    );
+  }, [me, byId, currentEntityId, leaving, leaveRequested, managedEntity?.name, managerSuspended, myEntityMine?.name, userSuspended]);
 
   const shownNationalId = useMemo(() => me?.nationalId ?? "-", [me]);
+  const suspendedBanner = managerSuspended || userSuspended;
+
+  const [suspendActors, setSuspendActors] = useState<string[]>([]);
+  useEffect(() => {
+    const entityId =
+      me?.role === "entityManager" ? managedEntity?.id :
+      me?.role === "user" ? myEntityMine?.id :
+      null;
+
+    if (!suspendedBanner || !entityId) { setSuspendActors([]); return; }
+
+    const fetchActors = async () => {
+      try {
+        let res = await fetch(`/api/entities/${entityId}/events?type=suspended&limit=5`, { cache: "no-store" });
+        if (!res.ok) {
+          res = await fetch(`/api/entities/${entityId}?events=1&type=suspended&limit=5`, { cache: "no-store" });
+        }
+        const data = await res.json().catch(() => ({}));
+        const names = Array.isArray(data?.events)
+          ? data.events.map((e: any) => e?.actorName || e?.actorRole || "مسؤول").filter(Boolean)
+          : [];
+        setSuspendActors(Array.from(new Set(names)));
+      } catch {
+        setSuspendActors([]);
+      }
+    };
+
+    fetchActors();
+  }, [suspendedBanner, managedEntity?.id, myEntityMine?.id, me?.role]);
 
   return (
     <div dir="rtl" className={`${cairo.className} min-h-screen flex flex-col`} style={{ background: COLORS.bg, color: COLORS.text }}>
       <HeaderBar />
+
+      {/* شارة الإيقاف */}
+      {suspendedBanner && (
+        <div className="mx-auto max-w-6xl w-full px-4 mt-4">
+          <div className="rounded-xl p-3 md:p-4 flex items-start gap-3" style={{ background: "#FFF7E6", border: "1px solid #FFE2B5" }}>
+            <span className="h-8 w-8 mt-0.5 rounded-lg grid place-items-center" style={{ background: "#FFFFFF", border: "1px solid #FFE2B5" }}>
+              <AlertTriangle className="h-5 w-5" color="#B26B00" />
+            </span>
+            <div className="text-sm" style={{ color: "#6B4E00" }}>
+              <div className="font-semibold mb-0.5">الكيان موقوف مؤقتًا</div>
+              <div>
+                {me?.role === "user"
+                  ? "لن تتمكن من تنفيذ إجراءات على الكيان الآن. يمكنك طلب مغادرة الكيان أو الانتظار حتى يتم استئنافه."
+                  : "لن تتمكن من تنفيذ إجراءات على الكيان الآن. غيّر الكيان أو انتظر حتى يتم استئنافه."}
+              </div>
+              {suspendActors.length > 0 && (
+                <div className="mt-1 text-xs">تم التعليق بواسطة: {suspendActors.join("، ")}</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8">
         <div
           className="rounded-[22px] p-5 md:p-6 flex items-center justify-between"
@@ -189,10 +307,25 @@ export default function ProfilePage() {
           </div>
 
           <div className="flex items-center gap-2">
+            {(managerSuspended || userSuspended) && (
+              <span className="inline-flex items-center gap-1 rounded-full px-3 h-8 text-sm"
+                    style={{ background: "#FFF0F0", border: "1px solid #F5C2C7", color: "#7A0010" }}>
+                موقوف مؤقتًا
+              </span>
+            )}
+
             <button
-              onClick={() => router.push("/profile/edit")}
-              className="h-9 px-3 rounded-full inline-flex items-center gap-2 font-semibold"
+              onClick={() => {
+                if (managerSuspended) {
+                  alert("الكيان متوقف — لا يمكن تنفيذ الإجراء حاليًا");
+                  return;
+                }
+                router.push("/profile/edit");
+              }}
+              className="h-9 px-3 rounded-full inline-flex items-center gap-2 font-semibold disabled:opacity-60"
               style={{ background: COLORS.primary, color: "#FFFFFF" }}
+              disabled={managerSuspended}
+              title={managerSuspended ? "الكيان متوقف — لا يمكن تنفيذ الإجراء حاليًا" : undefined}
             >
               <Pencil className="h-4 w-4" />
               تعديل
@@ -214,7 +347,9 @@ export default function ProfilePage() {
               <div className="text-sm" style={{ color: COLORS.muted }}>لا يمكن تحميل البيانات حالياً.</div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-5">
-                <div className="rounded-2xl p-4 flex flex-col items-stretch" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                {/* العمود الأيسر: الصورة + الأزرار */}
+                <div className="rounded-2xl p-4 flex flex-col items-stretch"
+                     style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
                   <button
                     type="button"
                     onClick={me.avatar ? openAvatarModal : undefined}
@@ -234,24 +369,39 @@ export default function ProfilePage() {
                   <div className="text-center mt-3">
                     <div className="font-semibold text-lg">{me.name}</div>
                     <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
-                      {roleLabel[me.role] || me.role}
+                      {me.role === "entityManager" && managerSuspended ? "مسؤول كيان — (موقوف)" : (roleLabel[me.role] || me.role)}
                     </div>
                   </div>
 
-                  {/* زر سجل العضوية يظهر فقط للمستخدم العادي */}
-                  {me.role === "user" && (
-                    <button
-                      onClick={() => router.push("/profile/history")}
-                      className="mt-4 h-9 px-3 rounded-xl inline-flex items-center justify-center gap-2 font-semibold"
-                      style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text }}
-                      title="عرض سجل الانضمام والخروج"
-                    >
-                      <Clock className="h-4 w-4" />
-                      سجل العضوية
-                    </button>
+                  {/* الأزرار الجانبية */}
+                  {["user", "entityManager", "unionSupervisor"].includes(me.role) && (
+                    <>
+                      {/* ✅ زر سجل المنصّة/العضوية — يظهر لكل الأدوار */}
+                      <button
+                        onClick={() => router.push("/profile/history")}
+                        className="mt-4 h-9 px-3 rounded-xl inline-flex items-center justify-center gap-2 font-semibold"
+                        style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text }}
+                        title="عرض سجل المنصة والعضوية"
+                      >
+                        <Clock className="h-4 w-4" />
+                        سجل المنصّة
+                      </button>
+
+                      {/* كارت العضوية — يظهر للجميع */}
+                      <button
+                        onClick={() => router.push("/profile/card")}
+                        className="mt-2 h-9 px-3 rounded-xl inline-flex items-center justify-center gap-2 font-semibold"
+                        style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text }}
+                        title="عرض كارت العضوية"
+                      >
+                        <IdCard className="h-4 w-4" />
+                        كارت العضوية
+                      </button>
+                    </>
                   )}
                 </div>
 
+                {/* العمود الأيمن: معلومات */}
                 <div className="rounded-2xl p-4 space-y-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
                   <InfoRow icon={<User className="h-4 w-4" />} label="الاسم" value={me.name || "-"} />
                   <InfoRow icon={<Mail className="h-4 w-4" />} label="البريد الإلكتروني" value={me.email || "-"} />
@@ -263,21 +413,16 @@ export default function ProfilePage() {
                     icon={<Tag className="h-4 w-4" />}
                     label="الاهتمامات"
                     value={(me.interests && me.interests.length > 0) ? undefined : "لا توجد اهتمامات محددة"}
-                    custom={
-                      (me.interests && me.interests.length > 0) ? (
-                        <div className="flex flex-wrap gap-2">
-                          {me.interests.map((t, i) => (
-                            <span
-                              key={i}
-                              className="text-xs rounded-full px-3 h-7 inline-flex items-center"
-                              style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}`, color: COLORS.text }}
-                            >
-                              {t}
-                            </span>
-                          ))}
-                        </div>
-                      ) : undefined
-                    }
+                    custom={(me.interests && me.interests.length > 0) ? (
+                      <div className="flex flex-wrap gap-2">
+                        {me.interests.map((t, i) => (
+                          <span key={i} className="text-xs rounded-full px-3 h-7 inline-flex items-center"
+                                style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}`, color: COLORS.text }}>
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    ) : undefined}
                   />
                   {me.bio && (
                     <div className="rounded-xl p-3" style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
@@ -292,23 +437,12 @@ export default function ProfilePage() {
         </Card>
       </main>
 
-      {/* مودال معاينة الصورة */}
+      {/* مودال الصورة */}
       {showAvatarModal && me?.avatar && (
-        <div
-          className="fixed inset-0 z-[999]"
-          role="dialog"
-          aria-modal="true"
-          aria-label="معاينة الصورة الشخصية"
-        >
-          <div
-            className="absolute inset-0 bg-black/60"
-            onClick={closeAvatarModal}
-          />
+        <div className="fixed inset-0 z-[999]" role="dialog" aria-modal="true" aria-label="معاينة الصورة الشخصية">
+          <div className="absolute inset-0 bg-black/60" onClick={closeAvatarModal} />
           <div className="absolute inset-0 p-4 grid place-items-center">
-            <div
-              className="relative max-w-[90vw] max-h-[85vh] rounded-2xl overflow-hidden bg-white"
-              style={{ border: `1px solid ${COLORS.border}` }}
-            >
+            <div className="relative max-w-[90vw] max-h-[85vh] rounded-2xl overflow-hidden bg-white" style={{ border: `1px solid ${COLORS.border}` }}>
               <button
                 type="button"
                 onClick={closeAvatarModal}
@@ -318,11 +452,7 @@ export default function ProfilePage() {
                 <X className="h-4 w-4" />
               </button>
               <div className="w-[min(92vw,720px)] h-[min(80vh,720px)] grid place-items-center bg-black">
-                <img
-                  src={me.avatar}
-                  alt={me.name}
-                  className="max-w-full max-h-full object-contain"
-                />
+                <img src={me.avatar} alt={me.name} className="max-w-full max-h-full object-contain" />
               </div>
             </div>
           </div>
@@ -368,7 +498,7 @@ function HeaderBar() {
   return (
     <header className="relative z-10">
       <div className="mx-auto max-w-6xl px-4">
-        {/* أصلحت خطأ مطبعي "rounded-عي" */}
+        {/* ✅ إصلاح خطأ حرفي في قيمة الـshadow (rgba بدل rgrgba) */}
         <div className="mt-4 h-14 w-full rounded-2xl flex items-center justify-between px-4 bg-white border border-[#E7E2DC] shadow-[0_6px_12px_rgba(0,0,0,0.04)]">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-[#F6F6F6] border border-[#E5E5E5]">

@@ -1,4 +1,3 @@
-// app/events/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -17,7 +16,16 @@ const cairo = Cairo({ subsets: ["arabic", "latin"], weight: ["400", "600", "700"
 type Role = "unionSupervisor" | "entityManager" | "user";
 type Session = { id: string; email: string; name: string; role: Role; entityId?: string | null };
 
-type EventRow = { id: string; title: string; date?: string | null; status?: string; entityId?: string | null };
+type EventRow = {
+  id: string;
+  title: string;
+  date?: string | null;
+  status?: string;
+  entityId?: string | null;
+  organizerName?: string | null;
+  canEvaluate?: boolean;
+};
+
 type EntityLite = { id: string; name: string };
 
 const PALETTE = { black: "#1D1D1D", red: "#EC1A24", beige: "#EFE6DE", border: "#E7E2DC", soft:"#F6F6F6", muted:"#6B6B6B" };
@@ -77,7 +85,7 @@ export default function EventsPage() {
             ) : session?.role === "entityManager" ? (
               <RequestForm
                 entityId={session?.entityId || ""}
-                canPublic={false}
+                supervisor={false}
                 onOk={(t) => setMsg({ ok: t })}
                 onErr={(e) => setMsg({ err: e })}
               />
@@ -117,13 +125,13 @@ export default function EventsPage() {
           <div className="absolute inset-0 grid place-items-center p-4">
             <div className="w-full max-w-3xl max-h-[85vh] overflow-auto rounded-2xl bg-white border shadow-xl" style={{ borderColor:"#E7E2DC" }}>
               <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3 border-b bg-white" style={{ borderColor:"#F1EEE8" }}>
-                <div className="font-semibold">إضافة فعالية عامة</div>
+                <div className="font-semibold">إضافة فعالية</div>
                 <button onClick={()=>setShowAdd(false)} className="h-8 px-3 rounded-full border text-sm">إغلاق</button>
               </div>
               <div className="p-5">
                 <RequestForm
                   entityId=""
-                  canPublic={true}
+                  supervisor={true}
                   onOk={(t)=>{ setMsg({ ok:t }); setShowAdd(false); location.reload(); }}
                   onErr={(e)=> setMsg({ err:e })}
                 />
@@ -146,7 +154,7 @@ function EventList({ session }: { session: Session | null }) {
   const isEntityMgr  = session?.role === "entityManager";
 
   const entName = (id?: string | null) =>
-    id == null ? "فعالية عامة" : (entities.find(e => String(e.id) === String(id || ""))?.name || "—");
+    id == null ? "كل الكيانات" : (entities.find(e => String(e.id) === String(id || ""))?.name || "—");
 
   const scopeText = useMemo(() => {
     const r = session?.role;
@@ -235,12 +243,13 @@ function EventList({ session }: { session: Session | null }) {
                 <div className="font-semibold" style={{ color: PALETTE.black }}>{ev.title || "فعالية بدون عنوان"}</div>
                 <div className="text-sm" style={{ color: PALETTE.muted }}>
                   {ev.date ? new Date(ev.date).toLocaleDateString("ar-EG") : "بدون تاريخ"} •
-                  {" "}الكيان: {entName(ev.entityId ?? null)} •
-                  {" "}الحالة: {ev.status || "—"}
+                  {" "}النطاق: {entName(ev.entityId ?? null)} •
+                  {" "}الحالة: {ev.status || "—"} •
+                  {" "}المنظِّم: {ev.organizerName || "—"}
                 </div>
               </div>
               <div className="flex items-center gap-2" onClick={(e)=>e.stopPropagation()}>
-                {session?.role !== "unionSupervisor" && (
+                {session?.role !== "unionSupervisor" && ev.canEvaluate ? (
                   <Link
                     href={`/events/evaluate?eventId=${encodeURIComponent(ev.id)}`}
                     className="h-9 px-3 rounded-full text-sm"
@@ -248,7 +257,16 @@ function EventList({ session }: { session: Session | null }) {
                   >
                     تقييم
                   </Link>
-                )}
+                ) : session?.role !== "unionSupervisor" ? (
+                  <button
+                    className="h-9 px-3 rounded-full text-sm opacity-60 cursor-not-allowed"
+                    style={{ background: PALETTE.soft, border:`1px solid ${PALETTE.border}`, color: PALETTE.black }}
+                    title="التقييم متاح للحضور فقط"
+                    disabled
+                  >
+                    تقييم
+                  </button>
+                ) : null}
               </div>
             </li>
           ))}
@@ -261,6 +279,10 @@ function EventList({ session }: { session: Session | null }) {
           detail={detail}
           onClose={()=>setOpen(null)}
           canEdit={Boolean(isSupervisor || isEntityMgr)}
+          entityName={(() => {
+            const eid = detail?.entityId ?? events.find(e => e.id === open.id)?.entityId;
+            return entName(eid ?? null);
+          })()}
         />
       )}
     </>
@@ -268,8 +290,8 @@ function EventList({ session }: { session: Session | null }) {
 }
 
 function EventDetailsModal({
-  id, detail, onClose, canEdit
-}: { id: string; detail: any; onClose: ()=>void; canEdit: boolean }) {
+  id, detail, onClose, canEdit, entityName
+}: { id: string; detail: any; onClose: ()=>void; canEdit: boolean; entityName?: string }) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     title: detail?.title || "",
@@ -323,7 +345,20 @@ function EventDetailsModal({
   }
 
   const req = detail?.details || {};
-  const files = req?.files || {};
+  const filesRaw = req?.files;
+
+  const files =
+    filesRaw && Array.isArray(filesRaw)
+      ? filesRaw.reduce((acc: any, it: any) => {
+          const label = String(it?.label || "");
+          const url = it?.url || null;
+          if (!url) return acc;
+          if (/ميزانية|budget/i.test(label)) acc.budgetPdf = url;
+          else if (/خطة|plan/i.test(label)) acc.miniPlanPdf = url;
+          else if (/برنامج|program/i.test(label)) acc.programPdf = url;
+          return acc;
+        }, {} as any)
+      : (filesRaw || {});
 
   return (
     <div className="fixed inset-0 z-[999]">
@@ -345,9 +380,19 @@ function EventDetailsModal({
                 <div className="rounded-xl border p-4" style={{ borderColor:"#EDE8E1", background:"#FAFAFA" }}>
                   <div className="font-semibold">{detail.title || "—"}</div>
                   <div className="text-sm text-[#666]">
-                    {detail.date ? new Date(detail.date).toLocaleDateString("ar-EG") : "بدون تاريخ"} •
-                    {" "}الحالة: {detail.status || "—"} •
-                    {" "}عدد التقييمات: {detail.evalCount ?? 0}
+                    {detail.date ? new Date(detail.date).toLocaleDateString("ar-EG") : "بدون تاريخ"} •{" "}
+                    الحالة: {detail.status || "—"} •{" "}
+                    عدد التقييمات: {detail.evalCount ?? 0}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border p-3" style={{ borderColor:"#EDE8E1", background:"#FFF" }}>
+                  <div className="text-sm" style={{ color:"#333" }}>
+                    المنظِّم: <span className="font-semibold">{detail?.organizerName || detail?.approvedByName || detail?.createdByName || "—"}</span>
+                  </div>
+                  <div className="text-xs mt-1" style={{ color:"#666" }}>
+                    النطاق: <span className="font-medium">{entityName || (detail?.entityId ? "—" : "كل الكيانات")}</span> •{" "}
+                    مسئول اتحاد الكيانات: <span className="font-medium">{detail?.approvedByName || "—"}</span>
                   </div>
                 </div>
 
@@ -462,17 +507,20 @@ function FileBox({ title, url }: { title: string; url?: string|null }) {
 
 function RequestForm({
   entityId,
-  canPublic,
+  supervisor,
   onOk,
   onErr,
 }: {
   entityId: string;
-  canPublic: boolean;
+  supervisor: boolean;
   onOk: (t: string) => void;
   onErr: (t: string) => void;
 }) {
   const [saving, setSaving] = useState(false);
-  const [makePublic, setMakePublic] = useState(canPublic);
+  const [entities, setEntities] = useState<EntityLite[]>([]);
+  const [scope, setScope] = useState<"all" | "entity">(supervisor ? "all" : "entity");
+  const [targetEntityId, setTargetEntityId] = useState<string>(supervisor ? "" : (entityId || ""));
+
   const [form, setForm] = useState({
     name: "",
     date: "",
@@ -487,6 +535,19 @@ function RequestForm({
     budgetPdf: null as File | null,
     briefPlanPdf: null as File | null,
   });
+
+  useEffect(() => {
+    if (!supervisor) return;
+    (async () => {
+      try {
+        const r = await fetch("/api/entities", { cache: "no-store" });
+        const j = await r.json().catch(() => []);
+        const ents: EntityLite[] = (Array.isArray(j) ? j : j?.entities || [])
+          .map((e: any) => ({ id: String(e.id), name: String(e.name) }));
+        setEntities(ents);
+      } catch {}
+    })();
+  }, [supervisor]);
 
   async function uploadOne(file?: File | null): Promise<string | null> {
     if (!file) return null;
@@ -506,7 +567,10 @@ function RequestForm({
     e.preventDefault();
     onOk(""); onErr("");
     if (!form.name.trim()) return onErr("اسم الفعالية مطلوب");
-    if (!makePublic && !entityId) return onErr("كيان غير معروف");
+    if (scope === "entity") {
+      const chosenId = supervisor ? targetEntityId : (entityId || "");
+      if (!chosenId) return onErr("يرجى اختيار الكيان");
+    }
 
     setSaving(true);
     try {
@@ -532,8 +596,15 @@ function RequestForm({
         ].filter(Boolean),
       };
 
-      if (makePublic) payload.public = true;
-      else payload.entityId = entityId;
+      if (supervisor) {
+        if (scope === "all") {
+          payload.public = true;
+        } else {
+          payload.entityId = targetEntityId;
+        }
+      } else {
+        payload.entityId = entityId;
+      }
 
       const r = await fetch("/api/events/requests", {
         method: "POST",
@@ -549,6 +620,7 @@ function RequestForm({
         audience: "", speakers: "", supportType: "",
         planPdf: null, timelinePdf: null, budgetPdf: null, briefPlanPdf: null,
       });
+      if (supervisor) { setScope("all"); setTargetEntityId(""); }
     } catch (e: any) {
       onErr(e?.message || "فشل إرسال الطلب");
     } finally {
@@ -558,14 +630,38 @@ function RequestForm({
 
   return (
     <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {canPublic && (
-        <div className="md:col-span-2">
-          <label className="inline-flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={makePublic} onChange={(e)=>setMakePublic(e.target.checked)} />
-            <span>فعالية عامة لكل الكيانات</span>
-          </label>
-        </div>
+      {supervisor && (
+        <>
+          <div className="space-y-2">
+            <Label>نطاق الفعالية *</Label>
+            <select
+              className="h-11 w-full rounded-xl border px-3"
+              value={scope}
+              onChange={(e)=> setScope(e.target.value as "all" | "entity")}
+            >
+              <option value="all">كل الكيانات</option>
+              <option value="entity">كيان محدد</option>
+            </select>
+          </div>
+
+          {scope === "entity" && (
+            <div className="space-y-2">
+              <Label>اختر الكيان *</Label>
+              <select
+                className="h-11 w-full rounded-xl border px-3"
+                value={targetEntityId}
+                onChange={(e)=> setTargetEntityId(e.target.value)}
+              >
+                <option value="">— اختر كيان —</option>
+                {entities.map((e) => (
+                  <option key={e.id} value={e.id}>{e.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </>
       )}
+
       <div className="space-y-2">
         <Label>اسم الفعالية *</Label>
         <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />

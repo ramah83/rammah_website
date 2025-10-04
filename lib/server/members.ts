@@ -1,4 +1,3 @@
-// lib/server/members.ts
 import "server-only";
 import { getDB, uid } from "@/lib/server/sqlite";
 
@@ -14,16 +13,17 @@ export type Member = {
   entityId?: string | null;
   joinedAt: string;
   nationalId?: string | null;
+
 };
 
-// === helpers ===
+
 const nowSql = () => new Date().toISOString().slice(0, 19).replace("T", " ");
 
 function canRead(session: Session, memberEntityId: string | null) {
   if (session.role === "systemAdmin") return true;
-  if (session.role === "qualitySupervisor") return true; // read-only
+  if (session.role === "qualitySupervisor") return true; 
   if (session.role === "entityManager") return !!session.entityId && session.entityId === memberEntityId;
-  return false; // youth
+  return false; 
 }
 
 function canWrite(session: Session, memberEntityId: string | null) {
@@ -43,7 +43,7 @@ const toMember = (r: any): Member => ({
   nationalId: r.nationalId ?? null,
 });
 
-// === queries ===
+
 export function listMembers(session: Session): Member[] {
   const db = getDB();
   if (session.role === "systemAdmin" || session.role === "qualitySupervisor") {
@@ -55,7 +55,7 @@ export function listMembers(session: Session): Member[] {
     const rows = db.prepare(`SELECT * FROM members WHERE entityId=? ORDER BY name`).all(session.entityId) as any[];
     return rows.map(toMember);
   }
-  return []; // youth
+  return []; 
 }
 
 export function getMember(session: Session, id: string) {
@@ -66,15 +66,15 @@ export function getMember(session: Session, id: string) {
   return { ok: true as const, member: toMember(r) };
 }
 
-/** إنشاء user تلقائيًا بكلمة سر ثابتة لو فيه إيميل */
+
 function ensureUserForMember(input: { name: string; email?: string | null; entityId: string | null }) {
-  if (!input.email) return; // بدون إيميل مش هنعمل يوزر
+  if (!input.email) return; 
   const db = getDB();
   const exists: any = db.prepare(`SELECT id FROM users WHERE email=?`).get(input.email);
   if (exists) return;
 
   const newId = uid();
-  const defaultPassword = "user12345"; // المطلوب
+  const defaultPassword = "user12345"; 
   db.prepare(`
     INSERT INTO users (id, name, email, password, role, entityId, createdAt)
     VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -83,7 +83,7 @@ function ensureUserForMember(input: { name: string; email?: string | null; entit
     input.name,
     input.email,
     defaultPassword,
-    "youth",                 // المستخدم الافتراضي عضو عادي
+    "youth",                 
     input.entityId,
     nowSql()
   );
@@ -94,7 +94,7 @@ export function createMember(session: Session, input: {
   email?: string | null;
   phone?: string | null;
   roleInEntity?: string | null;
-  entityId?: string | null;       // للـ systemAdmin فقط مسموح يحدد كيان مختلف
+  entityId?: string | null;       
   nationalId?: string | null;
 }) {
   const db = getDB();
@@ -110,7 +110,7 @@ export function createMember(session: Session, input: {
   if (!canWrite(session, targetEntityId)) return { ok: false as const, error: "غير مصرح" };
   if (!input.name?.trim()) return { ok: false as const, error: "اسم العضو مطلوب" };
 
-  // تحقق الرقم القومي داخل نفس الكيان (لو مرّرته)
+  
   if (input.nationalId) {
     const dupe = db.prepare(`SELECT 1 FROM members WHERE entityId=? AND nationalId=?`).get(targetEntityId, input.nationalId);
     if (dupe) return { ok: false as const, error: "الرقم القومي مسجّل لهذا الكيان" };
@@ -131,7 +131,7 @@ export function createMember(session: Session, input: {
     input.roleInEntity ?? null
   );
 
-  // إنشاء يوزر بكلمة سر ثابتة لو فيه إيميل ومافيش يوزر سابق
+  
   ensureUserForMember({ name: input.name.trim(), email: input.email ?? null, entityId: targetEntityId });
 
   const created = db.prepare(`SELECT * FROM members WHERE id=?`).get(id);
@@ -144,23 +144,23 @@ export function updateMember(session: Session, id: string, patch: {
   phone?: string | null;
   roleInEntity?: string | null;
   nationalId?: string | null;
-  entityId?: string | null; // مسموح تغيير كيان العضو: فقط systemAdmin
+  entityId?: string | null; 
 }) {
   const db = getDB();
   const r: any = db.prepare(`SELECT * FROM members WHERE id=?`).get(id);
   if (!r) return { ok: false as const, error: "العضو غير موجود" };
 
-  // تحديد الكيان الهدف بعد التعديل
+  
   let newEntityId = r.entityId as string | null;
   if (patch.entityId && session.role === "systemAdmin") {
     newEntityId = String(patch.entityId);
   }
 
-  // لازم يكون عنده صلاحية على الكيان الحالي AND الكيان بعد التغيير
+  
   if (!canWrite(session, r.entityId ?? null)) return { ok: false as const, error: "غير مصرح" };
   if (!canWrite(session, newEntityId)) return { ok: false as const, error: "غير مصرح على الكيان الهدف" };
 
-  // uniqueness للرقم القومي داخل الكيان
+  
   const nextNatId = patch.nationalId ?? r.nationalId ?? null;
   if (nextNatId) {
     const dupe = db.prepare(`SELECT 1 FROM members WHERE entityId=? AND nationalId=? AND id<>?`).get(newEntityId, nextNatId, id);

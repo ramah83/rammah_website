@@ -1,4 +1,3 @@
-// app/api/public/join/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import fs from "fs";

@@ -19,12 +19,12 @@ type Row = {
 };
 
 export async function GET(req: NextRequest) {
-  // مسموح لمسؤول الاتحاد فقط (الفرونت أصلًا ما بيطلبها لمدير الكيان)
+  
   const guard = await ensureRole(["unionSupervisor"], req);
   if (guard) return guard;
 
   const db = getDB();
-  // كل من role = unionSupervisor
+  
   const sql = `
     SELECT
       u.id             AS id,

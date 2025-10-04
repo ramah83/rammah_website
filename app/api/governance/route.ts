@@ -109,12 +109,12 @@ export async function GET(req: Request) {
     const entityIdParam = searchParams.get("entityId");
     const statusRaw = searchParams.get("status");
     const typeRaw = searchParams.get("type");
-    const scope = searchParams.get("scope") || "all"; // all | mine | public
+    const scope = searchParams.get("scope") || "all"; 
 
     const where: string[] = [];
     const params: any[] = [];
 
-    // رؤية حسب الدور
+    
     if (!ses) {
       where.push(`status = 'approved'`);
     } else if (ses.role === "user") {
@@ -125,33 +125,33 @@ export async function GET(req: Request) {
       where.push(`ownerEntityId = ?`); params.push(String(userEntityId));
     } else if (ses.role === "entityManager") {
       where.push(`ownerEntityId = ?`); params.push(String(ses.entityId || ""));
-    } // unionSupervisor يرى الكل
+    } 
 
-    // فلتر كيان (للمشرف فقط)
+    
     if (entityIdParam && entityIdParam !== "all" && ses?.role === "unionSupervisor") {
       where.push(`ownerEntityId = ?`); params.push(entityIdParam);
     }
 
-    // فلتر حالة
+    
     const allowedStatus = new Set(["draft","submitted","review","approved","rejected"]);
     if (statusRaw && statusRaw !== "all" && allowedStatus.has(statusRaw)) {
       where.push(`status = ?`); params.push(statusRaw);
     }
 
-    // فلتر النوع
+    
     const allowedTypes = new Set(["policy","procedure","minutes","decision","inquiry","response"]);
     if (typeRaw && typeRaw !== "all" && allowedTypes.has(typeRaw)) {
       where.push(`type = ?`); params.push(typeRaw);
     }
 
-    // scope
+    
     if (scope === "mine" && ses?.role && ses.role !== "unionSupervisor") {
       where.push(`ownerEntityId = ?`); params.push(String(ses?.entityId || ""));
     } else if (scope === "public") {
       where.push(`status = 'approved'`);
     }
 
-    // بحث
+    
     if (q) {
       where.push(`(title LIKE ? OR COALESCE(notes,'') LIKE ? OR COALESCE(type,'') LIKE ?)`); 
       params.push(`%${q}%`, `%${q}%`, `%${q}%`);

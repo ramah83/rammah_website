@@ -114,11 +114,14 @@ export default function PromotionRequestPage() {
       </section>
 
       <main className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-6 pb-10">
-        {isAlreadyAdmin && (
-          <div className="mb-4 rounded-2xl p-3" style={{ backgroundColor: "#E8FFF1", border: "1px solid #BDE8CE", color: "#126B3A" }}>
-            أنت بالفعل مسؤول اتحاد.
-          </div>
-        )}
+      {isAlreadyAdmin ? (
+  <div className="mb-4 space-y-4">
+    <div className="rounded-2xl p-3" style={{ backgroundColor: "#E8FFF1", border: "1px solid #BDE8CE", color: "#126B3A" }}>
+      أنت بالفعل مسؤول اتحاد.
+    </div>
+    <AdminRequestsPanel />
+  </div>
+) : null}
 
         {errorMsg && (
           <div className="mb-4 rounded-2xl p-3" style={{ backgroundColor: "#FFF5F5", border: "1px solid #FAD3D3", color: "#A82C2C" }}>
@@ -183,7 +186,89 @@ export default function PromotionRequestPage() {
     </div>
   );
 }
+function AdminRequestsPanel() {
+  const [rows, setRows] = useState<PromotionRequest[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [submittingId, setSubmittingId] = useState<string|null>(null);
+  const [error, setError] = useState<string|null>(null);
 
+  const load = async () => {
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch("/api/promotion-request?scope=all&status=pending&limit=200", withSession());
+      const data = await safeJson<PromotionRequest[]>(res, []);
+      setRows(data);
+    } catch (e:any) {
+      setError(String(e?.message || "تعذر تحميل الطلبات"));
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const act = async (id: string, action: "approve"|"reject") => {
+    setSubmittingId(id);
+    setError(null);
+    try {
+      await fetch(`/api/promotion-request/${id}`, withSession({
+        method: "PATCH",
+        body: JSON.stringify({ action })
+      })).then(r => safeJson<PromotionRequest>(r, null as any));
+      // شيل الطلب من القائمة (اتحدّث لغير معلق)
+      setRows(prev => prev.filter(r => r.id !== id));
+    } catch (e:any) {
+      setError(String(e?.message || "تعذر تنفيذ العملية"));
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  return (
+    <SurfaceCard>
+      <div className="px-5 pt-5 flex items-center justify-between">
+        <h3 className="font-bold">طلبات الترقية المعلقة</h3>
+        <button onClick={load} className="inline-flex items-center gap-2 h-8 px-3 rounded-full bg-[#F6F6F6] border">
+          <RefreshCw className="h-4 w-4" /> تحديث
+        </button>
+      </div>
+      <div className="mx-5 my-4 h-px" style={{ backgroundColor: "#EDE8E1" }} />
+      <div className="px-5 pb-5">
+        {loading && <div className="text-sm text-[#6B6B6B]"><RefreshCw className="h-4 w-4 inline animate-spin" /> جاري التحميل...</div>}
+        {error && <div className="rounded p-3 text-sm" style={{ background:"#FFF5F5", border:"1px solid #FAD3D3", color:"#A82C2C" }}>{error}</div>}
+        {!loading && rows.length === 0 && <div className="text-sm text-[#6B6B6B]">لا توجد طلبات معلّقة.</div>}
+        {!loading && rows.length > 0 && (
+          <div className="space-y-3">
+            {rows.map(r => (
+              <div key={r.id} className="rounded-xl p-3 flex items-start justify-between gap-3"
+                   style={{ background:"#F9F9F9", border:"1px solid #EEE4DA" }}>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold">{r.applicantName || r.applicantEmail || r.applicantUserId}</span>
+                    <span className="text-xs text-[#6B6B6B]">قدّم في {new Date(r.createdAt).toLocaleString("ar-EG")}</span>
+                    <span className="text-xs rounded bg-yellow-100 px-2 py-0.5 text-yellow-900">قيد المراجعة</span>
+                  </div>
+                  {r.note && <div className="text-sm mt-1">ملاحظة: {r.note}</div>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => act(r.id, "approve")}
+                    disabled={!!submittingId}
+                    className="h-8 px-3 rounded-full text-sm font-semibold bg-green-600 text-white disabled:opacity-50">
+                    قبول
+                  </button>
+                  <button
+                    onClick={() => act(r.id, "reject")}
+                    disabled={!!submittingId}
+                    className="h-8 px-3 rounded-full text-sm font-semibold bg-red-600 text-white disabled:opacity-50">
+                    رفض
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </SurfaceCard>
+  );
+}
 function HeaderBar() {
   const pathname = usePathname();
   const active = (href: string) => pathname === href;

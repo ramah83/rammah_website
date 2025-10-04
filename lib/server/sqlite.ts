@@ -1,4 +1,4 @@
-// lib/server/sqlite.ts
+// src/lib/server/sqlite.ts
 import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
@@ -6,6 +6,7 @@ import { randomUUID } from "crypto";
 
 let db: Database.Database | null = null;
 
+/* ===================== Utils: schema helpers ===================== */
 function hasColumn(d: Database.Database, table: string, col: string) {
   try {
     const rows = d.prepare(`PRAGMA table_info(${table})`).all() as any[];
@@ -23,21 +24,34 @@ function tableInfo(d: Database.Database, table: string) {
 }
 function hasTable(d: Database.Database, table: string) {
   try {
-    const row = d.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(table) as any;
+    const row = d
+      .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`)
+      .get(table) as any;
     return !!row;
   } catch {
     return false;
   }
 }
 
-/** 🔧 تأكيد وجود nationalId في members مع الحفاظ على البيانات */
+/* ===================== Targeted migrations ===================== */
+function ensureMembersHasRoleInEntity(d: Database.Database) {
+  try {
+    const has = d.prepare(`PRAGMA table_info(members)`).all() as any[];
+    if (!has.some((r) => String(r.name) === "roleInEntity")) {
+      d.exec(`ALTER TABLE members ADD COLUMN roleInEntity TEXT`);
+    }
+  } catch {}
+}
+
 function ensureMembersHasNationalId(d: Database.Database) {
   if (hasColumn(d, "members", "nationalId")) return;
   try {
     d.exec(`ALTER TABLE members ADD COLUMN nationalId TEXT`);
   } catch {}
+
   if (hasColumn(d, "members", "nationalId")) return;
 
+  // fallback: recreate table with nationalId
   d.exec(`
     PRAGMA foreign_keys=OFF;
     CREATE TABLE IF NOT EXISTS members_new (
@@ -47,7 +61,8 @@ function ensureMembersHasNationalId(d: Database.Database) {
       phone TEXT,
       entityId TEXT,
       joinedAt TEXT NOT NULL,
-      nationalId TEXT
+      nationalId TEXT,
+      roleInEntity TEXT
     );
     INSERT INTO members_new (id, name, email, phone, entityId, joinedAt)
       SELECT id, name, email, phone, entityId, joinedAt FROM members;
@@ -56,6 +71,7 @@ function ensureMembersHasNationalId(d: Database.Database) {
     PRAGMA foreign_keys=ON;
   `);
 
+  // unique index to prevent duplicate nationalId inside same entity
   try {
     d.exec(`
       CREATE UNIQUE INDEX IF NOT EXISTS ux_members_entity_nationalId
@@ -65,7 +81,6 @@ function ensureMembersHasNationalId(d: Database.Database) {
   } catch {}
 }
 
-/** 🔧 توسعة iso */
 function ensureIsoExtended(d: Database.Database) {
   if (!hasTable(d, "iso")) return;
 
@@ -81,7 +96,6 @@ function ensureIsoExtended(d: Database.Database) {
   addIfMissing("tags", "TEXT");
   addIfMissing("description", "TEXT");
   addIfMissing("fileUrl", "TEXT");
-
   if (!hasColumn(d, "iso", "status")) {
     try {
       d.exec(`ALTER TABLE iso ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'`);
@@ -96,7 +110,6 @@ function ensureIsoExtended(d: Database.Database) {
   } catch {}
 }
 
-/** 🔧 جداول الحوكمة */
 function ensureGovernanceTables(d: Database.Database) {
   d.exec(`
     CREATE TABLE IF NOT EXISTS governance (
@@ -133,6 +146,7 @@ function ensureGovernanceTables(d: Database.Database) {
   addIfMissing("notes", "TEXT");
   addIfMissing("fileUrl", "TEXT");
   addIfMissing("ownerEntityId", "TEXT");
+
   if (!hasColumn(d, "governance", "status")) {
     try {
       d.exec(`ALTER TABLE governance ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'`);
@@ -157,9 +171,12 @@ function ensureGovernanceTables(d: Database.Database) {
   } catch {}
 }
 
+/* ===================== Init: create/patch schema ===================== */
 function init(d: Database.Database) {
   d.exec(`PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;`);
-ensureMembersHasRoleInEntity(d);
+
+  // Users, Entities, Requests, Members, Events, ISO, etc.
+  ensureMembersHasRoleInEntity(d);
 
   d.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -193,7 +210,8 @@ ensureMembersHasRoleInEntity(d);
       createdAt TEXT NOT NULL DEFAULT (datetime('now')),
       createdBy TEXT,
       managerUserId TEXT,
-      status TEXT NOT NULL DEFAULT 'approved'
+      status TEXT NOT NULL DEFAULT 'approved',
+      imageUrl TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_entities_createdBy ON entities(createdBy);
     CREATE INDEX IF NOT EXISTS idx_entities_manager   ON entities(managerUserId);
@@ -227,9 +245,9 @@ ensureMembersHasRoleInEntity(d);
       decidedBy TEXT,
       note TEXT
     );
-    CREATE INDEX IF NOT EXISTS idx_mreq_entity   ON manager_requests(entityId);
-    CREATE INDEX IF NOT EXISTS idx_mreq_user     ON manager_requests(applicantUserId);
-    CREATE INDEX IF NOT EXISTS idx_mreq_status   ON manager_requests(status);
+    CREATE INDEX IF NOT EXISTS idx_mreq_entity ON manager_requests(entityId);
+    CREATE INDEX IF NOT EXISTS idx_mreq_user   ON manager_requests(applicantUserId);
+    CREATE INDEX IF NOT EXISTS idx_mreq_status ON manager_requests(status);
 
     CREATE TABLE IF NOT EXISTS join_requests (
       id TEXT PRIMARY KEY,
@@ -262,7 +280,6 @@ ensureMembersHasRoleInEntity(d);
       phone TEXT,
       entityId TEXT,
       joinedAt TEXT NOT NULL
-      -- nationalId هيتضاف بالمَيجرَيْشن تحت
     );
 
     CREATE TABLE IF NOT EXISTS events (
@@ -270,9 +287,15 @@ ensureMembersHasRoleInEntity(d);
       title TEXT NOT NULL,
       date TEXT,
       status TEXT NOT NULL,
-      entityId TEXT
+      entityId TEXT,
+      createdBy TEXT,
+      createdByName TEXT,
+      createdByRole TEXT,
+      approvedBy TEXT,
+      approvedByName TEXT,
+      approvedAt TEXT
     );
-    -- جدول طلبات الفعاليات ضروري قبل أي تحديث يعتمد عليه
+
     CREATE TABLE IF NOT EXISTS event_requests (
       id TEXT PRIMARY KEY,
       eventId TEXT,
@@ -293,7 +316,6 @@ ensureMembersHasRoleInEntity(d);
     );
     CREATE INDEX IF NOT EXISTS idx_eveval_event ON event_evaluations(eventId);
 
-    -- جدول ISO (بالأعمدة الموسعة الجديدة)
     CREATE TABLE IF NOT EXISTS iso (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -322,6 +344,29 @@ ensureMembersHasRoleInEntity(d);
     CREATE INDEX IF NOT EXISTS idx_em_entity ON entity_members(entityId);
     CREATE INDEX IF NOT EXISTS idx_em_user   ON entity_members(userId);
 
+    /* === NEW: entity managers/admins bridge tables to avoid "فشخ الاضافه" عند إضافة مدير === */
+    CREATE TABLE IF NOT EXISTS entity_admins (
+      id TEXT PRIMARY KEY,
+      entityId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      assignedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      joinedAt   TEXT,
+      UNIQUE(entityId, userId)
+    );
+    CREATE INDEX IF NOT EXISTS idx_ea_entity ON entity_admins(entityId);
+    CREATE INDEX IF NOT EXISTS idx_ea_user   ON entity_admins(userId);
+
+    CREATE TABLE IF NOT EXISTS entity_managers (
+      id TEXT PRIMARY KEY,
+      entityId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      assignedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      joinedAt   TEXT,
+      UNIQUE(entityId, userId)
+    );
+    CREATE INDEX IF NOT EXISTS idx_emg_entity ON entity_managers(entityId);
+    CREATE INDEX IF NOT EXISTS idx_emg_user   ON entity_managers(userId);
+
     CREATE TABLE IF NOT EXISTS admin_promotion_requests (
       id TEXT PRIMARY KEY,
       applicantUserId TEXT NOT NULL,
@@ -335,7 +380,24 @@ ensureMembersHasRoleInEntity(d);
     CREATE INDEX IF NOT EXISTS idx_apr_user   ON admin_promotion_requests(applicantUserId);
   `);
 
-  // 🔄 إصلاح ربط event_requests بالـ events (لو كانت موجودة بيانات قديمة بدون eventId)
+  d.exec(`
+    CREATE TABLE IF NOT EXISTS entity_events (
+      id           TEXT PRIMARY KEY,
+      entityId     TEXT NOT NULL,
+      action       TEXT NOT NULL,
+      fromStatus   TEXT,
+      toStatus     TEXT,
+      reason       TEXT,
+      actorId      TEXT,
+      actorName    TEXT,
+      actorRole    TEXT,
+      createdAt    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_entity_events_entity ON entity_events(entityId);
+    CREATE INDEX IF NOT EXISTS idx_entity_events_action ON entity_events(action);
+  `);
+
+  // Back-fill eventId in event_requests if missing
   try {
     d.exec(`
       UPDATE event_requests
@@ -354,7 +416,7 @@ ensureMembersHasRoleInEntity(d);
     `);
   } catch {}
 
-  // جداول إضافية
+  // membership_events history table (optional analytics)
   if (!hasTable(d, "membership_events")) {
     d.exec(`
       CREATE TABLE IF NOT EXISTS membership_events (
@@ -373,20 +435,32 @@ ensureMembersHasRoleInEntity(d);
     `);
   }
 
-  // users migrations
+  // Users backward-compat fields
   if (!hasColumn(d, "users", "passwordHash")) {
-    try { d.exec(`ALTER TABLE users ADD COLUMN passwordHash TEXT`); } catch {}
+    try {
+      d.exec(`ALTER TABLE users ADD COLUMN passwordHash TEXT`);
+    } catch {}
   }
   if (!hasColumn(d, "users", "nationalId")) {
-    try { d.exec(`ALTER TABLE users ADD COLUMN nationalId TEXT`); } catch {}
-    try { d.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_users_nationalId ON users(nationalId) WHERE nationalId IS NOT NULL`); } catch {}
+    try {
+      d.exec(`ALTER TABLE users ADD COLUMN nationalId TEXT`);
+    } catch {}
+    try {
+      d.exec(
+        `CREATE UNIQUE INDEX IF NOT EXISTS ux_users_nationalId ON users(nationalId) WHERE nationalId IS NOT NULL`
+      );
+    } catch {}
   }
   if (!hasColumn(d, "users", "createdAt")) {
-    try { d.exec(`ALTER TABLE users ADD COLUMN createdAt TEXT NOT NULL DEFAULT (datetime('now'))`); } catch {}
+    try {
+      d.exec(`ALTER TABLE users ADD COLUMN createdAt TEXT NOT NULL DEFAULT (datetime('now'))`);
+    } catch {}
   }
+
+  // Recreate users if email was NOT NULL in older schema
   try {
     const info = tableInfo(d, "users");
-    const emailInfo = info.find(r => String(r.name) === "email");
+    const emailInfo = info.find((r) => String(r.name) === "email");
     if (emailInfo && Number(emailInfo.notnull) === 1) {
       d.exec(`
         PRAGMA foreign_keys=OFF;
@@ -420,13 +494,20 @@ ensureMembersHasRoleInEntity(d);
     }
   } catch {}
 
-  // entities migrations
+  // Entities adjustments (status, imageUrl, createdAt default)
   if (!hasColumn(d, "entities", "status")) {
-    try { d.exec(`ALTER TABLE entities ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'`); } catch {}
+    try {
+      d.exec(`ALTER TABLE entities ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'`);
+    } catch {}
+  }
+  if (!hasColumn(d, "entities", "imageUrl")) {
+    try {
+      d.exec(`ALTER TABLE entities ADD COLUMN imageUrl TEXT`);
+    } catch {}
   }
   try {
     const info = tableInfo(d, "entities");
-    const createdAtInfo = info.find(r => String(r.name) === "createdAt");
+    const createdAtInfo = info.find((r) => String(r.name) === "createdAt");
     if (createdAtInfo && !String(createdAtInfo.dflt_value || "").toLowerCase().includes("datetime('now')")) {
       d.exec(`
         PRAGMA foreign_keys=OFF;
@@ -441,11 +522,14 @@ ensureMembersHasRoleInEntity(d);
           createdAt TEXT NOT NULL DEFAULT (datetime('now')),
           createdBy TEXT,
           managerUserId TEXT,
-          status TEXT NOT NULL DEFAULT 'approved'
+          status TEXT NOT NULL DEFAULT 'approved',
+          imageUrl TEXT
         );
         INSERT OR IGNORE INTO entities_new
-          (id,name,type,contactEmail,phone,location,documents,createdAt,createdBy,managerUserId,status)
-        SELECT id,name,type,contactEmail,phone,location,documents,COALESCE(createdAt, datetime('now')),createdBy,managerUserId,status
+          (id,name,type,contactEmail,phone,location,documents,createdAt,createdBy,managerUserId,status,imageUrl)
+        SELECT id,name,type,contactEmail,phone,location,documents,
+               COALESCE(createdAt, datetime('now')) AS createdAt,
+               createdBy,managerUserId,status,imageUrl
         FROM entities;
         DROP TABLE entities;
         ALTER TABLE entities_new RENAME TO entities;
@@ -456,7 +540,7 @@ ensureMembersHasRoleInEntity(d);
     }
   } catch {}
 
-  // members migration: تأكيد وجود nationalId + الإندكس
+  // Members nationalId + unique index
   ensureMembersHasNationalId(d);
   try {
     d.exec(`
@@ -466,34 +550,72 @@ ensureMembersHasRoleInEntity(d);
     `);
   } catch {}
 
-  // entity_members قيود إضافية (اختياري)
-  try { d.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_em_one_entity_per_user ON entity_members(userId)`); } catch {}
-  try { d.exec(`DROP INDEX IF EXISTS ux_join_active_user`); } catch {}
+  // Limit 1 entity per user in entity_members if ده شرطك
+  try {
+    d.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_em_one_entity_per_user ON entity_members(userId)`);
+  } catch {}
 
-  // ملفات الرفع
+  // clean old wrong index if exists
+  try {
+    d.exec(`DROP INDEX IF EXISTS ux_join_active_user`);
+  } catch {}
+
+  // ensure uploads folder
   try {
     const upDir = path.join(process.cwd(), "data", "uploads");
     if (!fs.existsSync(upDir)) fs.mkdirSync(upDir, { recursive: true });
   } catch {}
 
-  // seed entities
+  // seed entities (once)
   try {
     const row = d.prepare(`SELECT COUNT(*) AS c FROM entities`).get() as any;
     const c = row?.c ?? 0;
     if (!c) {
       const ins = d.prepare(
         "INSERT INTO entities (id, name, type, contactEmail, phone, location, documents, createdAt, createdBy, managerUserId, status) " +
-        "VALUES (?, ?, NULL, NULL, NULL, NULL, '[]', datetime('now'), 'seed', NULL, 'approved')"
+          "VALUES (?, ?, NULL, NULL, NULL, NULL, '[]', datetime('now'), 'seed', NULL, 'approved')"
       );
       const NAMES = [
-        "كيان سند شباب الصعيد","كيان اتحاد شباب الاقصر","كيان رواد التطوير و التنميه الشبابيه بمحافظه","كيان المصريون الشباب",
-        "كيان اراده شباب مصر","كيان شباب بحري","رواد المحافظات الحدوديه","كيان الجبهه الدبلوماسيه المصريه","كيان كوادر شباب مصر",
-        "كيان اتحاد طلاب مصر","كيان سند شباب الدلتا","كيان الجيل الشبابي الصاعد","كيان الشباب بناة المستقبل","كيان قيادات شباب مصر",
-        "كيان مشروع وطن","كيان اتحاد شباب كفر الشيخ","كيان الاتحاد الشبابي لدعم مصر","كيان إرادة شباب مصر بالغربية","كيان شباب مستدام",
-        "كيان رحلة شباب الجمهورية الجديدة","كيان أكاديمية الكوري بسوهاج","كيان أتحاد شباب الوطن بسوهاج","كيان حلم مصر بسوهاج",
-        "كيان تيم القمه بسوهاج","كيان تيم الشيمي بسوهاج","كيان جيل قادر بسوهاج","كيان مراكز شباب مصر","كيان فكرة","الاتحاد الوطني للقيادات الشبابية",
-        "كيان فن إدارة الحياة","كيان تنمية وطن","كيان حكاية إشارة","كيان رموز شباب مصر","كيان شباب يبني وطن","كيان صناع الفرص","كيان شباب مراكز مصر",
-        "كيان مهندسون من أجل مصر المستدامة","كيان شباب قادرون"
+        "كيان جيل قادر",
+        "اتحاد بشبابها",
+        "اتحاد شباب الأقصر",
+        "رواد المحافظات الحدودية",
+        "مهندسون من أجل مصر المستدامة",
+        "اتحاد شباب يبني وطن",
+        "اتحاد طلاب تحيا مصر",
+        "رحلة شباب الجمهورية الجديدة",
+        "الاتحاد الشبابي لدعم مصر",
+        "اتحاد شباب كفر الشيخ",
+        "شباب الوطن للريادة والتنمية",
+        "الجيل الشبابي الصاعد",
+        "شباب مصر احنا معاكوا",
+        "الشباب بناة المستقبل",
+        "سند شباب الدلتا",
+        "انتماء شباب مصر",
+        "حكاية إشارة",
+        "رواد التطوير والتنمية الشبابية",
+        "رموز شباب مصر",
+        "إرادة شباب مصر",
+        "الجبهة الدبلوماسية المصرية",
+        "شباب مصر 2030",
+        "قيادات شباب مصر",
+        "كوادر شباب مصر",
+        "شباب قادرون",
+        "تنمية وطن",
+        "اتحاد شباب البحيرة",
+        "الاتحاد العام لمراكز شباب مصر",
+        "سواعد شباب مصر",
+        "سند شباب الصعيد",
+        "مشروع وطن",
+        "فكرة",
+        "طاقة شباب مصر",
+        "المصريون الشباب",
+        "شباب مستدام",
+        "صناع الفرص",
+        "شباب بحري",
+        "صوت شباب مصر",
+        "فن إدارة الحياة",
+        "الاتحاد الوطني للقيادات الشبابية"
       ];
       const tx = (d as any).transaction(() => {
         for (const nm of NAMES) ins.run(randomUUID(), nm);
@@ -502,39 +624,56 @@ ensureMembersHasRoleInEntity(d);
     }
   } catch {}
 
-  // 👈 توسعة iso لو كان موجود قديمًا بدون الأعمدة الجديدة
+  // Extend iso & governance
   ensureIsoExtended(d);
-
-  // 👈 إنشاء/ترقية جداول الحوكمة
   ensureGovernanceTables(d);
-try {
-  // نزّل أي أعضاء من entity_members مش موجودين في members
-  d.exec(`
-    INSERT INTO members (id, name, email, phone, entityId, nationalId, joinedAt)
-    SELECT
-      lower(hex(randomblob(16)))               AS id,
-      COALESCE(u.name,'—')                     AS name,
-      u.email,
-      u.phone,
-      em.entityId,
-      u.nationalId,
-      COALESCE(em.joinedAt, datetime('now'))   AS joinedAt
-    FROM entity_members em
-    JOIN users u ON u.id = em.userId
-    WHERE NOT EXISTS (
-      SELECT 1 FROM members m
-      WHERE m.entityId = em.entityId
-        AND m.nationalId = u.nationalId
-    );
-  `);
-} catch {}
-  d.exec(`PRAGMA foreign_keys = ON; PRAGMA recursive_triggers = OFF;`);
 
+  // Backfill members from entity_members (to guarantee listing)
+  try {
+    d.exec(`
+      INSERT INTO members (id, name, email, phone, entityId, nationalId, joinedAt)
+      SELECT
+        lower(hex(randomblob(16))),
+        COALESCE(u.name,'—'),
+        u.email,
+        u.phone,
+        em.entityId,
+        u.nationalId,
+        COALESCE(em.joinedAt, datetime('now'))
+      FROM entity_members em
+      JOIN users u ON u.id = em.userId
+      WHERE NOT EXISTS (
+        SELECT 1 FROM members m
+        WHERE m.entityId = em.entityId
+          AND m.nationalId = u.nationalId
+      );
+    `);
+  } catch {}
+
+  // Ensure attendance table
+  if (!hasTable(d, "event_attendance")) {
+    try {
+      d.exec(`
+        CREATE TABLE IF NOT EXISTS event_attendance (
+          eventId TEXT NOT NULL,
+          userId  TEXT NOT NULL,
+          attended INTEGER NOT NULL DEFAULT 1,
+          checkedAt TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (eventId, userId)
+        );
+      `);
+    } catch {}
+  }
+
+  d.exec(`PRAGMA foreign_keys = ON; PRAGMA recursive_triggers = OFF;`);
 }
 
+/* ===================== Public API ===================== */
 export function getDB() {
   if (db) {
-    try { init(db); } catch {}
+    try {
+      init(db);
+    } catch {}
     return db;
   }
   const dataDir = path.join(process.cwd(), "data");
@@ -547,14 +686,9 @@ export function getDB() {
 }
 
 export function uid() {
-  try { return randomUUID(); }
-  catch { return "id_" + Math.random().toString(36).slice(2) + Date.now().toString(36); }
-}
-function ensureMembersHasRoleInEntity(d: Database.Database) {
   try {
-    const has = d.prepare(`PRAGMA table_info(members)`).all() as any[];
-    if (!has.some((r) => String(r.name) === "roleInEntity")) {
-      d.exec(`ALTER TABLE members ADD COLUMN roleInEntity TEXT`);
-    }
-  } catch {}
+    return randomUUID();
+  } catch {
+    return "id_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  }
 }

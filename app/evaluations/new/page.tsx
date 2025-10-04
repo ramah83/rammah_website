@@ -53,7 +53,7 @@ export default function NewEvaluationPage() {
     surveyUrl: "",
   });
 
-  // تفاصيل الطلب/الفعالية (تُعرض في المودال فقط)
+  
   const [reqDetails, setReqDetails] = useState<null | {
     attendeesTarget?: number|null;
     date?: string|null;
@@ -67,7 +67,7 @@ export default function NewEvaluationPage() {
 
   const [showDetails, setShowDetails] = useState(false);
 
-  // هل توجد تفاصيل أصلاً؟
+  
   function hasAnyDetails(d: typeof reqDetails): boolean {
     if (!d) return false;
     const hasFiles = !!(d.files?.budgetPdf || d.files?.miniPlanPdf || d.files?.programPdf);
@@ -92,7 +92,7 @@ export default function NewEvaluationPage() {
     if (q) setForm(p => ({ ...p, eventId: String(q) })); 
   }, [hydrated, searchParams]);
 
-  // تحميل فعاليات المستخدم/كياناته
+  
   useEffect(() => {
     if (!hydrated) return;
     setLoadingEvents(true);
@@ -107,12 +107,12 @@ export default function NewEvaluationPage() {
     [events, form.eventId]
   );
 
-  // ========= جلب التفاصيل مع فول-باك =========
+  
   useEffect(() => {
     if (!form.eventId) { setReqDetails(null); return; }
     (async () => {
       try {
-        // 1) من /requests
+        
         const r1 = await fetch(`/api/events/requests?eventId=${encodeURIComponent(form.eventId)}`, {
           cache: "no-store",
           headers: buildSessionHeaders(false),
@@ -136,7 +136,7 @@ export default function NewEvaluationPage() {
           });
           return;
         }
-        // 2) فول-باك من /events/[id]
+        
         const r2 = await fetch(`/api/events/${encodeURIComponent(form.eventId)}`, {
           cache: "no-store",
           headers: buildSessionHeaders(false),
@@ -243,7 +243,7 @@ export default function NewEvaluationPage() {
             {msg.err && <div className="mb-4 p-3 rounded-lg text-sm" style={{ color:"#EC1A24", background:"#FDEBEC", border:"1px solid #EC1A2433" }}>{msg.err}</div>}
             {msg.ok &&  <div className="mb-4 p-3 rounded-lg text-sm" style={{ color:"#0F5132", background:"#E8F7EE", border:"1px solid #CBE9D6" }}>{msg.ok}</div>}
 
-            {/* اختيار فعالية */}
+            {}
             <div className="space-y-2 mb-2">
               <Label>اسم الفعالية *</Label>
               <Select
@@ -264,7 +264,7 @@ export default function NewEvaluationPage() {
               </Select>
             </div>
 
-            {/* شريط علوي بسيط + زر عرض التفاصيل فقط */}
+            {}
             {selectedEvent && (
               <div className="mb-4 rounded-2xl border p-4 bg-[#FAFAFA]" style={{ borderColor:"#EDE8E1" }}>
                 <div className="flex items-start justify-between gap-3">
@@ -298,7 +298,7 @@ export default function NewEvaluationPage() {
               </div>
             )}
 
-            {/* نموذج التقييم */}
+            {}
             <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
               <div className="space-y-2">
                 <Label>عدد الحضور</Label>
@@ -374,7 +374,7 @@ export default function NewEvaluationPage() {
       </main>
       <FooterBar />
 
-      {/* نافذة التفاصيل (تظهر عند الضغط فقط) */}
+      {}
       {showDetails && selectedEvent && (
         <Modal onClose={()=>setShowDetails(false)} title="تفاصيل الفعالية">
           <div className="space-y-3">
@@ -422,7 +422,7 @@ export default function NewEvaluationPage() {
   );
 }
 
-/* --------- UI أجزاء مساعدة --------- */
+
 function Modal({ title, children, onClose }:{
   title: string; children: React.ReactNode; onClose: ()=>void;
 }) {

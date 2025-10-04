@@ -1,0 +1,51 @@
+@page { 
+  size: A6 landscape; 
+  margin: 0; /* بدون هوامش من المتصفح */
+}
+
+/* مهم لإظهار الخلفيات والألوان في الـ PDF */
+* { 
+  -webkit-print-color-adjust: exact; 
+  print-color-adjust: exact; 
+}
+
+@media print {
+  /* إخفاء كل العناصر ما عدا الكارت */
+  body * { 
+    visibility: hidden !important; 
+  }
+
+  #cardRoot, 
+  #cardRoot * { 
+    visibility: visible !important; 
+  }
+
+  /* ضبط الكارت في نص الصفحة */
+  #cardRoot {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    width: 148mm;   /* عرض A6 landscape */
+    height: 105mm;  /* ارتفاع A6 landscape */
+    display: grid;
+    place-items: center;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+
+  /* أدوات اختيارية لتقليل مشاكل الطباعة */
+  .no-print-shadow { 
+    box-shadow: none !important; 
+  }
+
+  .no-print-border { 
+    border: none !important; 
+  }
+
+  /* إخفاء زر الطباعة */
+  #printCardBtn { 
+    display: none !important; 
+  }
+}

@@ -1,4 +1,3 @@
-// /app/api/manager-requests/[id]/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -26,7 +25,7 @@ export async function PATCH(
 
   const db = getDB();
 
-  // احضر الطلب وتأكد أنه معلّق
+  
   const reqRow = db.prepare(`SELECT * FROM manager_requests WHERE id=?`).get(id) as
     | {
         id: string;
@@ -59,19 +58,19 @@ export async function PATCH(
 
   try {
     const tx = (db as any).transaction(() => {
-      // اعتمد الطلب
+      
       db.prepare(
         `UPDATE manager_requests
             SET status='approved', decidedAt=datetime('now'), decidedBy=?, note=COALESCE(?, note)
           WHERE id=?`
       ).run(s.id, note, id);
 
-      // رقّي المستخدم إلى مسؤول كيان واربطه بالكيان
+      
       db.prepare(
         `UPDATE users SET role='entityManager', entityId=? WHERE id=?`
       ).run(reqRow.entityId, reqRow.applicantUserId);
 
-      // لو الكيان ملوش مدير، عيّن المتقدّم كمدير
+      
       const current = db
         .prepare(`SELECT managerUserId FROM entities WHERE id=?`)
         .get(reqRow.entityId) as { managerUserId?: string } | undefined;

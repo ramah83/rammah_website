@@ -150,7 +150,7 @@ export default function GovernancePage() {
     },
   };
 
-  // session
+  
   useEffect(() => {
     try {
       const s = localStorage.getItem("session");
@@ -163,7 +163,7 @@ export default function GovernancePage() {
     } catch { router.push("/"); }
   }, [router]);
 
-  // fetch entities + items
+  
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -186,7 +186,7 @@ export default function GovernancePage() {
       } finally { if (mounted) setLoading(false); }
     })();
     return () => { mounted = false; };
-  }, [filterEntity, filterStatus, filterType, search, session?.role, session?.entityId]); // refetch on filters/session
+  }, [filterEntity, filterStatus, filterType, search, session?.role, session?.entityId]); 
 
   const filtered = useMemo(() => list, [list]);
 

@@ -12,8 +12,8 @@ type UserRow = {
   id: string;
   email: string;
   name: string;
-  password: string | null;       // قد يحتوي Plain أو Bcrypt في أنظمة قديمة
-  passwordHash: string | null;   // الحقل المعتمد الحالي
+  password: string | null;       
+  passwordHash: string | null;   
   role: string;
   entityId?: string | null;
   permissions?: string | null;
@@ -55,16 +55,16 @@ export async function POST(req: NextRequest) {
       user = db.prepare(`SELECT * FROM users WHERE lower(email)=?`).get(loginId.toLowerCase()) as UserRow | undefined;
     }
 
-    // التحقق من كلمة المرور مع دعم الترحيل
+    
     let ok = false;
     if (user) {
-      // الحالة الطبيعية: عندنا passwordHash
+      
       if (user.passwordHash && bcrypt.compareSync(password, user.passwordHash)) {
         ok = true;
       } else if (!user.passwordHash && user.password) {
-        // نظام قديم: ممكن password يكون Bcrypt أو Plain
+        
         if (isBcryptHash(user.password)) {
-          // password يحتوي Bcrypt — نقارن ونهاجره لـ passwordHash
+          
           if (bcrypt.compareSync(password, user.password)) {
             ok = true;
             db.prepare(`UPDATE users SET passwordHash=?, password=NULL WHERE id=?`).run(user.password, user.id);
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
             user.password = null;
           }
         } else {
-          // password Plain — قارن نصيًا ثم هاش وهاجر
+          
           if (password === user.password) {
             ok = true;
             const newHash = bcrypt.hashSync(password, 10);
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
       | { type: "approved" | "rejected" | "pending"; text: string; requestId?: string }
       | undefined;
 
-    // ترقية لمسؤول اتحاد الكيانات
+    
     try {
       const pr = db.prepare(
         `SELECT id, status FROM admin_promotion_requests
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
       }
     } catch {}
 
-    // تعيين مدير كيان
+    
     try {
       const mr = db.prepare(
         `SELECT id, entityId, status FROM manager_requests
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
       }
     } catch {}
 
-    // تطبيع الدور
+    
     const rawRole = (user.role as string) || "user";
     const normalizedRole: UserRole =
       rawRole === "youth" ? "user"
