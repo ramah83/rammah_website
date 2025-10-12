@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, X } from "lucide-react";
+import { Users, X, Plus, Trash2 } from "lucide-react";
 import { Cairo } from "next/font/google";
 
 const cairo = Cairo({ subsets:["arabic","latin"], weight:["400","600","700","800"], display:"swap" });
@@ -32,6 +32,8 @@ function buildSessionHeaders(contentType = true): HeadersInit {
 function isPdf(u?: string|null) { return !!u && /\.pdf($|\?)/i.test(u); }
 function isImage(u?: string|null) { return !!u && /\.(png|jpe?g|gif|webp|avif|bmp|svg)($|\?)/i.test(u); }
 
+/* ------------------------------------------------------------------ */
+
 export default function NewEvaluationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -43,17 +45,41 @@ export default function NewEvaluationPage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({});
 
+  // ===== النموذج (تم توسيعه) =====
   const [form, setForm] = useState({
     eventId: "",
+    // أرقام أساسية
     attendees: "",
-    goalsScore: "3",
+    male: "",
+    female: "",
+    volunteers: "",
+    durationHours: "",
+    // تقييمات 1–5
+    orgScore: "3",
+    contentScore: "3",
+    speakersScore: "3",
+    logisticsScore: "3",
+    mediaScore: "3",
+    overallScore: "3",
+    // الأهداف
+    goalsAchieved: "yes", // yes | no
+    goalsScore: "3",      // احتفاظ للحقل القديم (توافق)
+    goalsPercent: "",
+    // نصوص
     notes: "",
+    positives: "",
+    challenges: "",
+    improvements: "",
+    // مرفقات وروابط
     photoUrls: [] as string[],
     attendanceUrl: "",
     surveyUrl: "",
+    finalReportUrl: "",
+    budgetReportUrl: "",
+    links: [""], // روابط تغطية/ألبوم… ديناميكية
   });
 
-  
+  // ===== تفاصيل الطلب/الفعالية للعرض =====
   const [reqDetails, setReqDetails] = useState<null | {
     attendeesTarget?: number|null;
     date?: string|null;
@@ -64,10 +90,8 @@ export default function NewEvaluationPage() {
     supportType?: string;
     files?: { budgetPdf?: string|null; miniPlanPdf?: string|null; programPdf?: string|null };
   }>(null);
-
   const [showDetails, setShowDetails] = useState(false);
 
-  
   function hasAnyDetails(d: typeof reqDetails): boolean {
     if (!d) return false;
     const hasFiles = !!(d.files?.budgetPdf || d.files?.miniPlanPdf || d.files?.programPdf);
@@ -89,10 +113,9 @@ export default function NewEvaluationPage() {
   useEffect(() => {
     if (!hydrated) return;
     const q = searchParams.get("eventId");
-    if (q) setForm(p => ({ ...p, eventId: String(q) })); 
+    if (q) setForm(p => ({ ...p, eventId: String(q) }));
   }, [hydrated, searchParams]);
 
-  
   useEffect(() => {
     if (!hydrated) return;
     setLoadingEvents(true);
@@ -107,15 +130,13 @@ export default function NewEvaluationPage() {
     [events, form.eventId]
   );
 
-  
   useEffect(() => {
     if (!form.eventId) { setReqDetails(null); return; }
     (async () => {
       try {
-        
+        // نحاول قراءة آخر طلب (لو API عندك بتدعم)
         const r1 = await fetch(`/api/events/requests?eventId=${encodeURIComponent(form.eventId)}`, {
-          cache: "no-store",
-          headers: buildSessionHeaders(false),
+          cache: "no-store", headers: buildSessionHeaders(false),
         });
         const d1 = await r1.json().catch(() => null);
         const p1 = d1?.payload || null;
@@ -136,10 +157,9 @@ export default function NewEvaluationPage() {
           });
           return;
         }
-        
+        // بديل: تفاصيل الحدث
         const r2 = await fetch(`/api/events/${encodeURIComponent(form.eventId)}`, {
-          cache: "no-store",
-          headers: buildSessionHeaders(false),
+          cache: "no-store", headers: buildSessionHeaders(false),
         });
         if (!r2.ok) { setReqDetails(null); return; }
         const d2 = await r2.json().catch(() => null);
@@ -158,9 +178,7 @@ export default function NewEvaluationPage() {
             programPdf: details?.files?.programPdf || null,
           }
         });
-      } catch {
-        setReqDetails(null);
-      }
+      } catch { setReqDetails(null); }
     })();
   }, [form.eventId]);
 
@@ -173,7 +191,14 @@ export default function NewEvaluationPage() {
     return String(data?.url || "");
   }
 
-  async function onUpload(kind: "photo" | "attendance" | "survey", f?: File | null) {
+  async function onUpload(kind:
+    | "photo"
+    | "attendance"
+    | "survey"
+    | "finalReport"
+    | "budgetReport",
+    f?: File | null
+  ) {
     if (!f) return;
     setSaving(true); setMsg({});
     try {
@@ -181,9 +206,23 @@ export default function NewEvaluationPage() {
       if (kind === "photo") setForm(p => ({ ...p, photoUrls: [...p.photoUrls, url] }));
       if (kind === "attendance") setForm(p => ({ ...p, attendanceUrl: url }));
       if (kind === "survey") setForm(p => ({ ...p, surveyUrl: url }));
+      if (kind === "finalReport") setForm(p => ({ ...p, finalReportUrl: url }));
+      if (kind === "budgetReport") setForm(p => ({ ...p, budgetReportUrl: url }));
     } catch (e:any) {
       setMsg({ err: e?.message || "فشل الرفع" });
     } finally { setSaving(false); }
+  }
+
+  function setLink(i: number, v: string) {
+    setForm(p => {
+      const next = [...p.links];
+      next[i] = v;
+      return { ...p, links: next };
+    });
+  }
+  function addLink() { setForm(p => ({ ...p, links: [...p.links, ""] })); }
+  function removeLink(i: number) {
+    setForm(p => ({ ...p, links: p.links.filter((_, idx) => idx !== i) }));
   }
 
   async function submit(e: React.FormEvent) {
@@ -197,19 +236,56 @@ export default function NewEvaluationPage() {
       return setMsg({ err: `عدد الحضور المُدخل (${n}) أكبر من العدد المستهدف (${target}).` });
     }
 
+    // بناء الـ payload الشامل (يحافظ على الحقول القديمة للتوافق)
+    const payload = {
+      eventId: form.eventId,
+
+      metrics: {
+        attendees: n,
+        male: Number(form.male || 0) || null,
+        female: Number(form.female || 0) || null,
+        volunteers: Number(form.volunteers || 0) || null,
+        durationHours: Number(form.durationHours || 0) || null,
+      },
+
+      ratings: {
+        organization: Number(form.orgScore || 0),
+        content: Number(form.contentScore || 0),
+        speakers: Number(form.speakersScore || 0),
+        logistics: Number(form.logisticsScore || 0),
+        media: Number(form.mediaScore || 0),
+        overall: Number(form.overallScore || 0),
+        // توافق للخلف (لو السيرفر بيقرأ goalsScore فقط)
+        goalsScore: Number(form.goalsScore || 0),
+      },
+
+      goals: {
+        achieved: form.goalsAchieved === "yes",
+        percent: form.goalsPercent ? Number(form.goalsPercent) : null,
+      },
+
+      notes: {
+        general: form.notes || "",
+        positives: form.positives || "",
+        challenges: form.challenges || "",
+        improvements: form.improvements || "",
+      },
+
+      links: (form.links || []).filter(Boolean),
+
+      files: {
+        // القديم — للتوافق
+        photos: form.photoUrls,
+        attendance: form.attendanceUrl || null,
+        survey: form.surveyUrl || null,
+        // الجديد
+        finalReport: form.finalReportUrl || null,
+        budgetReport: form.budgetReportUrl || null,
+      },
+    };
+
     setSaving(true);
     try {
-      const payload = {
-        eventId: form.eventId,
-        attendees: n,
-        goalsScore: Number(form.goalsScore || 0),
-        notes: form.notes || "",
-        files: {
-          photos: form.photoUrls,
-          attendance: form.attendanceUrl || null,
-          survey: form.surveyUrl || null,
-        },
-      };
       const r = await fetch("/api/new-evaluations", {
         method: "POST",
         headers: buildSessionHeaders(true),
@@ -220,7 +296,14 @@ export default function NewEvaluationPage() {
       if (!r.ok) throw new Error(data?.error || raw || "تعذر إرسال التقييم");
 
       setMsg({ ok: "تم إرسال تقييمك بنجاح." });
-      setForm({ eventId:"", attendees:"", goalsScore:"3", notes:"", photoUrls:[], attendanceUrl:"", surveyUrl:"" });
+      setForm({
+        eventId:"", attendees:"", male:"", female:"", volunteers:"", durationHours:"",
+        orgScore:"3", contentScore:"3", speakersScore:"3", logisticsScore:"3", mediaScore:"3", overallScore:"3",
+        goalsAchieved:"yes", goalsScore:"3", goalsPercent:"",
+        notes:"", positives:"", challenges:"", improvements:"",
+        photoUrls:[], attendanceUrl:"", surveyUrl:"", finalReportUrl:"", budgetReportUrl:"",
+        links:[""],
+      });
       setReqDetails(null);
       setShowDetails(false);
     } catch (e:any) {
@@ -243,7 +326,7 @@ export default function NewEvaluationPage() {
             {msg.err && <div className="mb-4 p-3 rounded-lg text-sm" style={{ color:"#EC1A24", background:"#FDEBEC", border:"1px solid #EC1A2433" }}>{msg.err}</div>}
             {msg.ok &&  <div className="mb-4 p-3 rounded-lg text-sm" style={{ color:"#0F5132", background:"#E8F7EE", border:"1px solid #CBE9D6" }}>{msg.ok}</div>}
 
-            {}
+            {/* اختيار الفعالية */}
             <div className="space-y-2 mb-2">
               <Label>اسم الفعالية *</Label>
               <Select
@@ -264,7 +347,7 @@ export default function NewEvaluationPage() {
               </Select>
             </div>
 
-            {}
+            {/* كارد مختصرة + زر عرض التفاصيل */}
             {selectedEvent && (
               <div className="mb-4 rounded-2xl border p-4 bg-[#FAFAFA]" style={{ borderColor:"#EDE8E1" }}>
                 <div className="flex items-start justify-between gap-3">
@@ -298,72 +381,126 @@ export default function NewEvaluationPage() {
               </div>
             )}
 
-            {}
-            <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-              <div className="space-y-2">
-                <Label>عدد الحضور</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={reqDetails?.attendeesTarget ?? undefined}
-                  value={form.attendees}
-                  onChange={(e)=>setForm(p=>({...p, attendees:e.target.value}))}
-                />
-                {reqDetails?.attendeesTarget != null && (
-                  <p className="text-xs text-[#6B6B6B]">الحد الأقصى: {reqDetails.attendeesTarget}</p>
-                )}
-              </div>
+            {/* ====== النموذج الموسّع ====== */}
+            <form onSubmit={submit} className="grid grid-cols-1 gap-6 mt-2">
+              {/* أرقام أساسية */}
+              <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <NumberField label="عدد الحضور الفعلي" value={form.attendees} onChange={(v)=>setForm(p=>({...p, attendees:v}))}
+                             hint={reqDetails?.attendeesTarget != null ? `الحد الأقصى: ${reqDetails.attendeesTarget}` : undefined} />
+                <NumberField label="ذكور (اختياري)" value={form.male} onChange={(v)=>setForm(p=>({...p, male:v}))} />
+                <NumberField label="إناث (اختياري)" value={form.female} onChange={(v)=>setForm(p=>({...p, female:v}))} />
+                <NumberField label="عدد المتطوعين (اختياري)" value={form.volunteers} onChange={(v)=>setForm(p=>({...p, volunteers:v}))} />
+                <NumberField label="مدة الفعالية (ساعات)" value={form.durationHours} onChange={(v)=>setForm(p=>({...p, durationHours:v}))} />
+              </section>
 
-              <div className="space-y-2">
-                <Label>نسبة تحقيق الأهداف (1–5)</Label>
-                <Select value={form.goalsScore} onValueChange={(v)=>setForm(p=>({...p, goalsScore:v}))}>
-                  <SelectTrigger className="h-11 rounded-xl" style={{ background:"#F6F6F6", borderColor:"#E3E3E3" }}>
-                    <SelectValue placeholder="اختر الدرجة" />
-                  </SelectTrigger>
-                  <SelectContent>{["1","2","3","4","5"].map(s=><SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
+              {/* تقييمات 1–5 */}
+              <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <RatingField label="التنظيم" value={form.orgScore} onChange={(v)=>setForm(p=>({...p, orgScore:v}))} />
+                <RatingField label="المحتوى" value={form.contentScore} onChange={(v)=>setForm(p=>({...p, contentScore:v}))} />
+                <RatingField label="المتحدثون" value={form.speakersScore} onChange={(v)=>setForm(p=>({...p, speakersScore:v}))} />
+                <RatingField label="اللوجستيات" value={form.logisticsScore} onChange={(v)=>setForm(p=>({...p, logisticsScore:v}))} />
+                <RatingField label="التغطية الإعلامية" value={form.mediaScore} onChange={(v)=>setForm(p=>({...p, mediaScore:v}))} />
+                <RatingField label="التقييم العام" value={form.overallScore} onChange={(v)=>setForm(p=>({...p, overallScore:v}))} />
+              </section>
 
-              <div className="space-y-2 md:col-span-2">
-                <Label>ملاحظاتك</Label>
-                <textarea
-                  className="w-full min-h-[110px] rounded-xl p-3 border"
-                  style={{ background:"#F6F6F6", borderColor:"#E3E3E3" }}
-                  value={form.notes}
-                  onChange={(e)=>setForm(p=>({...p, notes:e.target.value}))}
-                />
-              </div>
+              {/* الأهداف */}
+              <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>هل تحققت الأهداف؟</Label>
+                  <Select value={form.goalsAchieved} onValueChange={(v)=>setForm(p=>({...p, goalsAchieved:v as "yes"|"no"}))}>
+                    <SelectTrigger className="h-11 rounded-xl" style={{ background:"#F6F6F6", borderColor:"#E3E3E3" }}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="yes">نعم</SelectItem>
+                      <SelectItem value="no">لا</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <RatingField label="نسبة تحقيق الأهداف (1–5)" value={form.goalsScore} onChange={(v)=>setForm(p=>({...p, goalsScore:v}))} />
+                <NumberField label="النسبة التقديرية (%) — اختياري" value={form.goalsPercent} onChange={(v)=>setForm(p=>({...p, goalsPercent:v}))} />
+              </section>
 
-              <div className="space-y-2">
-                <Label>رفع صورة (يمكن عدة صور)</Label>
-                <Input type="file" accept="image/*" onChange={(e)=>onUpload("photo", e.target.files?.[0] || null)} />
-                {!!form.photoUrls.length && (
-                  <>
-                    <p className="text-xs text-green-700">تم رفع {form.photoUrls.length} صورة ✓</p>
-                    <div className="mt-2 grid grid-cols-3 gap-2">
-                      {form.photoUrls.map((u, i) => (
-                        <a key={u+i} href={u} target="_blank" rel="noreferrer" className="block rounded overflow-hidden border" title="فتح الصورة">
-                          {isImage(u) ? <img src={u} alt="" className="w-full h-24 object-cover" /> : <div className="p-2 text-xs break-all">{u}</div>}
-                        </a>
-                      ))}
+              {/* نصوص تفصيلية */}
+              <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <TextAreaField label="نقاط القوة" value={form.positives} onChange={(v)=>setForm(p=>({...p, positives:v}))} />
+                <TextAreaField label="التحديات" value={form.challenges} onChange={(v)=>setForm(p=>({...p, challenges:v}))} />
+                <TextAreaField label="مقترحات التحسين" value={form.improvements} onChange={(v)=>setForm(p=>({...p, improvements:v}))} wide />
+                <TextAreaField label="ملاحظات عامة" value={form.notes} onChange={(v)=>setForm(p=>({...p, notes:v}))} wide />
+              </section>
+
+              {/* مرفقات */}
+              <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* صور متعددة */}
+                <div className="space-y-2">
+                  <Label>رفع صور (يمكن عدة صور)</Label>
+                  <Input type="file" accept="image/*" onChange={(e)=>onUpload("photo", e.target.files?.[0] || null)} />
+                  {!!form.photoUrls.length && (
+                    <>
+                      <p className="text-xs text-green-700">تم رفع {form.photoUrls.length} صورة ✓</p>
+                      <div className="mt-2 grid grid-cols-3 gap-2">
+                        {form.photoUrls.map((u, i) => (
+                          <a key={u+i} href={u} target="_blank" rel="noreferrer" className="block rounded overflow-hidden border" title="فتح الصورة">
+                            {isImage(u) ? <img src={u} alt="" className="w-full h-24 object-cover" /> : <div className="p-2 text-xs break-all">{u}</div>}
+                          </a>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* قائمة الحضور */}
+                <div className="space-y-2">
+                  <Label>قائمة الحضور (PDF/صورة)</Label>
+                  <Input type="file" accept="application/pdf,image/*" onChange={(e)=>onUpload("attendance", e.target.files?.[0] || null)} />
+                  {form.attendanceUrl && <TinyPreview url={form.attendanceUrl} />}
+                </div>
+
+                {/* استطلاع الرأي */}
+                <div className="space-y-2">
+                  <Label>تقرير استطلاع الرأي (PDF/صورة)</Label>
+                  <Input type="file" accept="application/pdf,image/*" onChange={(e)=>onUpload("survey", e.target.files?.[0] || null)} />
+                  {form.surveyUrl && <TinyPreview url={form.surveyUrl} />}
+                </div>
+
+                {/* تقرير نهائي + ميزانية */}
+                <div className="space-y-2">
+                  <Label>التقرير النهائي (PDF)</Label>
+                  <Input type="file" accept="application/pdf" onChange={(e)=>onUpload("finalReport", e.target.files?.[0] || null)} />
+                  {form.finalReportUrl && <TinyPreview url={form.finalReportUrl} />}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>تقرير الميزانية/المصروفات (PDF)</Label>
+                  <Input type="file" accept="application/pdf" onChange={(e)=>onUpload("budgetReport", e.target.files?.[0] || null)} />
+                  {form.budgetReportUrl && <TinyPreview url={form.budgetReportUrl} />}
+                </div>
+              </section>
+
+              {/* روابط التغطية/الألبومات */}
+              <section className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>روابط التغطية/الألبومات</Label>
+                  <Button type="button" onClick={addLink} className="h-8 rounded-full px-3" variant="secondary"
+                          style={{ background:"#fff", border:`1px solid ${PALETTE.border}`, color:PALETTE.black }}>
+                    <Plus className="h-4 w-4 me-1" /> إضافة رابط
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {form.links.map((v, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Input placeholder="https://…" value={v} onChange={(e)=>setLink(i, e.target.value)} />
+                      <Button type="button" onClick={()=>removeLink(i)} className="h-10 w-10" variant="secondary"
+                              style={{ background:"#fff", border:`1px solid ${PALETTE.border}`, color:"#B00020" }}
+                              title="حذف الرابط">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </>
-                )}
-              </div>
+                  ))}
+                </div>
+              </section>
 
-              <div className="space-y-2">
-                <Label>قائمة الحضور (PDF/صورة)</Label>
-                <Input type="file" accept="application/pdf,image/*" onChange={(e)=>onUpload("attendance", e.target.files?.[0] || null)} />
-                {form.attendanceUrl && <TinyPreview url={form.attendanceUrl} />}
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <Label>تقرير استطلاع الرأي (PDF/صورة)</Label>
-                <Input type="file" accept="application/pdf,image/*" onChange={(e)=>onUpload("survey", e.target.files?.[0] || null)} />
-                {form.surveyUrl && <TinyPreview url={form.surveyUrl} />}
-              </div>
-
-              <div className="md:col-span-2">
+              <div>
                 <Button disabled={saving || !form.eventId} className="h-11 rounded-full font-semibold" style={{ background:PALETTE.red, color:"#fff" }}>
                   {saving ? "جارٍ الإرسال..." : "إرسال التقييم"}
                 </Button>
@@ -374,7 +511,7 @@ export default function NewEvaluationPage() {
       </main>
       <FooterBar />
 
-      {}
+      {/* Modal تفاصيل الفعالية */}
       {showDetails && selectedEvent && (
         <Modal onClose={()=>setShowDetails(false)} title="تفاصيل الفعالية">
           <div className="space-y-3">
@@ -388,7 +525,8 @@ export default function NewEvaluationPage() {
                 )}
               </div>
               {reqDetails?.attendeesTarget != null && (
-                <div className="mt-2 text-xs inline-flex items-center px-3 h-7 rounded-full" style={{ background:"#E8F7EE", color:"#0F5132", border:"1px solid #CBE9D6" }}>
+                <div className="mt-2 text-xs inline-flex items-center px-3 h-7 rounded-full"
+                     style={{ background:"#E8F7EE", color:"#0F5132", border:"1px solid #CBE9D6" }}>
                   الحد الأقصى للحضور: {reqDetails.attendeesTarget}
                 </div>
               )}
@@ -422,6 +560,51 @@ export default function NewEvaluationPage() {
   );
 }
 
+/* ----------------------- صغار UI ----------------------- */
+
+function NumberField({ label, value, onChange, hint }:{
+  label:string; value:string; onChange:(v:string)=>void; hint?:string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Input type="number" value={value} onChange={(e)=>onChange(e.target.value)} />
+      {hint && <p className="text-xs text-[#6B6B6B]">{hint}</p>}
+    </div>
+  );
+}
+
+function RatingField({ label, value, onChange }:{
+  label:string; value:string; onChange:(v:string)=>void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="h-11 rounded-xl" style={{ background:"#F6F6F6", borderColor:"#E3E3E3" }}>
+          <SelectValue placeholder="اختر الدرجة" />
+        </SelectTrigger>
+        <SelectContent>{["1","2","3","4","5"].map(s=><SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function TextAreaField({ label, value, onChange, wide=false }:{
+  label:string; value:string; onChange:(v:string)=>void; wide?:boolean;
+}) {
+  return (
+    <div className={wide ? "md:col-span-2" : ""}>
+      <Label>{label}</Label>
+      <textarea
+        className="w-full min-h-[110px] rounded-xl p-3 border"
+        style={{ background:"#F6F6F6", borderColor:"#E3E3E3" }}
+        value={value}
+        onChange={(e)=>onChange(e.target.value)}
+      />
+    </div>
+  );
+}
 
 function Modal({ title, children, onClose }:{
   title: string; children: React.ReactNode; onClose: ()=>void;
@@ -431,9 +614,9 @@ function Modal({ title, children, onClose }:{
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="absolute inset-0 grid place-items-center p-4">
         <div className="w-full max-w-3xl max-h-[85vh] overflow-auto rounded-2xl bg-white border shadow-xl" style={{ borderColor:"#E7E2DC" }}>
-          <div className="sticky top-0 z-10 flex items-center justify_between px-5 py-3 border-b bg-white" style={{ borderColor:"#F1EEE8" }}>
+          <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3 border-b bg-white" style={{ borderColor:"#F1EEE8" }}>
             <div className="font-semibold">{title}</div>
-            <button onClick={onClose} className="h-8 w-8 grid place-items-center rounded-full hover:bg_black/5">
+            <button onClick={onClose} className="h-8 w-8 grid place-items-center rounded-full hover:bg-black/5">
               <X className="h-5 w-5" />
             </button>
           </div>

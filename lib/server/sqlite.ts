@@ -1,4 +1,3 @@
-// src/lib/server/sqlite.ts
 import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
@@ -6,7 +5,6 @@ import { randomUUID } from "crypto";
 
 let db: Database.Database | null = null;
 
-/* ===================== Utils: schema helpers ===================== */
 function hasColumn(d: Database.Database, table: string, col: string) {
   try {
     const rows = d.prepare(`PRAGMA table_info(${table})`).all() as any[];
@@ -33,7 +31,6 @@ function hasTable(d: Database.Database, table: string) {
   }
 }
 
-/* ===================== Targeted migrations ===================== */
 function ensureMembersHasRoleInEntity(d: Database.Database) {
   try {
     const has = d.prepare(`PRAGMA table_info(members)`).all() as any[];
@@ -51,7 +48,6 @@ function ensureMembersHasNationalId(d: Database.Database) {
 
   if (hasColumn(d, "members", "nationalId")) return;
 
-  // fallback: recreate table with nationalId
   d.exec(`
     PRAGMA foreign_keys=OFF;
     CREATE TABLE IF NOT EXISTS members_new (
@@ -71,7 +67,6 @@ function ensureMembersHasNationalId(d: Database.Database) {
     PRAGMA foreign_keys=ON;
   `);
 
-  // unique index to prevent duplicate nationalId inside same entity
   try {
     d.exec(`
       CREATE UNIQUE INDEX IF NOT EXISTS ux_members_entity_nationalId
@@ -171,11 +166,9 @@ function ensureGovernanceTables(d: Database.Database) {
   } catch {}
 }
 
-/* ===================== Init: create/patch schema ===================== */
 function init(d: Database.Database) {
   d.exec(`PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;`);
 
-  // Users, Entities, Requests, Members, Events, ISO, etc.
   ensureMembersHasRoleInEntity(d);
 
   d.exec(`
@@ -230,9 +223,11 @@ function init(d: Database.Database) {
       decidedBy TEXT,
       note TEXT
     );
-    CREATE INDEX IF NOT EXISTS idx_ereq_status       ON entity_requests(status);
-    CREATE INDEX IF NOT EXISTS idx_ereq_approver     ON entity_requests(approverRole);
-    CREATE INDEX IF NOT EXISTS idx_ereq_targetEntity ON entity_requests(targetEntityId);
+    CREATE INDEX IF NOT EXISTS idx_ereq_status        ON entity_requests(status);
+    CREATE INDEX IF NOT EXISTS idx_ereq_approver      ON entity_requests(approverRole);
+    CREATE INDEX IF NOT EXISTS idx_ereq_targetEntity  ON entity_requests(targetEntityId);
+    CREATE INDEX IF NOT EXISTS idx_ereq_createdBy     ON entity_requests(createdBy);
+    CREATE INDEX IF NOT EXISTS idx_ereq_createdAt     ON entity_requests(createdAt);
 
     CREATE TABLE IF NOT EXISTS manager_requests (
       id TEXT PRIMARY KEY,
@@ -293,7 +288,8 @@ function init(d: Database.Database) {
       createdByRole TEXT,
       approvedBy TEXT,
       approvedByName TEXT,
-      approvedAt TEXT
+      approvedAt TEXT,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS event_requests (
@@ -344,7 +340,6 @@ function init(d: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_em_entity ON entity_members(entityId);
     CREATE INDEX IF NOT EXISTS idx_em_user   ON entity_members(userId);
 
-    /* === NEW: entity managers/admins bridge tables to avoid "فشخ الاضافه" عند إضافة مدير === */
     CREATE TABLE IF NOT EXISTS entity_admins (
       id TEXT PRIMARY KEY,
       entityId TEXT NOT NULL,
@@ -380,6 +375,17 @@ function init(d: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_apr_user   ON admin_promotion_requests(applicantUserId);
   `);
 
+  if (!hasColumn(d, "events", "createdAt")) {
+    try {
+      d.exec(`ALTER TABLE events ADD COLUMN createdAt TEXT NOT NULL DEFAULT (datetime('now'))`);
+    } catch {}
+  }
+  try {
+    d.exec(`CREATE INDEX IF NOT EXISTS idx_events_createdAt ON events(createdAt)`);
+    d.exec(`CREATE INDEX IF NOT EXISTS idx_events_entity ON events(entityId)`);
+    d.exec(`CREATE INDEX IF NOT EXISTS idx_events_status ON events(status)`);
+  } catch {}
+
   d.exec(`
     CREATE TABLE IF NOT EXISTS entity_events (
       id           TEXT PRIMARY KEY,
@@ -397,7 +403,6 @@ function init(d: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_entity_events_action ON entity_events(action);
   `);
 
-  // Back-fill eventId in event_requests if missing
   try {
     d.exec(`
       UPDATE event_requests
@@ -416,7 +421,6 @@ function init(d: Database.Database) {
     `);
   } catch {}
 
-  // membership_events history table (optional analytics)
   if (!hasTable(d, "membership_events")) {
     d.exec(`
       CREATE TABLE IF NOT EXISTS membership_events (
@@ -435,7 +439,6 @@ function init(d: Database.Database) {
     `);
   }
 
-  // Users backward-compat fields
   if (!hasColumn(d, "users", "passwordHash")) {
     try {
       d.exec(`ALTER TABLE users ADD COLUMN passwordHash TEXT`);
@@ -457,7 +460,6 @@ function init(d: Database.Database) {
     } catch {}
   }
 
-  // Recreate users if email was NOT NULL in older schema
   try {
     const info = tableInfo(d, "users");
     const emailInfo = info.find((r) => String(r.name) === "email");
@@ -494,7 +496,6 @@ function init(d: Database.Database) {
     }
   } catch {}
 
-  // Entities adjustments (status, imageUrl, createdAt default)
   if (!hasColumn(d, "entities", "status")) {
     try {
       d.exec(`ALTER TABLE entities ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'`);
@@ -540,7 +541,6 @@ function init(d: Database.Database) {
     }
   } catch {}
 
-  // Members nationalId + unique index
   ensureMembersHasNationalId(d);
   try {
     d.exec(`
@@ -550,23 +550,19 @@ function init(d: Database.Database) {
     `);
   } catch {}
 
-  // Limit 1 entity per user in entity_members if ده شرطك
   try {
     d.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_em_one_entity_per_user ON entity_members(userId)`);
   } catch {}
 
-  // clean old wrong index if exists
   try {
     d.exec(`DROP INDEX IF EXISTS ux_join_active_user`);
   } catch {}
 
-  // ensure uploads folder
   try {
     const upDir = path.join(process.cwd(), "data", "uploads");
     if (!fs.existsSync(upDir)) fs.mkdirSync(upDir, { recursive: true });
   } catch {}
 
-  // seed entities (once)
   try {
     const row = d.prepare(`SELECT COUNT(*) AS c FROM entities`).get() as any;
     const c = row?.c ?? 0;
@@ -624,11 +620,9 @@ function init(d: Database.Database) {
     }
   } catch {}
 
-  // Extend iso & governance
   ensureIsoExtended(d);
   ensureGovernanceTables(d);
 
-  // Backfill members from entity_members (to guarantee listing)
   try {
     d.exec(`
       INSERT INTO members (id, name, email, phone, entityId, nationalId, joinedAt)
@@ -650,7 +644,6 @@ function init(d: Database.Database) {
     `);
   } catch {}
 
-  // Ensure attendance table
   if (!hasTable(d, "event_attendance")) {
     try {
       d.exec(`
@@ -668,7 +661,6 @@ function init(d: Database.Database) {
   d.exec(`PRAGMA foreign_keys = ON; PRAGMA recursive_triggers = OFF;`);
 }
 
-/* ===================== Public API ===================== */
 export function getDB() {
   if (db) {
     try {

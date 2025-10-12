@@ -37,10 +37,13 @@ type Me = {
 
 type EntityLite = { id: string; name: string; status?: string };
 
+/* ---------- جلسة: Base64URL بدون padding ---------- */
 function sessionHeaderB64() {
   try {
     const raw = localStorage.getItem("session") || "";
-    return raw ? btoa(unescape(encodeURIComponent(raw))) : "";
+    if (!raw) return "";
+    return btoa(unescape(encodeURIComponent(raw)))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/,"");
   } catch { return ""; }
 }
 function withSession(init: RequestInit = {}): RequestInit {
@@ -60,9 +63,8 @@ export default function ProfilePage() {
   const [entities, setEntities] = useState<EntityLite[]>([]);
   const [currentEntityId, setCurrentEntityId] = useState<string | null>(null);
 
-  // حالات طلب المغادرة (بدل الخروج الفوري)
+  // حالة زر الطلب
   const [leaving, setLeaving] = useState(false);
-  const [leaveRequested, setLeaveRequested] = useState(false);
 
   const [managedEntities, setManagedEntities] = useState<EntityLite[]>([]);
   const managedEntity = managedEntities[0] || null;
@@ -97,7 +99,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!session?.id) return;
     setLoading(true);
-    fetch(`/api/me?id=${encodeURIComponent(session.id)}`, { cache: "no-store" })
+    fetch(`/api/me?id=${encodeURIComponent(session.id)}`, withSession())
       .then(r => (r.ok ? r.json() : Promise.reject()))
       .then((u: Me) => setMe(u))
       .catch(() => {})
@@ -106,7 +108,7 @@ export default function ProfilePage() {
 
   // load entities list (names map)
   useEffect(() => {
-    fetch("/api/entities", { cache: "no-store" })
+    fetch("/api/entities", withSession())
       .then(r => (r.ok ? r.json() : []))
       .then((rows: any) => {
         const arr: EntityLite[] = Array.isArray(rows) ? rows : Array.isArray(rows?.entities) ? rows.entities : [];
@@ -138,7 +140,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!session?.id || me?.role !== "entityManager") { setManagedEntities([]); return; }
     const url = `/api/entities?viewerId=${encodeURIComponent(session.id)}&role=entityManager&scope=mine`;
-    fetch(url, { cache: "no-store" })
+    fetch(url, withSession())
       .then(r => (r.ok ? r.json() : []))
       .then((list: any[]) => setManagedEntities(Array.isArray(list) ? list : []))
       .catch(() => setManagedEntities([]));
@@ -152,37 +154,39 @@ export default function ProfilePage() {
 
   const byId = useMemo(() => new Map(entities.map(e => [String(e.id), e.name])), [entities]);
 
-  // إرسال "طلب مغادرة" بدلاً من الخروج الفوري
-const requestLeaveEntity = async () => {
-  if (!currentEntityId || !me || me.role !== "user") return;
-  if (!confirm("هل تريد إرسال طلب مغادرة الكيان الحالي؟ سيتم مراجعته من مدير الكيان ثم من مسؤول الاتحاد.")) return;
+  /* ---------- إرسال طلب مغادرة ---------- */
+  const requestLeave = async () => {
+    if (!currentEntityId || !me || me.role !== "user") return;
 
-  try {
-    setLeaving(true);
-    // ✅ تصحيح المسار: /api/membership/leave (مفرد) وليس /api/memberships/leave
-    const r = await fetch("/api/membership/leave", withSession({
-      method: "POST",
-      body: JSON.stringify({ entityId: currentEntityId }) // reason اختياري
-    }));
+    const reason = prompt("يمكنك كتابة سبب المغادرة (اختياري):") || null;
+    if (!confirm("هل تريد إرسال طلب مغادرة الكيان؟ سيقوم بمراجعته مدير الكيان أو مسؤول الاتحاد.")) return;
 
-    const data = await r.json().catch(() => ({} as any));
+    try {
+      setLeaving(true);
+      const r = await fetch("/api/entities/requests", withSession({
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }));
+      const data = await r.json().catch(() => ({} as any));
 
-    if (r.status === 202) {
-      setLeaveRequested(true);
-      alert(data?.message || "تم إرسال طلب المغادرة. بانتظار موافقة مدير الكيان ثم مسؤول الاتحاد.");
-    } else if (!r.ok) {
-      throw new Error(data?.error || "تعذر إرسال طلب المغادرة");
-    } else {
-      // لو رجع 200 لأي سبب
-      setLeaveRequested(true);
-      alert(data?.message || "تم استلام طلبك.");
+      if (r.status === 202) {
+        alert(
+          (data?.message || "تم إرسال طلب المغادرة.") +
+          (data?.requestId ? `\nرقم الطلب: ${data.requestId}` : "")
+        );
+        // ممكن توجهه لمتابعة الطلبات:
+        // router.push("/dashboard/leave-requests-pro");
+      } else if (!r.ok) {
+        alert(data?.error || "تعذر إرسال الطلب");
+      } else {
+        alert("تم إرسال الطلب.");
+      }
+    } catch (e: any) {
+      alert(String(e?.message || e || "تعذر إرسال الطلب"));
+    } finally {
+      setLeaving(false);
     }
-  } catch (e: any) {
-    alert("تعذر إتمام العملية: " + String(e?.message || e));
-  } finally {
-    setLeaving(false);
-  }
-};
+  };
 
   const entityField: React.ReactNode = useMemo(() => {
     if (!me) return "غير منضم لكيان";
@@ -222,17 +226,17 @@ const requestLeaveEntity = async () => {
           </span>
         )}
         <button
-          onClick={requestLeaveEntity}
-          disabled={leaving || leaveRequested}
+          onClick={requestLeave}
+          disabled={leaving}
           className="h-8 px-3 rounded-full inline-flex items-center gap-2 font-semibold disabled:opacity-60"
           style={{ background: COLORS.primary, color: "#FFFFFF" }}
-          title={leaveRequested ? "تم إرسال طلب المغادرة بالفعل" : "إرسال طلب مغادرة"}
+          title="إرسال طلب مغادرة للكيان"
         >
-          {leaving ? "جارٍ الإرسال..." : (leaveRequested ? "تم إرسال طلب المغادرة" : "طلب مغادرة")}
+          {leaving ? "جارٍ الإرسال..." : "طلب مغادرة"}
         </button>
       </div>
     );
-  }, [me, byId, currentEntityId, leaving, leaveRequested, managedEntity?.name, managerSuspended, myEntityMine?.name, userSuspended]);
+  }, [me, byId, currentEntityId, leaving, managedEntity?.name, managerSuspended, myEntityMine?.name, userSuspended]);
 
   const shownNationalId = useMemo(() => me?.nationalId ?? "-", [me]);
   const suspendedBanner = managerSuspended || userSuspended;
@@ -248,9 +252,9 @@ const requestLeaveEntity = async () => {
 
     const fetchActors = async () => {
       try {
-        let res = await fetch(`/api/entities/${entityId}/events?type=suspended&limit=5`, { cache: "no-store" });
+        let res = await fetch(`/api/entities/${entityId}/events?type=suspended&limit=5`, withSession());
         if (!res.ok) {
-          res = await fetch(`/api/entities/${entityId}?events=1&type=suspended&limit=5`, { cache: "no-store" });
+          res = await fetch(`/api/entities/${entityId}?events=1&type=suspended&limit=5`, withSession());
         }
         const data = await res.json().catch(() => ({}));
         const names = Array.isArray(data?.events)
@@ -280,7 +284,7 @@ const requestLeaveEntity = async () => {
               <div className="font-semibold mb-0.5">الكيان موقوف مؤقتًا</div>
               <div>
                 {me?.role === "user"
-                  ? "لن تتمكن من تنفيذ إجراءات على الكيان الآن. يمكنك طلب مغادرة الكيان أو الانتظار حتى يتم استئنافه."
+                  ? "لا يمكن تنفيذ إجراءات داخل الكيان الآن. يمكنك إرسال طلب مغادرة أو الانتظار حتى يتم استئنافه."
                   : "لن تتمكن من تنفيذ إجراءات على الكيان الآن. غيّر الكيان أو انتظر حتى يتم استئنافه."}
               </div>
               {suspendActors.length > 0 && (
@@ -376,7 +380,6 @@ const requestLeaveEntity = async () => {
                   {/* الأزرار الجانبية */}
                   {["user", "entityManager", "unionSupervisor"].includes(me.role) && (
                     <>
-                      {/* ✅ زر سجل المنصّة/العضوية — يظهر لكل الأدوار */}
                       <button
                         onClick={() => router.push("/profile/history")}
                         className="mt-4 h-9 px-3 rounded-xl inline-flex items-center justify-center gap-2 font-semibold"
@@ -387,7 +390,6 @@ const requestLeaveEntity = async () => {
                         سجل المنصّة
                       </button>
 
-                      {/* كارت العضوية — يظهر للجميع */}
                       <button
                         onClick={() => router.push("/profile/card")}
                         className="mt-2 h-9 px-3 rounded-xl inline-flex items-center justify-center gap-2 font-semibold"
@@ -404,7 +406,7 @@ const requestLeaveEntity = async () => {
                 {/* العمود الأيمن: معلومات */}
                 <div className="rounded-2xl p-4 space-y-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
                   <InfoRow icon={<User className="h-4 w-4" />} label="الاسم" value={me.name || "-"} />
-                  <InfoRow icon={<Mail className="h-4 w-4" />} label="البريد الإلكتروني" value={me.email || "-"} />
+                  <InfoRow icon={<Mail className="h-4 و-4" />} label="البريد الإلكتروني" value={me.email || "-"} />
                   <InfoRow icon={<Hash className="h-4 w-4" />} label="الرقم القومي" value={shownNationalId || "-"} />
                   <InfoRow icon={<Phone className="h-4 w-4" />} label="الهاتف" value={me.phone || "-"} />
                   <InfoRow icon={<MapPin className="h-4 w-4" />} label="المدينة" value={me.city || "-"} />
@@ -452,7 +454,7 @@ const requestLeaveEntity = async () => {
                 <X className="h-4 w-4" />
               </button>
               <div className="w-[min(92vw,720px)] h-[min(80vh,720px)] grid place-items-center bg-black">
-                <img src={me.avatar} alt={me.name} className="max-w-full max-h-full object-contain" />
+                <img src={me.avatar} alt={me.name} className="max-w/full max-h-full object-contain" />
               </div>
             </div>
           </div>
@@ -498,8 +500,7 @@ function HeaderBar() {
   return (
     <header className="relative z-10">
       <div className="mx-auto max-w-6xl px-4">
-        {/* ✅ إصلاح خطأ حرفي في قيمة الـshadow (rgba بدل rgrgba) */}
-        <div className="mt-4 h-14 w-full rounded-2xl flex items-center justify-between px-4 bg-white border border-[#E7E2DC] shadow-[0_6px_12px_rgba(0,0,0,0.04)]">
+        <div className="mt-4 h-14 w-full rounded-٢xl flex items-center justify-between px-4 bg-white border border-[#E7E2DC] shadow-[0_6px_12px_rgba(0,0,0,0.04)]">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-[#F6F6F6] border border-[#E5E5E5]">
               <Users className="h-5 w-5 text-[#1D1D1D]" />

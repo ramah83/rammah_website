@@ -1,3 +1,4 @@
+// app/dashboard/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -16,6 +17,7 @@ import {
   LogOut,
   Check,
   AlertTriangle,
+  LogOut as LogOutIcon,
 } from "lucide-react";
 import { Cairo } from "next/font/google";
 
@@ -284,7 +286,6 @@ export default function DashboardPage() {
     <div className={`${cairo.className} relative min-h-screen overflow-hidden flex flex-col bg-[#EFE6DE]`}>
       <HeaderBar />
 
-      {/* تنبيه التوقيف */}
       {(managerSuspended || userSuspended) && (
         <div className="mx-auto max-w-6xl w-full px-4 mt-4">
           <div className="rounded-xl p-3 md:p-4 flex items-start gap-3 bg-[#FFF7E6] border border-[#FFE2B5]">
@@ -314,7 +315,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* رأس الصفحة */}
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-6">
         <div className="rounded-[22px] p-4 md:p-6 flex items-center justify-between bg-white border border-[#E7E2DC] shadow-[0_8px_18px_rgba(0,0,0,0.05)]">
           <div>
@@ -334,7 +334,6 @@ export default function DashboardPage() {
                   )}
                 </span>
 
-                {/* شارة التوقيف */}
                 {(managerSuspended || userSuspended) && (
                   <span className="inline-flex items-center gap-1 rounded-full px-3 h-8 text-sm bg-[#FFF0F0] text-[#7A0010] border border-[#F5C2C7]">
                     موقوف مؤقتًا
@@ -363,7 +362,6 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* المحتوى */}
       <main className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-6 space-y-6 pb-10">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard
@@ -399,7 +397,6 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="pt-4">
             <Tabs defaultValue="events" className="w-full">
-              {/* تبويبات */}
               <TabsList className="grid grid-cols-2 md:grid-cols-6 gap-2 rounded-full p-1 bg-[#F6F6F6] border border-[#E7E2DC]">
                 <Tab value="overview" label="الملخص" />
                 <Tab value="entities" label="الكيانات" />
@@ -517,6 +514,22 @@ export default function DashboardPage() {
                   />
                 )}
 
+                {/* ✅ جديد: صفحة طلبات مغادرة العضوية */}
+                {(session?.role === "unionSupervisor" || session?.role === "entityManager") && (
+                  <UnitCard
+                    icon={<LogOutIcon className="h-5 w-5 text-[#1D1D1D]" />}
+                    title={session?.role === "unionSupervisor" ? "طلبات مغادرة من الكيانات" : "طلبات مغادرة كيانك"}
+                    desc={
+                      session?.role === "unionSupervisor"
+                        ? "قائمة بالأعضاء الذين تم تصعيد طلباتهم لك للموافقة النهائية على المغادرة."
+                        : "طلبات مغادرة كيانك من الأعضاء — وافق أو ارفض (سيتم تصعيد الموافق للاتحاد)."
+                    }
+                    href="/dashboard/leave-requests"
+                    blocked={false}
+                    onOpen={(href) => guardNavigate(href)}
+                  />
+                )}
+
                 {session?.role === "unionSupervisor" && (
                   <>
                     <UnitCard
@@ -565,31 +578,7 @@ export default function DashboardPage() {
                   className="rounded-xl px-3 py-3 flex items-center justify-between bg-[#F6F6F6] border border-[#E7E2DC]"
                   style={{ boxShadow: "0 6px 12px rgba(0,0,0,0.04)" }}
                 >
-                  <span className="text-sm text-[#6B6B6B]">إجراءات سريعة على الفعاليات</span>
-                  <div className="flex items-center gap-2">
-                    {session?.role === "user" && (
-                      <button
-                        onClick={() => guardNavigate("/evaluations/new")}
-                        className="inline-flex items-center h-10 px-4 rounded-full font-semibold bg-[#EC1A24] text-white disabled:opacity-60"
-                        disabled={suspendedAny}
-                        title={suspendedAny ? "الكيان متوقف — لا يمكن تنفيذ الإجراء حاليًا" : undefined}
-                      >
-                        تقييم فعالية
-                        <CalendarDays className="h-4 w-4 ms-2" />
-                      </button>
-                    )}
-                    {session?.role === "entityManager" && (
-                      <button
-                        onClick={() => guardNavigate("/manager/evaluations")}
-                        className="inline-flex items-center h-10 px-4 rounded-full font-semibold bg-[#EC1A24] text-white disabled:opacity-60"
-                        disabled={suspendedAny}
-                        title={suspendedAny ? "الكيان متوقف — لا يمكن تنفيذ الإجراء حاليًا" : undefined}
-                      >
-                        عرض تقييمات الكيان
-                        <ArrowRight className="h-4 w-4 ms-2" />
-                      </button>
-                    )}
-                  </div>
+
                 </div>
               </TabsContent>
 
@@ -656,7 +645,7 @@ function HeaderBar() {
   return (
     <header className="relative z-10">
       <div className="mx-auto max-w-6xl px-4">
-        <div className="mt-4 h-14 w-full rounded-2xl flex items-center justify-between px-4 bg-white border border-[#E7E2DC] shadow-[0_6px_12px_rgba(0,0,0,0.04)]">
+        <div className="mt-4 h-14 w-full rounded-ص2 flex items-center justify-between px-4 bg-white border border-[#E7E2DC] shadow-[0_6px_12px_rgba(0,0,0,0.04)]">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-[#F6F6F6] border border-[#E5E5E5]">
               <Users className="h-5 w-5 text-[#1D1D1D]" />

@@ -8,8 +8,13 @@ import bcrypt from "bcryptjs";
 import { getDB } from "@/lib/server/sqlite";
 import { getSession } from "@/lib/server/session";
 
+/* ================== Helpers ================== */
 const P = <T = any>(s: any) => {
-  try { return JSON.parse(s ?? "null") as T; } catch { return null as any; }
+  try {
+    return JSON.parse(s ?? "null") as T;
+  } catch {
+    return null as any;
+  }
 };
 const J = (v: any) => JSON.stringify(v ?? null);
 
@@ -21,15 +26,17 @@ function isBcryptHash(v?: string | null) {
   return !!v && /^\$2[aby]\$\d{2}\$/.test(v);
 }
 
-
 function okPasswordComplexity(pwd: string) {
+  // على الأقل 8 حروف وتحتوي رقمًا وحرفًا
   return /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(pwd);
 }
 
+/* ================== GET ================== */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
   const email = searchParams.get("email");
+
   if (!id && !email) {
     return NextResponse.json({ error: "missing id/email" }, { status: 400 });
   }
@@ -39,7 +46,9 @@ export async function GET(req: NextRequest) {
     ? db.prepare(`SELECT * FROM users WHERE id=?`).get(id)
     : db.prepare(`SELECT * FROM users WHERE email=?`).get(email);
 
-  if (!row) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!row) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
 
   const user = {
     id: row.id,
@@ -59,6 +68,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(user, { status: 200 });
 }
 
+/* ================== PATCH ================== */
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
@@ -81,22 +91,27 @@ export async function PATCH(req: NextRequest) {
     if (!effectiveId) {
       return NextResponse.json({ error: "missing id" }, { status: 400 });
     }
+
+    // منع تحديث بيانات مستخدم آخر
     if (session?.id && bodyId && session.id !== bodyId) {
       return NextResponse.json({ error: "غير مصرح" }, { status: 403 });
     }
 
     const db = getDB();
     const row: any = db.prepare(`SELECT * FROM users WHERE id=?`).get(effectiveId);
-    if (!row) return NextResponse.json({ error: "not found" }, { status: 404 });
+    if (!row) {
+      return NextResponse.json({ error: "not found" }, { status: 404 });
+    }
 
-    const nextName   = typeof name   === "string" ? (name.trim()   || row.name) : row.name;
-    const nextPhone  = typeof phone  === "string" ? (phone.trim()  || null)     : (row.phone ?? null);
-    const nextCity   = typeof city   === "string" ? (city.trim()   || null)     : (row.city ?? null);
-    const nextBio    = typeof bio    === "string" ? (bio.trim()    || null)     : (row.bio ?? null);
-    const nextAvatar = typeof avatar === "string" ? (avatar.trim() || null)     : (row.avatar ?? null);
-    const nextInterests = Array.isArray(interests) ? J(interests) : (row.interests ?? J([]));
+    /* ====== تحديث الحقول العامة ====== */
+    const nextName = typeof name === "string" ? name.trim() || row.name : row.name;
+    const nextPhone = typeof phone === "string" ? phone.trim() || null : row.phone ?? null;
+    const nextCity = typeof city === "string" ? city.trim() || null : row.city ?? null;
+    const nextBio = typeof bio === "string" ? bio.trim() || null : row.bio ?? null;
+    const nextAvatar = typeof avatar === "string" ? avatar.trim() || null : row.avatar ?? null;
+    const nextInterests = Array.isArray(interests) ? J(interests) : row.interests ?? J([]);
 
-    
+    /* ====== الرقم القومي ====== */
     let nextNationalId = row.nationalId ?? null;
     if (nationalId !== undefined) {
       if (row.nationalId) {
@@ -112,19 +127,20 @@ export async function PATCH(req: NextRequest) {
       nextNationalId = nationalId;
     }
 
-    
+    /* ====== كلمة المرور ====== */
     let willUpdatePassword = false;
     let newPasswordHash: string | undefined;
 
-    const hasStoredHash  = !!row.passwordHash;
+    const hasStoredHash = !!row.passwordHash;
     const hasLegacyField = row.password != null && row.password !== "";
 
     if (newPassword) {
       if (!okPasswordComplexity(String(newPassword))) {
-        return NextResponse.json({ error: "كلمة السر الجديدة يجب أن تكون 8 أحرف على الأقل وتحتوي على حروف وأرقام" }, { status: 400 });
+        return NextResponse.json({
+          error: "كلمة السر الجديدة يجب أن تكون 8 أحرف على الأقل وتحتوي على حروف وأرقام",
+        }, { status: 400 });
       }
 
-      
       const hadAnyPassword = hasStoredHash || hasLegacyField;
       if (hadAnyPassword) {
         if (!oldPassword) {
@@ -133,24 +149,22 @@ export async function PATCH(req: NextRequest) {
 
         let okOld = false;
 
-        
+        // تحقق من كلمة السر الحالية
         if (hasStoredHash && bcrypt.compareSync(String(oldPassword), String(row.passwordHash))) {
           okOld = true;
         } else if (hasLegacyField) {
-          
           if (isBcryptHash(row.password)) {
-            
+            // migrate legacy bcrypt hash
             if (bcrypt.compareSync(String(oldPassword), String(row.password))) {
               okOld = true;
-              db.prepare(`UPDATE users SET passwordHash=?, password=NULL WHERE id=?`).run(row.password, effectiveId);
+              db.prepare(`UPDATE users SET passwordHash=?, password=NULL WHERE id=?`)
+                .run(row.password, effectiveId);
             }
-          } else {
-            
-            if (String(oldPassword) === String(row.password)) {
-              okOld = true;
-              const migrated = bcrypt.hashSync(String(oldPassword), 10);
-              db.prepare(`UPDATE users SET passwordHash=?, password=NULL WHERE id=?`).run(migrated, effectiveId);
-            }
+          } else if (String(oldPassword) === String(row.password)) {
+            okOld = true;
+            const migrated = bcrypt.hashSync(String(oldPassword), 10);
+            db.prepare(`UPDATE users SET passwordHash=?, password=NULL WHERE id=?`)
+              .run(migrated, effectiveId);
           }
         }
 
@@ -158,15 +172,15 @@ export async function PATCH(req: NextRequest) {
           return NextResponse.json({ error: "كلمة السر الحالية غير صحيحة" }, { status: 400 });
         }
       }
-      
 
+      // تعيين كلمة السر الجديدة
       newPasswordHash = bcrypt.hashSync(String(newPassword), 10);
       willUpdatePassword = true;
     } else if (oldPassword && !newPassword) {
       return NextResponse.json({ error: "يرجى إدخال كلمة السر الجديدة" }, { status: 400 });
     }
 
-    
+    /* ====== تنفيذ التحديث ====== */
     const sql = `
       UPDATE users
          SET name=?,
@@ -179,6 +193,7 @@ export async function PATCH(req: NextRequest) {
              ${willUpdatePassword ? `, passwordHash=?, password=NULL` : ``}
        WHERE id=?
     `;
+
     const params: any[] = [
       nextName,
       nextPhone,
@@ -193,6 +208,7 @@ export async function PATCH(req: NextRequest) {
 
     db.prepare(sql).run(...params);
 
+    /* ====== نتيجة التحديث ====== */
     const after: any = db.prepare(`SELECT * FROM users WHERE id=?`).get(effectiveId);
     const user = {
       id: after.id,
@@ -208,8 +224,10 @@ export async function PATCH(req: NextRequest) {
       bio: after.bio ?? null,
       avatar: after.avatar ?? null,
     };
+
     return NextResponse.json(user, { status: 200 });
   } catch (err: any) {
+    console.error("PATCH /api/users error:", err);
     return NextResponse.json({ error: err?.message || "Internal Server Error" }, { status: 500 });
   }
 }

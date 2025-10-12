@@ -34,6 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   if (action === "approve") {
+    const decidedBy = s.name || s.id;
     const tx = (db as any).transaction(() => {
       const existing = db.prepare(
         `SELECT entityId FROM entity_members WHERE userId=? LIMIT 1`
@@ -47,16 +48,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
                    decidedAt=datetime('now'),
                    decidedBy=?
              WHERE id=?
-          `).run(s.id, id);
+          `).run(decidedBy, id);
         } else {
           db.prepare(`
             UPDATE join_requests
                SET status='joined_elsewhere',
                    decidedAt=datetime('now'),
                    decidedBy=?,
-                   note=COALESCE(note,'تم إغلاق الطلب تلقائيًا لانضمام المستخدم إلى كيان آخر')
+                   note=COALESCE(NULLIF(note,''),'تم إغلاق الطلب تلقائيًا لانضمام المستخدم إلى كيان آخر')
              WHERE id=?
-          `).run(s.id, id);
+          `).run(decidedBy, id);
         }
         return;
       }
@@ -67,7 +68,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
                decidedAt=datetime('now'),
                decidedBy=?
          WHERE id=?
-      `).run(s.id, id);
+      `).run(decidedBy, id);
 
       db.prepare(`
         INSERT OR IGNORE INTO entity_members (id, entityId, userId, joinedAt)
@@ -79,9 +80,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
            SET status='joined_elsewhere',
                decidedAt=datetime('now'),
                decidedBy=?,
-               note=COALESCE(note,'تم إغلاق الطلب تلقائيًا لانضمام المستخدم إلى كيان آخر')
+               note=COALESCE(NULLIF(note,''),'تم إغلاق الطلب تلقائيًا لانضمام المستخدم إلى كيان آخر')
          WHERE userId=? AND status='pending' AND id<>?
-      `).run(s.id, row.userId, id);
+      `).run(decidedBy, row.userId, id);
     });
 
     try {
@@ -94,13 +95,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   if (action === "reject") {
+    const decidedBy = s.name || s.id;
     db.prepare(`
       UPDATE join_requests
          SET status='rejected',
              decidedAt=datetime('now'),
              decidedBy=?
        WHERE id=?
-    `).run(s.id, id);
+    `).run(decidedBy, id);
     return NextResponse.json({ ok: true, status: "rejected" });
   }
 

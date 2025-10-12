@@ -1,24 +1,7 @@
 {
-  "/api/entities/route": "app/api/entities/route.js",
-  "/api/admin/current-admins/route": "app/api/admin/current-admins/route.js",
-  "/api/me/route": "app/api/me/route.js",
-  "/api/stats/route": "app/api/stats/route.js",
-  "/api/auth/login/route": "app/api/auth/login/route.js",
-  "/api/iso/route": "app/api/iso/route.js",
-  "/api/membership/my/route": "app/api/membership/my/route.js",
-  "/api/events/route": "app/api/events/route.js",
-  "/api/members/route": "app/api/members/route.js",
-  "/api/join-requests/route": "app/api/join-requests/route.js",
-  "/api/entities/requests/route": "app/api/entities/requests/route.js",
-  "/api/join-requests/[id]/route": "app/api/join-requests/[id]/route.js",
-  "/api/entities/[id]/route": "app/api/entities/[id]/route.js",
-  "/api/entities/[id]/events/route": "app/api/entities/[id]/events/route.js",
-  "/api/membership/leave/route": "app/api/membership/leave/route.js",
-  "/page": "app/page.js",
-  "/members/page": "app/members/page.js",
+  "/events/page": "app/events/page.js",
+  "/iso/page": "app/iso/page.js",
   "/profile/page": "app/profile/page.js",
-  "/entities/page": "app/entities/page.js",
   "/dashboard/page": "app/dashboard/page.js",
-  "/dashboard/entity-requests/page": "app/dashboard/entity-requests/page.js",
-  "/dashboard/requests/page": "app/dashboard/requests/page.js"
+  "/dashboard/leave-requests/page": "app/dashboard/leave-requests/page.js"
 }

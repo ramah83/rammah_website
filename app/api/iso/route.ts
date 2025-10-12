@@ -21,7 +21,7 @@ type DBRow = {
   id: string;
   code: string;
   title: string;
-  ownerEntityId: string | null;
+  ownerEntityId: string | null; // يمكن أن تكون 'all'
   status: string;
   version: string | null;
   tags: string | null;
@@ -31,12 +31,8 @@ type DBRow = {
   updatedAt: string;
 };
 
-function ok(data: any, status = 200) {
-  return NextResponse.json(data, { status });
-}
-function err(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
+function ok(data: any, status = 200) { return NextResponse.json(data, { status }); }
+function err(message: string, status = 400) { return NextResponse.json({ error: message }, { status }); }
 
 function decodeB64(s?: string | null) {
   if (!s) return "";
@@ -109,6 +105,17 @@ function serialize(r: DBRow) {
   };
 }
 
+// يجيب كيان العضو من الجلسة أو جدول العضوية
+function getUserEntityId(db: ReturnType<typeof getDB>, s: Session | null): string | null {
+  if (!s) return null;
+  if (s.entityId) return String(s.entityId);
+  try {
+    const row = db.prepare(`SELECT entityId FROM entity_members WHERE userId=? LIMIT 1`).get(s.id) as { entityId?: string } | undefined;
+    return row?.entityId ? String(row.entityId) : null;
+  } catch { return null; }
+}
+
+// ===================== LIST =====================
 export async function GET(req: Request) {
   try {
     const ses = await getSession();
@@ -118,57 +125,45 @@ export async function GET(req: Request) {
     const q = (searchParams.get("q") || "").trim();
     const entityIdParam = searchParams.get("entityId");
     const statusRaw = searchParams.get("status");
-    const scope = searchParams.get("scope") || "all"; 
 
     const where: string[] = [];
     const params: any[] = [];
 
-    
     if (!ses) {
-      
-      where.push(`status = 'approved'`);
+      // زائر: لا شيء (لو عايز تعرض العام لغير مسجلين، بدّل السطرين دول)
+      return ok([]);
     } else if (ses.role === "user") {
-      
-      
-      const row = db.prepare(`SELECT entityId FROM entity_members WHERE userId=? LIMIT 1`).get(ses.id) as { entityId?: string } | undefined;
-      const userEntityId = row?.entityId || (ses.entityId ? String(ses.entityId) : null);
-      if (!userEntityId) {
-        
-        return ok([]);
-      }
+      // العضو: approved فقط على كيانه أو العام
+      const userEntityId = getUserEntityId(db, ses);
+      if (!userEntityId) return ok([]);
       where.push(`status = 'approved'`);
-      where.push(`ownerEntityId = ?`);
-      params.push(String(userEntityId));
+      where.push(`(ownerEntityId = 'all' OR ownerEntityId = ?)`);
+      params.push(userEntityId);
+      // نتجاهل entityId/status الواردة من الواجهة
     } else if (ses.role === "entityManager") {
-      
-      where.push(`ownerEntityId = ?`);
+      // مدير الكيان: كيانه + العام
+      where.push(`(ownerEntityId = ? OR ownerEntityId = 'all')`);
       params.push(String(ses.entityId || ""));
+      const allowed = new Set(["draft","submitted","review","approved","rejected"]);
+      if (statusRaw && statusRaw !== "all" && allowed.has(statusRaw)) {
+        where.push(`status = ?`);
+        params.push(statusRaw);
+      }
+      // نتجاهل entityId لعدم الخروج من نطاق الكيان
     } else {
-      
+      // unionSupervisor: يرى الكل + فلاتر
+      if (entityIdParam && entityIdParam !== "all") {
+        where.push(`ownerEntityId = ?`);
+        params.push(entityIdParam);
+      }
+      const allowed = new Set(["draft","submitted","review","approved","rejected"]);
+      if (statusRaw && statusRaw !== "all" && allowed.has(statusRaw)) {
+        where.push(`status = ?`);
+        params.push(statusRaw);
+      }
     }
 
-    
-    if (entityIdParam && entityIdParam !== "all" && ses?.role === "unionSupervisor") {
-      where.push(`ownerEntityId = ?`);
-      params.push(entityIdParam);
-    }
-
-    
-    const allowed = new Set(["draft", "submitted", "review", "approved", "rejected"]);
-    if (statusRaw && statusRaw !== "all" && allowed.has(statusRaw)) {
-      where.push(`status = ?`);
-      params.push(statusRaw);
-    }
-
-    
-    if (scope === "mine" && ses?.role && ses.role !== "unionSupervisor") {
-      where.push(`ownerEntityId = ?`);
-      params.push(String(ses?.entityId || ""));
-    } else if (scope === "public") {
-      where.push(`status = 'approved'`);
-    }
-
-    
+    // البحث داخل نطاق الرؤية فقط
     if (q) {
       where.push(`(code LIKE ? OR title LIKE ? OR COALESCE(tags,'') LIKE ? OR COALESCE(description,'') LIKE ?)`);
       params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
@@ -185,6 +180,7 @@ export async function GET(req: Request) {
   }
 }
 
+// ===================== CREATE =====================
 export async function POST(req: Request) {
   try {
     const db = ensureISOTables();
@@ -203,18 +199,18 @@ export async function POST(req: Request) {
 
     let ownerEntityId: string | null = null;
     if (ses.role === "unionSupervisor") {
+      // المشرف يقدر يحدد 'all' أو كيان ما
       ownerEntityId = b?.ownerEntityId ? String(b.ownerEntityId) : (ses?.entityId ?? null);
     } else {
-      
+      // مدير كيان: على كيانه فقط
       ownerEntityId = String(ses.entityId || "");
     }
 
     const statusStr = String(b?.status || "draft");
-    const allowed: ISOStatus[] = ["draft", "submitted", "review", "approved", "rejected"];
-    
+    const allowed: ISOStatus[] = ["draft","submitted","review","approved","rejected"];
     const status: ISOStatus =
       ses.role === "entityManager"
-        ? (["draft", "submitted"].includes(statusStr) ? (statusStr as ISOStatus) : "draft")
+        ? (["draft","submitted"].includes(statusStr) ? (statusStr as ISOStatus) : "draft")
         : (allowed.includes(statusStr as ISOStatus) ? (statusStr as ISOStatus) : "draft");
 
     if (!code) return err("كود النموذج مطلوب", 400);
@@ -225,7 +221,7 @@ export async function POST(req: Request) {
       return err("غير مصرح: يمكنك الإضافة على كيانك فقط", 403);
     }
 
-    
+    // منع تكرار الكود داخل نفس الكيان (يشمل 'all')
     const dup = db.prepare(`SELECT 1 FROM iso WHERE code = ? AND ownerEntityId = ? LIMIT 1`).get(code, ownerEntityId);
     if (dup) return err("الكود مستخدم مسبقًا داخل نفس الكيان", 409);
 

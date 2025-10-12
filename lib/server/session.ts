@@ -19,13 +19,18 @@ export type Session = {
 /** تحويل أسماء أدوار متباينة إلى الدور الأساسي */
 function normalizeRole(role?: string | null): UserRole | null {
   if (!role) return null;
-  const r = String(role);
-  if (r === "systemAdmin") return "unionSupervisor";
-  if (r === "qualitySupervisor") return "unionSupervisor";
-  if (r === "youth") return "user";
-  return r as UserRole;
-}
+  const r = String(role).trim();
 
+  if (["unionSupervisor","entityManager","user"].includes(r)) return r as CoreRole;
+
+  if (["systemAdmin","superadmin","root","unionAdmin","unionSupervisorRole","qualitySupervisor"].includes(r)) return "unionSupervisor";
+
+  if (["manager","entity_manager","entityAdmin","entitySupervisor","orgManager","org_admin"].includes(r)) return "entityManager";
+
+  if (["youth","member","basic","viewer"].includes(r)) return "user";
+
+  return "user";
+}
 /** حارس نوع: هل القيمة واحدة من أدوارنا الأساسية؟ */
 function isCoreRole(r: any): r is CoreRole {
   return r === "unionSupervisor" || r === "entityManager" || r === "user";
@@ -42,7 +47,7 @@ function tryJSON(str: string): any | null {
   try { return JSON.parse(str); } catch { return null; }
 }
 
-function fromBase64Any(v: string): string {
+export function fromBase64Any(v: string): string {
   let s = v.trim();
   try { s = decodeURIComponent(s); } catch {}
   s = s.replace(/-/g, "+").replace(/_/g, "/");

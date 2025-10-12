@@ -97,8 +97,20 @@ const CAN_TRANSITION: Record<ISOStatus, ISOStatus[]> = {
 export async function GET(_req: Request, ctx: { params: { id: string } }) {
   try {
     const db = ensureISOTables();
-    const row = db.prepare(`SELECT * FROM iso WHERE id=?`).get(ctx.params.id);
+    const row = db.prepare(`SELECT * FROM iso WHERE id=?`).get(ctx.params.id) as any;
     if (!row) return NextResponse.json({ error: "غير موجود" }, { status: 404 });
+
+    // تقييد العرض للعضو: فقط المعتمد لكيانه أو العام
+    const s = await getSession();
+    if (s?.role === "user") {
+      const isApproved = String(row.status) === "approved";
+      const visible =
+        isApproved &&
+        (String(row.ownerEntityId) === "all" ||
+         (s.entityId && String(row.ownerEntityId) === String(s.entityId)));
+      if (!visible) return NextResponse.json({ error: "غير موجود" }, { status: 404 });
+    }
+
     return NextResponse.json(serialize(row));
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
@@ -135,16 +147,16 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
     if (typeof body?.description === "string") fields.description = body.description.trim();
     if (typeof body?.fileUrl === "string") fields.fileUrl = body.fileUrl.trim();
     if (typeof body?.ownerEntityId === "string") {
-      
       if (!isSupervisor) {
         return NextResponse.json({ error: "غير مصرح: لا يمكنك تغيير الكيان المالك" }, { status: 403 });
       }
+      // يسمح بتعيين 'all'
       fields.ownerEntityId = body.ownerEntityId.trim();
     }
     if (typeof body?.status === "string") {
       const next = body.status as ISOStatus;
       if (!ALLOWED.includes(next)) return NextResponse.json({ error: "status غير صالح" }, { status: 400 });
-      
+
       if (isEntityMgr) {
         const allowedNext = new Set(CAN_TRANSITION[before.status as ISOStatus] || []);
         if (!allowedNext.has(next)) {
@@ -163,7 +175,7 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
     const values = Object.keys(fields).map(k => fields[k]);
     db.prepare(`UPDATE iso SET ${setSql} WHERE id=?`).run(...values, id);
 
-    
+    // Audit
     const changedStatus = typeof fields.status !== "undefined";
     const noteParts: string[] = [];
     ["title", "code", "version", "tags", "description", "fileUrl", "ownerEntityId"].forEach(k => {
@@ -209,8 +221,10 @@ export async function DELETE(_req: Request, ctx: { params: { id: string } }) {
     }
 
     db.prepare("DELETE FROM iso WHERE id=?").run(id);
-    db.prepare("INSERT INTO iso_audit (id, isoId, actorId, actorRole, action, fromStatus, toStatus, note, at) VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(id, s.id, s.role, "delete", row.status, null, null, new Date().toISOString());
+    db.prepare(`
+      INSERT INTO iso_audit (id, isoId, actorId, actorRole, action, fromStatus, toStatus, note, at)
+      VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, s.id, s.role, "delete", row.status, null, null, new Date().toISOString());
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
