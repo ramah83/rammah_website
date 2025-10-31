@@ -64,7 +64,10 @@ export default function ISOPage() {
   const [entities, setEntities] = useState<any[]>([]);
   const [list, setList] = useState<any[]>([]);
 
-  // ملاحظة: سنُخفي فلاتر الكيان/الحالة لو الدور User
+  // الجديد: نخزّن myEntityId الجاي من الـ API (meta) لو session.entityId فاضي
+  const [myEntityId, setMyEntityId] = useState<string>("");
+
+  // للمستخدم العادي فلتر الكيان ثابت على كيان المستخدم (أو myEntityId) + العام
   const [filterEntity, setFilterEntity] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<ISOStatus | "all">("all");
   const [search, setSearch] = useState("");
@@ -127,15 +130,18 @@ export default function ISOPage() {
     },
     getISO: async () => {
       const q = new URLSearchParams();
-      // للمستخدم العادي لا نرسل entityId/status حتى لا “يوسّع” النطاق؛ API يطبق قواعده
+      // للمستخدم العادي: نمرر حالة/بحث فقط، والـ API يردّ ضمن النطاق + يرجّع meta.myEntityId
       if (session?.role !== "user") {
         if (filterEntity !== "all") q.set("entityId", filterEntity);
-        if (filterStatus !== "all") q.set("status", String(filterStatus));
       }
+      if (filterStatus !== "all") q.set("status", String(filterStatus));
       if (search.trim()) q.set("q", search.trim());
       const res = await fetch(`/api/iso?${q.toString()}`, { cache: "no-store" });
       if (!res.ok) throw new Error("GET /api/iso failed");
-      return await res.json();
+      const data = await res.json();
+      // يدعم شكلين: Array أو {items, meta}
+      if (Array.isArray(data)) return { items: data, meta: {} };
+      return { items: Array.isArray(data?.items) ? data.items : [], meta: data?.meta || {} };
     },
     createISO: async (payload: FormState) => {
       const res = await fetch("/api/iso", {
@@ -178,6 +184,13 @@ export default function ISOPage() {
       if (!s) { router.push("/"); return; }
       const parsed = JSON.parse(s) as Session;
       setSession(parsed);
+
+      // مبدئيًا للمستخدم العادي ثبّت الفلتر على كيانه لو موجود
+      if (parsed.role === "user" && parsed.entityId) {
+        setFilterEntity(String(parsed.entityId));
+        setMyEntityId(String(parsed.entityId));
+      }
+
       if (parsed.role === "entityManager" && parsed.entityId) {
         setForm(p => ({ ...p, ownerEntityId: String(parsed.entityId) }));
       }
@@ -190,13 +203,22 @@ export default function ISOPage() {
     (async () => {
       setLoading(true); setErrMsg("");
       try {
-        const [ents, isoItems] = await Promise.all([
-          api.getEntities().catch(() => []),
-          api.getISO(),
-        ]);
+        const ents = await api.getEntities().catch(() => []);
+        const { items, meta } = await api.getISO();
+
         if (!mounted) return;
         setEntities(Array.isArray(ents) ? ents : []);
-        setList(Array.isArray(isoItems) ? isoItems : []);
+        setList(Array.isArray(items) ? items : []);
+
+        // لو المستخدم العادي ومفيش entityId في الـ session، استخدم meta.myEntityId من السيرفر
+        if (session?.role === "user") {
+          const serverMyId = String(meta?.myEntityId || "");
+          if (!session.entityId && serverMyId) {
+            setMyEntityId(serverMyId);
+            setFilterEntity(serverMyId); // لتناسق الفلاتر/الواجهة
+          }
+        }
+
         if (session?.role === "entityManager" && session.entityId && !form.ownerEntityId) {
           setForm(p => ({ ...p, ownerEntityId: String(session.entityId) }));
         }
@@ -211,7 +233,47 @@ export default function ISOPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterEntity, filterStatus, search, session?.role, session?.entityId]);
 
-  const filtered = useMemo(() => list, [list]);
+  // ====== فلترة واجهة ======
+  const effectiveEntityId = useMemo(
+    () => String(session?.entityId || myEntityId || ""),
+    [session?.entityId, myEntityId]
+  );
+
+  const filtered = useMemo(() => {
+    let data = Array.isArray(list) ? [...list] : [];
+
+    if (session?.role === "user") {
+      const myId = effectiveEntityId;
+      data = data.filter(
+        (it) => String(it.ownerEntityId) === myId || String(it.ownerEntityId) === "all"
+      );
+    }
+
+    if (filterStatus !== "all") {
+      data = data.filter((it) => String(it.status) === String(filterStatus));
+    }
+
+    const q = search.trim().toLowerCase();
+    if (q) {
+      data = data.filter((it) => {
+        const code = String(it.code || "").toLowerCase();
+        const title = String(it.title || "").toLowerCase();
+        const tagsArr = Array.isArray(it.tags)
+          ? it.tags
+          : String(it.tags || "")
+              .split(",")
+              .map((s: string) => s.trim());
+        const tagsStr = tagsArr.join(" ").toLowerCase();
+        return code.includes(q) || title.includes(q) || tagsStr.includes(q);
+      });
+    }
+
+    if (session?.role !== "user" && filterEntity !== "all") {
+      data = data.filter((it) => String(it.ownerEntityId) === String(filterEntity));
+    }
+
+    return data;
+  }, [list, filterEntity, filterStatus, search, session?.role, effectiveEntityId]);
 
   if (!session) return null;
 
@@ -228,7 +290,15 @@ export default function ISOPage() {
     });
 
   const refreshISO = async () => {
-    try { setList(await api.getISO()); } catch { setList([]); }
+    try {
+      const { items, meta } = await api.getISO();
+      setList(Array.isArray(items) ? items : []);
+      if (session?.role === "user" && !session.entityId && meta?.myEntityId) {
+        setMyEntityId(String(meta.myEntityId));
+      }
+    } catch {
+      setList([]);
+    }
   };
 
   // ====== Create ======
@@ -614,7 +684,6 @@ export default function ISOPage() {
                       <SelectValue placeholder={session?.role === "entityManager" ? "كيانك" : "اختر الكيان"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {/* المشرف فقط يقدر يختار "الكل" */}
                       {session?.role === "unionSupervisor" && <SelectItem value="all">كل الكيانات (عام)</SelectItem>}
                       {entities.map((e) => (<SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>))}
                     </SelectContent>
@@ -677,12 +746,14 @@ export default function ISOPage() {
           <CardHeader className="pb-0 px-5 pt-5">
             <CardTitle>قائمة النماذج</CardTitle>
             <CardDescription style={{ color: palette.mut }}>
-              {session.role === "user" ? "ستظهر لك النماذج المعتمدة لجهتك أو العامة" : "فلترة حسب الكيان/الحالة أو البحث بالكود/العنوان/الوسوم"}
+              {session.role === "user"
+                ? "ستظهر لك نماذج كيانك بالإضافة إلى النماذج العامة. يمكنك البحث وتغيير حالة العرض."
+                : "فلترة حسب الكيان/الحالة أو البحث بالكود/العنوان/الوسوم"}
             </CardDescription>
           </CardHeader>
 
           <CardContent className="px-5 pb-5">
-            {/* نخفي فلاتر الكيان/الحالة للمستخدم العادي */}
+            {/* فلاتر المشرف/مدير الكيان */}
             {session.role !== "user" && (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
                 <Field label="فلتر الكيان">
@@ -725,15 +796,51 @@ export default function ISOPage() {
               </div>
             )}
 
-            {/* بحث فقط للمستخدم العادي */}
+            {/* فلاتر المستخدم العادي: كيان ثابت + فلتر حالة + بحث */}
             {session.role === "user" && (
-              <div className="mb-4">
-                <Label className="text-sm" style={{ color: palette.black }}>بحث</Label>
-                <div className="relative">
-                  <Search className="absolute top-1/2 -translate-y-1/2 right-3 h-4 w-4" color="#7A7A7A" />
-                  <Input placeholder="ابحث بالكود/العنوان/الوسوم..." className="pr-9 h-11 rounded-xl"
-                         style={{ backgroundColor: palette.white, color: palette.black, borderColor: "#E3E3E3" }}
-                         value={search} onChange={(e) => setSearch(e.target.value)} />
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
+                {/* شارة الكيان (ثابت) */}
+                <div className="md:col-span-2">
+                  <Label className="text-sm" style={{ color: palette.black }}>كيانك</Label>
+                  <div className="h-11 rounded-xl flex items-center px-3"
+                       style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5", color: palette.black }}>
+                    <Building2 className="h-4 w-4 mr-1" />
+                    <span className="text-sm">
+                      {entities.find((e)=> String(e.id)===effectiveEntityId)?.name
+                        || (effectiveEntityId ? `كيان #${effectiveEntityId}` : "—")}
+                      {" "} + النماذج العامة
+                    </span>
+                  </div>
+                </div>
+
+                {/* فلتر الحالة */}
+                <div className="md:col-span-2">
+                  <Field label="فلتر الحالة">
+                    <Select value={filterStatus} onValueChange={(v: ISOStatus | "all") => setFilterStatus(v)}>
+                      <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor: palette.white, border: "1px solid #E3E3E3", color: palette.black }}>
+                        <SelectValue placeholder="كل الحالات" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">كل الحالات</SelectItem>
+                        <SelectItem value="draft">مسودة</SelectItem>
+                        <SelectItem value="submitted">مُقدَّم</SelectItem>
+                        <SelectItem value="review">قيد المراجعة</SelectItem>
+                        <SelectItem value="approved">معتمد</SelectItem>
+                        <SelectItem value="rejected">مرفوض</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
+
+                {/* البحث */}
+                <div className="md:col-span-2">
+                  <Label className="text-sm" style={{ color: palette.black }}>بحث</Label>
+                  <div className="relative">
+                    <Search className="absolute top-1/2 -translate-y-1/2 right-3 h-4 w-4" color="#7A7A7A" />
+                    <Input placeholder="ابحث بالكود/العنوان/الوسوم..." className="pr-9 h-11 rounded-xl"
+                           style={{ backgroundColor: palette.white, color: palette.black, borderColor: "#E3E3E3" }}
+                           value={search} onChange={(e) => setSearch(e.target.value)} />
+                  </div>
                 </div>
               </div>
             )}
@@ -884,7 +991,7 @@ export default function ISOPage() {
                               ) : (
                                 <>
                                   {nextActions(f.status as ISOStatus, session!.role as UserRole).map(a => (
-                                    <button key={a} onClick={() => api.updateISO(f.id, { status: a }).then(refreshISO).catch((e)=>alert(e?.message||"تعذر تغيير الحالة"))}
+                                    <button key={a} onClick={() => api.updateISO(f.id, { status: a as ISOStatus }).then(refreshISO).catch((e)=>alert(e?.message||"تعذر تغيير الحالة"))}
                                             className="h-8 px-3 rounded-full text-xs"
                                             style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5", color: palette.black }}
                                             title={`تغيير إلى ${statusLabel[a as ISOStatus]}`}>
@@ -933,7 +1040,7 @@ export default function ISOPage() {
         onDownloadTemplate={makeTemplateCSV}
         onStartImport={startBulkImport}
         role={session?.role}
-        entityId={String(session?.entityId || "")}
+        entityId={String(effectiveEntityId || "")}
       />
     </div>
   );
@@ -993,7 +1100,6 @@ function DetailsModal({ item, onClose }:{ item:any; onClose: ()=>void }) {
     </div>
   );
 }
-
 function ImportISOFromFileModal({
   open, onClose,
   importRows, importErr, importing, importProgress,
@@ -1009,7 +1115,7 @@ function ImportISOFromFileModal({
   onPickFile: (file?: File|null)=>void;
   onDownloadTemplate: ()=>void;
   onStartImport: ()=>void;
-  role?: UserRole|null;
+  role?: "unionSupervisor" | "entityManager" | "user" | null;
   entityId?: string|null;
 }) {
   if (!open) return null;

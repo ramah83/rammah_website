@@ -6,58 +6,21 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/evaluations/new/page": [
+    "/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/css/app/evaluations/new/page.css",
-      "static/chunks/app/evaluations/new/page.js"
-    ],
-    "/api/events/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/events/route.js"
-    ],
-    "/api/events/requests/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/events/requests/route.js"
-    ],
-    "/api/events/[id]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/events/[id]/route.js"
-    ],
-    "/api/new-evaluations/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/new-evaluations/route.js"
-    ],
-    "/api/events/[id]/evaluations/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/events/[id]/evaluations/route.js"
-    ],
-    "/events/evaluations/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/events/evaluations/page.css",
-      "static/chunks/app/events/evaluations/page.js"
+      "static/css/app/page.css",
+      "static/chunks/app/page.js"
     ],
     "/api/entities/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/entities/route.js"
     ],
-    "/events/page": [
+    "/api/admin/current-admins/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/css/app/events/page.css",
-      "static/chunks/app/events/page.js"
-    ],
-    "/api/upload/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/upload/route.js"
+      "static/chunks/app/api/admin/current-admins/route.js"
     ],
     "/dashboard/layout": [
       "static/chunks/webpack.js",
@@ -70,84 +33,41 @@
       "static/css/app/dashboard/page.css",
       "static/chunks/app/dashboard/page.js"
     ],
-    "/api/me/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/me/route.js"
-    ],
-    "/api/membership/my/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/membership/my/route.js"
-    ],
-    "/api/iso/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/iso/route.js"
-    ],
-    "/api/members/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/members/route.js"
-    ],
-    "/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/page.css",
-      "static/chunks/app/page.js"
-    ],
-    "/api/admin/current-admins/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/current-admins/route.js"
-    ],
-    "/api/auth/login/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/login/route.js"
-    ],
-    "/api/stats/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/stats/route.js"
-    ],
-    "/api/events/requests/bulk/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/events/requests/bulk/route.js"
-    ],
-    "/manager/evaluations/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/manager/evaluations/page.css",
-      "static/chunks/app/manager/evaluations/page.js"
-    ],
-    "/dashboard/leave-requests/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/dashboard/leave-requests/page.css",
-      "static/chunks/app/dashboard/leave-requests/page.js"
-    ],
-    "/api/membership/leave-requests/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/membership/leave-requests/route.js"
-    ],
-    "/members/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/members/page.js"
-    ],
     "/iso/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/css/app/iso/page.css",
       "static/chunks/app/iso/page.js"
     ],
-    "/about/page": [
+    "/api/stats/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/about/page.js"
+      "static/chunks/app/api/stats/route.js"
+    ],
+    "/api/me/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/me/route.js"
+    ],
+    "/api/iso/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/iso/route.js"
+    ],
+    "/api/membership/my/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/membership/my/route.js"
+    ],
+    "/api/events/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/events/route.js"
+    ],
+    "/api/members/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/members/route.js"
     ],
     "/profile/page": [
       "static/chunks/webpack.js",

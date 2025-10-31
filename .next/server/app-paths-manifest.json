@@ -1,7 +1,7 @@
 {
-  "/events/page": "app/events/page.js",
-  "/iso/page": "app/iso/page.js",
+  "/api/entities/route": "app/api/entities/route.js",
+  "/api/iso/route": "app/api/iso/route.js",
   "/profile/page": "app/profile/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/dashboard/leave-requests/page": "app/dashboard/leave-requests/page.js"
+  "/iso/page": "app/iso/page.js",
+  "/dashboard/page": "app/dashboard/page.js"
 }

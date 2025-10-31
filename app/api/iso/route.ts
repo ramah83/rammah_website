@@ -21,7 +21,7 @@ type DBRow = {
   id: string;
   code: string;
   title: string;
-  ownerEntityId: string | null; // يمكن أن تكون 'all'
+  ownerEntityId: string | null; // قد تكون 'all'
   status: string;
   version: string | null;
   tags: string | null;
@@ -82,10 +82,10 @@ function ensureISOTables() {
       at TEXT NOT NULL
     )
   `).run();
-  db.prepare(`CREATE INDEX IF NOT EXISTS idx_iso_owner ON iso(ownerEntityId)`).run();
-  db.prepare(`CREATE INDEX IF NOT EXISTS idx_iso_status ON iso(status)`).run();
+  db.prepare(`CREATE INDEX IF NOT EXISTS idx_iso_owner   ON iso(ownerEntityId)`).run();
+  db.prepare(`CREATE INDEX IF NOT EXISTS idx_iso_status  ON iso(status)`).run();
   db.prepare(`CREATE INDEX IF NOT EXISTS idx_iso_created ON iso(createdAt)`).run();
-  db.prepare(`CREATE INDEX IF NOT EXISTS idx_iso_code ON iso(code)`).run();
+  db.prepare(`CREATE INDEX IF NOT EXISTS idx_iso_code    ON iso(code)`).run();
   return db;
 }
 
@@ -105,7 +105,7 @@ function serialize(r: DBRow) {
   };
 }
 
-// يجيب كيان العضو من الجلسة أو جدول العضوية
+// يجيب كيان العضو من الجلسة أو من جدول عضوية اختياري
 function getUserEntityId(db: ReturnType<typeof getDB>, s: Session | null): string | null {
   if (!s) return null;
   if (s.entityId) return String(s.entityId);
@@ -130,18 +130,18 @@ export async function GET(req: Request) {
     const params: any[] = [];
 
     if (!ses) {
-      // زائر: لا شيء (لو عايز تعرض العام لغير مسجلين، بدّل السطرين دول)
+      // زائر: لا شيء (غير مسجّل)
       return ok([]);
     } else if (ses.role === "user") {
-      // العضو: approved فقط على كيانه أو العام
+      // العضو: فقط المعتمد + على كيانه أو العام
       const userEntityId = getUserEntityId(db, ses);
       if (!userEntityId) return ok([]);
       where.push(`status = 'approved'`);
-      where.push(`(ownerEntityId = 'all' OR ownerEntityId = ?)`);
+      where.push(`(ownerEntityId = 'all' OR ownerEntityId = ?)`); // كيانه + العام
       params.push(userEntityId);
-      // نتجاهل entityId/status الواردة من الواجهة
+      // يتم تجاهل entityId/status من الكويري للمستخدم العادي
     } else if (ses.role === "entityManager") {
-      // مدير الكيان: كيانه + العام
+      // مدير كيان: كيانه + العام، مع فلتر حالة اختياري
       where.push(`(ownerEntityId = ? OR ownerEntityId = 'all')`);
       params.push(String(ses.entityId || ""));
       const allowed = new Set(["draft","submitted","review","approved","rejected"]);
@@ -149,9 +149,9 @@ export async function GET(req: Request) {
         where.push(`status = ?`);
         params.push(statusRaw);
       }
-      // نتجاهل entityId لعدم الخروج من نطاق الكيان
+      // نتجاهل entityId حتى لا يخرج من نطاقه
     } else {
-      // unionSupervisor: يرى الكل + فلاتر
+      // unionSupervisor: يرى الكل مع فلاتر entity/status
       if (entityIdParam && entityIdParam !== "all") {
         where.push(`ownerEntityId = ?`);
         params.push(entityIdParam);
@@ -199,10 +199,10 @@ export async function POST(req: Request) {
 
     let ownerEntityId: string | null = null;
     if (ses.role === "unionSupervisor") {
-      // المشرف يقدر يحدد 'all' أو كيان ما
+      // المشرف: يقدر يختار 'all' أو كيان معيّن
       ownerEntityId = b?.ownerEntityId ? String(b.ownerEntityId) : (ses?.entityId ?? null);
     } else {
-      // مدير كيان: على كيانه فقط
+      // مدير الكيان: على كيانه فقط
       ownerEntityId = String(ses.entityId || "");
     }
 

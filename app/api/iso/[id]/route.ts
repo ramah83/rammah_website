@@ -94,13 +94,14 @@ const CAN_TRANSITION: Record<ISOStatus, ISOStatus[]> = {
   rejected:  [],
 };
 
+// -------- GET /api/iso/[id]
 export async function GET(_req: Request, ctx: { params: { id: string } }) {
   try {
     const db = ensureISOTables();
     const row = db.prepare(`SELECT * FROM iso WHERE id=?`).get(ctx.params.id) as any;
     if (!row) return NextResponse.json({ error: "غير موجود" }, { status: 404 });
 
-    // تقييد العرض للعضو: فقط المعتمد لكيانه أو العام
+    // العضو العادي: يرى فقط المعتمد على كيانه أو العام
     const s = await getSession();
     if (s?.role === "user") {
       const isApproved = String(row.status) === "approved";
@@ -117,6 +118,7 @@ export async function GET(_req: Request, ctx: { params: { id: string } }) {
   }
 }
 
+// -------- PATCH /api/iso/[id]
 export async function PATCH(req: Request, ctx: { params: { id: string } }) {
   try {
     const db = ensureISOTables();
@@ -150,8 +152,7 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
       if (!isSupervisor) {
         return NextResponse.json({ error: "غير مصرح: لا يمكنك تغيير الكيان المالك" }, { status: 403 });
       }
-      // يسمح بتعيين 'all'
-      fields.ownerEntityId = body.ownerEntityId.trim();
+      fields.ownerEntityId = body.ownerEntityId.trim(); // يسمح بـ 'all'
     }
     if (typeof body?.status === "string") {
       const next = body.status as ISOStatus;
@@ -204,6 +205,7 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
   }
 }
 
+// -------- DELETE /api/iso/[id]
 export async function DELETE(_req: Request, ctx: { params: { id: string } }) {
   try {
     const db = ensureISOTables();
