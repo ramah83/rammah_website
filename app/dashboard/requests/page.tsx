@@ -32,14 +32,37 @@ function buildSessionHeaders(contentType = true): HeadersInit {
   return h;
 }
 
+type LeaveRequest = {
+  id: string;
+  action: string;
+  targetEntityId: string;
+  entityName: string | null;
+  payload: any;
+  status: string;
+  createdBy: string;
+  userName: string | null;
+  userEmail: string | null;
+  approverRole: string;
+  createdAt: string;
+  note: string | null;
+};
+
 export default function JoinRequestsOnlyPage() {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
+
+  // التاب النشط: join أو leave
+  const [activeTab, setActiveTab] = useState<"join" | "leave">("join");
 
   // طلبات الانضمام
   const [rows, setRows] = useState<JoinRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<string | null>(null);
+
+  // طلبات الخروج
+  const [leaveRows, setLeaveRows] = useState<LeaveRequest[]>([]);
+  const [leaveLoading, setLeaveLoading] = useState(true);
+  const [leaveActing, setLeaveActing] = useState<string | null>(null);
 
   // الكيانات + اختيار المستخدم العادي للتقديم
   const [entities, setEntities] = useState<EntityLite[]>([]);
@@ -109,6 +132,30 @@ export default function JoinRequestsOnlyPage() {
     }
   }, [session?.id, session?.role, session?.entityId]);
 
+  // تحميل طلبات الخروج
+  const loadLeaveRequests = useCallback(async () => {
+    if (!session?.id) return;
+    setLeaveLoading(true);
+    try {
+      let q = "?status=pending";
+      if (session.role === "entityManager" && session.entityId) {
+        q += `&entityId=${encodeURIComponent(String(session.entityId))}`;
+      }
+
+      const res = await fetch(`/api/membership/leave-requests${q}`, {
+        cache: "no-store",
+        headers: buildSessionHeaders(false),
+        credentials: "include",
+      });
+      
+      const data: LeaveRequest[] = await res.json().catch(() => []);
+      
+      setLeaveRows(Array.isArray(data) ? data : []);
+    } finally {
+      setLeaveLoading(false);
+    }
+  }, [session?.id, session?.role, session?.entityId]);
+
   // عضوية المستخدم الحاليّة (لتعطيل التقديم لو داخل كيان)
   const loadMembership = useCallback(async () => {
     if (session?.role !== "user") { setCurrentEntityId(null); return; }
@@ -124,8 +171,8 @@ export default function JoinRequestsOnlyPage() {
   }, [session?.role]);
 
   const reloadAll = useCallback(async () => {
-    await Promise.all([loadJoinRequests(), loadEntities(), loadMembership()]);
-  }, [loadJoinRequests, loadEntities, loadMembership]);
+    await Promise.all([loadJoinRequests(), loadLeaveRequests(), loadEntities(), loadMembership()]);
+  }, [loadJoinRequests, loadLeaveRequests, loadEntities, loadMembership]);
 
   useEffect(() => { if (session?.id) reloadAll(); }, [session?.id, reloadAll]);
 
@@ -194,6 +241,26 @@ export default function JoinRequestsOnlyPage() {
     }
   };
 
+  const actLeave = async (id: string, decision: "approve" | "reject") => {
+    if (!canDecide || leaveActing) return;
+    setLeaveActing(id);
+    try {
+      const res = await fetch(`/api/membership/leave-requests`, {
+        method: "PATCH",
+        headers: buildSessionHeaders(true),
+        credentials: "include",
+        body: JSON.stringify({ id, decision }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data?.error || "تعذّر تنفيذ الإجراء"); return; }
+      await loadLeaveRequests();
+    } catch (e: any) {
+      alert(e?.message || "حدث خطأ");
+    } finally {
+      setLeaveActing(null);
+    }
+  };
+
   const submitJoin = async () => {
     if (!session) return;
     if (isMemberNow) { alert("أنت عضو حالياً في كيان. يجب الخروج أولاً قبل تقديم طلب جديد."); return; }
@@ -226,99 +293,255 @@ export default function JoinRequestsOnlyPage() {
 
       {/* Header */}
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8">
-        <div className="rounded-[22px] p-5 md:p-6 flex items-center justify-between"
+        <div className="rounded-[22px] p-5 md:p-6"
              style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
-          <div className="flex items-center gap-3">
-            <span className="h-10 w-10 rounded-xl grid place-items-center" style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
-              <Users className="h-5 w-5" color={COLORS.text} />
-            </span>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-extrabold">طلبات الانضمام</h1>
-              <p className="text-sm" style={{ color: COLORS.muted }}>
-                {canDecide
-                  ? (isSupervisor ? "استعراض واعتماد الطلبات المعلّقة لكل الكيانات" : "مراجعة طلبات الانضمام إلى كيانك")
-                  : "اختر كيانًا لتقديم طلب الانضمام، وتابع حالة طلباتك"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-9 px-3 rounded-full grid place-items-center"
-                 style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}`, color: COLORS.text }}>
-              {rows.length} طلب
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <span className="h-10 w-10 rounded-xl grid place-items-center" style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                <Users className="h-5 w-5" color={COLORS.text} />
+              </span>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-extrabold">إدارة الطلبات</h1>
+                <p className="text-sm" style={{ color: COLORS.muted }}>
+                  {canDecide
+                    ? (isSupervisor ? "استعراض واعتماد طلبات الانضمام والمغادرة لكل الكيانات" : "مراجعة طلبات الانضمام والمغادرة لكيانك")
+                    : "تقديم ومتابعة طلبات الانضمام للكيانات"}
+                </p>
+              </div>
             </div>
             <button
-              onClick={() => { loadJoinRequests(); loadEntities(); loadMembership(); }}
-              className="h-9 px-3 rounded-full inline-flex items-center gap-2"
+              onClick={() => { loadJoinRequests(); loadLeaveRequests(); loadEntities(); loadMembership(); }}
+              className="h-9 px-4 rounded-full inline-flex items-center gap-2"
               style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text }}
             >
               <RefreshCw className="h-4 w-4" /> تحديث
             </button>
           </div>
+
+          {/* Statistics Cards */}
+          {canDecide && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl p-4" style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm" style={{ color: COLORS.muted }}>طلبات الانضمام</div>
+                    <div className="text-2xl font-bold mt-1" style={{ color: COLORS.text }}>
+                      {rows.filter(r => r.status === "pending").length}
+                    </div>
+                  </div>
+                  <div className="h-12 w-12 rounded-xl grid place-items-center" style={{ background: COLORS.card }}>
+                    <Users className="h-6 w-6" style={{ color: COLORS.primary }} />
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl p-4" style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm" style={{ color: COLORS.muted }}>طلبات المغادرة</div>
+                    <div className="text-2xl font-bold mt-1" style={{ color: COLORS.text }}>
+                      {leaveRows.length}
+                    </div>
+                  </div>
+                  <div className="h-12 w-12 rounded-xl grid place-items-center" style={{ background: COLORS.card }}>
+                    <BadgeCheck className="h-6 w-6" style={{ color: COLORS.primary }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
       <main className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-6 pb-10">
+        {/* التابات للتبديل بين طلبات الانضمام والخروج */}
+        {canDecide && (
+          <div className="mb-6">
+            <div className="rounded-[22px] p-2 inline-flex gap-2" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: "0 4px 12px rgba(0,0,0,0.03)" }}>
+              <button
+                onClick={() => setActiveTab("join")}
+                className={`h-10 px-6 rounded-full font-semibold transition-all duration-200 flex items-center gap-2`}
+                style={{
+                  background: activeTab === "join" ? COLORS.primary : "transparent",
+                  color: activeTab === "join" ? "#FFFFFF" : COLORS.text,
+                }}
+              >
+                <Users className="h-4 w-4" />
+                طلبات الانضمام
+                {rows.filter(r => r.status === "pending").length > 0 && (
+                  <span className="h-5 w-5 rounded-full text-xs grid place-items-center font-bold"
+                        style={{ background: activeTab === "join" ? "rgba(255,255,255,0.3)" : COLORS.soft }}>
+                    {rows.filter(r => r.status === "pending").length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab("leave")}
+                className={`h-10 px-6 rounded-full font-semibold transition-all duration-200 flex items-center gap-2`}
+                style={{
+                  background: activeTab === "leave" ? COLORS.primary : "transparent",
+                  color: activeTab === "leave" ? "#FFFFFF" : COLORS.text,
+                }}
+              >
+                <BadgeCheck className="h-4 w-4" />
+                طلبات المغادرة
+                {leaveRows.length > 0 && (
+                  <span className="h-5 w-5 rounded-full text-xs grid place-items-center font-bold"
+                        style={{ background: activeTab === "leave" ? "rgba(255,255,255,0.3)" : COLORS.soft }}>
+                    {leaveRows.length}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ========== لوحة المشرف/المدير ========== */}
         {canDecide ? (
-          <SurfaceCard className="mb-6">
-            <div className="px-5 pt-5">
-              <div className="text-sm" style={{ color: COLORS.muted }}>طلبات الانضمام المعلّقة</div>
-            </div>
-            <div className="mx-5 my-4 h-px" style={{ background: COLORS.line }} />
-            <div className="px-5 pb-5">
-              {loading ? (
-                <div className="h-24 rounded-2xl animate-pulse" style={{ background: "#0000000A" }} />
-              ) : (
-                <>
-                  {/* مسؤول الاتحاد: تجميع حسب الكيان */}
-                  {isSupervisor ? (
-                    Object.keys(pendingJoinByEntity).length === 0 ? (
-                      <div className="text-sm" style={{ color: COLORS.muted }}>لا توجد طلبات معلّقة.</div>
-                    ) : (
-                      Object.entries(pendingJoinByEntity).map(([eid, list]) => {
-                        const ename = entities.find(e => e.id === eid)?.name || list[0]?.entityName || eid;
-                        return (
-                          <div key={eid} className="mb-6">
-                            <h3 className="font-semibold mb-2" style={{ color: COLORS.text }}>{ename}</h3>
-                            <ul className="space-y-3">
-                              {list.map((r) => (
-                                <JoinCard
-                                  key={r.id}
-                                  title={`${r.userName || "-"}`}
-                                  subtitle={`قدّم في ${new Date(r.createdAt).toLocaleString("ar-EG")}`}
-                                  onApprove={() => actJoin(r.id, "approve")}
-                                  onReject={() => actJoin(r.id, "reject")}
-                                  disabled={!!acting}
-                                />
-                              ))}
-                            </ul>
-                          </div>
-                        );
-                      })
-                    )
+          <>
+            {/* طلبات الانضمام */}
+            {activeTab === "join" && (
+              <SurfaceCard className="mb-6">
+                <div className="px-6 pt-6 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-bold" style={{ color: COLORS.text }}>طلبات الانضمام المعلّقة</h2>
+                      <p className="text-sm mt-1" style={{ color: COLORS.muted }}>
+                        {isSupervisor ? "جميع طلبات الانضمام المعلقة عبر المنصة" : "طلبات الانضمام إلى كيانك"}
+                      </p>
+                    </div>
+                    <div className="h-10 px-4 rounded-full grid place-items-center font-semibold"
+                         style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}`, color: COLORS.text }}>
+                      {rows.filter(r => r.status === "pending").length} طلب معلق
+                    </div>
+                  </div>
+                </div>
+                <div className="mx-6 mb-4 h-px" style={{ background: COLORS.line }} />
+                <div className="px-6 pb-6">
+                  {loading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="h-24 rounded-2xl animate-pulse" style={{ background: COLORS.soft }} />
+                      ))}
+                    </div>
                   ) : (
-                    // مدير الكيان: قائمة واحدة
-                    (rows.filter(r => r.status === "pending").length === 0 ? (
-                      <div className="text-sm" style={{ color: COLORS.muted }}>لا توجد طلبات معلّقة.</div>
-                    ) : (
-                      <ul className="space-y-3">
-                        {rows.filter(r => r.status === "pending").map((r) => (
-                          <JoinCard
-                            key={r.id}
-                            title={`${r.userName || "-"}`}
-                            subtitle={`كيان: ${r.entityName} • قدّم في ${new Date(r.createdAt).toLocaleString("ar-EG")}`}
-                            onApprove={() => actJoin(r.id, "approve")}
-                            onReject={() => actJoin(r.id, "reject")}
-                            disabled={!!acting}
-                          />
-                        ))}
-                      </ul>
-                    ))
+                    <>
+                      {/* مسؤول الاتحاد: تجميع حسب الكيان */}
+                      {isSupervisor ? (
+                        Object.keys(pendingJoinByEntity).length === 0 ? (
+                          <div className="text-center py-12">
+                            <div className="h-16 w-16 rounded-full mx-auto grid place-items-center mb-4"
+                                 style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                              <Users className="h-8 w-8" style={{ color: COLORS.muted }} />
+                            </div>
+                            <div className="font-semibold mb-1" style={{ color: COLORS.text }}>لا توجد طلبات انضمام معلّقة</div>
+                            <div className="text-sm" style={{ color: COLORS.muted }}>جميع طلبات الانضمام تمت معالجتها</div>
+                          </div>
+                        ) : (
+                          Object.entries(pendingJoinByEntity).map(([eid, list]) => {
+                            const ename = entities.find(e => e.id === eid)?.name || list[0]?.entityName || eid;
+                            return (
+                              <div key={eid} className="mb-6">
+                                <h3 className="font-semibold mb-2" style={{ color: COLORS.text }}>{ename}</h3>
+                                <ul className="space-y-3">
+                                  {list.map((r) => (
+                                    <JoinCard
+                                      key={r.id}
+                                      title={`${r.userName || "-"}`}
+                                      subtitle={`قدّم في ${new Date(r.createdAt).toLocaleString("ar-EG")}`}
+                                      onApprove={() => actJoin(r.id, "approve")}
+                                      onReject={() => actJoin(r.id, "reject")}
+                                      disabled={!!acting}
+                                    />
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          })
+                        )
+                      ) : (
+                        // مدير الكيان: قائمة واحدة
+                        (rows.filter(r => r.status === "pending").length === 0 ? (
+                          <div className="text-center py-12">
+                            <div className="h-16 w-16 rounded-full mx-auto grid place-items-center mb-4"
+                                 style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                              <Users className="h-8 w-8" style={{ color: COLORS.muted }} />
+                            </div>
+                            <div className="font-semibold mb-1" style={{ color: COLORS.text }}>لا توجد طلبات انضمام معلّقة</div>
+                            <div className="text-sm" style={{ color: COLORS.muted }}>جميع طلبات الانضمام تمت معالجتها</div>
+                          </div>
+                        ) : (
+                          <ul className="space-y-3">
+                            {rows.filter(r => r.status === "pending").map((r) => (
+                              <JoinCard
+                                key={r.id}
+                                title={`${r.userName || "-"}`}
+                                subtitle={`كيان: ${r.entityName} • قدّم في ${new Date(r.createdAt).toLocaleString("ar-EG")}`}
+                                onApprove={() => actJoin(r.id, "approve")}
+                                onReject={() => actJoin(r.id, "reject")}
+                                disabled={!!acting}
+                              />
+                            ))}
+                          </ul>
+                        ))
+                      )}
+                    </>
                   )}
-                </>
-              )}
-            </div>
-          </SurfaceCard>
+                </div>
+              </SurfaceCard>
+            )}
+
+            {/* طلبات الخروج */}
+            {activeTab === "leave" && (
+              <SurfaceCard className="mb-6">
+                <div className="px-6 pt-6 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-bold" style={{ color: COLORS.text }}>طلبات المغادرة المعلّقة</h2>
+                      <p className="text-sm mt-1" style={{ color: COLORS.muted }}>
+                        {isSupervisor ? "جميع طلبات المغادرة المعلقة عبر المنصة" : "طلبات المغادرة من كيانك"}
+                      </p>
+                    </div>
+                    <div className="h-10 px-4 rounded-full grid place-items-center font-semibold"
+                         style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}`, color: COLORS.text }}>
+                      {leaveRows.length} طلب معلق
+                    </div>
+                  </div>
+                </div>
+                <div className="mx-6 mb-4 h-px" style={{ background: COLORS.line }} />
+                <div className="px-6 pb-6">
+                  {leaveLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="h-24 rounded-2xl animate-pulse" style={{ background: COLORS.soft }} />
+                      ))}
+                    </div>
+                  ) : leaveRows.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="h-16 w-16 rounded-full mx-auto grid place-items-center mb-4"
+                           style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                        <BadgeCheck className="h-8 w-8" style={{ color: COLORS.muted }} />
+                      </div>
+                      <div className="font-semibold mb-1" style={{ color: COLORS.text }}>لا توجد طلبات مغادرة معلّقة</div>
+                      <div className="text-sm" style={{ color: COLORS.muted }}>جميع طلبات المغادرة تمت معالجتها</div>
+                    </div>
+                  ) : (
+                    <ul className="space-y-3">
+                      {leaveRows.map((r) => (
+                        <LeaveCard
+                          key={r.id}
+                          title={`${r.userName || r.userEmail || "عضو"}`}
+                          subtitle={`الكيان: ${r.entityName || r.targetEntityId} • قدّم في ${new Date(r.createdAt).toLocaleString("ar-EG")}${r.payload?.reason ? ` • السبب: ${r.payload.reason}` : ""}`}
+                          onApprove={() => actLeave(r.id, "approve")}
+                          onReject={() => actLeave(r.id, "reject")}
+                          disabled={!!leaveActing}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </SurfaceCard>
+            )}
+          </>
         ) : (
           /* ========== واجهة المستخدم العادي لتقديم طلب ========== */
           <SurfaceCard className="mb-6">
@@ -471,26 +694,32 @@ function JoinCard({
   disabled?: boolean;
 }) {
   return (
-    <li className="rounded-2xl p-4 flex items-center justify-between"
-        style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: "0 6px 12px rgba(0,0,0,0.04)" }}>
-      <div>
-        <div className="font-semibold" style={{ color: COLORS.text }}>{title}</div>
-        <div className="text-sm" style={{ color: COLORS.muted }}>{subtitle}</div>
+    <li className="rounded-2xl p-5 flex items-center justify-between transition-all duration-200 hover:shadow-md"
+        style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+      <div className="flex items-center gap-4">
+        <div className="h-12 w-12 rounded-xl grid place-items-center flex-shrink-0"
+             style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+          <Users className="h-6 w-6" style={{ color: COLORS.primary }} />
+        </div>
+        <div>
+          <div className="font-semibold text-base" style={{ color: COLORS.text }}>{title}</div>
+          <div className="text-sm mt-0.5" style={{ color: COLORS.muted }}>{subtitle}</div>
+        </div>
       </div>
       <div className="flex items-center gap-2">
         <button
           disabled={!!disabled}
           onClick={onApprove}
-          className="h-9 px-3 rounded-full flex items-center gap-2 font-medium"
+          className="h-10 px-4 rounded-full flex items-center gap-2 font-medium transition-all duration-200 hover:opacity-90"
           style={{ background: COLORS.primary, color: "#FFFFFF", opacity: disabled ? 0.6 : 1 }}>
-          <BadgeCheck className="h-4 w-4" /> قبول الانضمام
+          <BadgeCheck className="h-4 w-4" /> قبول
         </button>
         <button
           disabled={!!disabled}
           onClick={onReject}
-          className="h-9 px-3 rounded-full flex items-center gap-2"
-          style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text, opacity: disabled ? 0.6 : 1 }}>
-          <XCircle className="h-4 w-4" /> رفض الانضمام
+          className="h-10 px-4 rounded-full flex items-center gap-2 transition-all duration-200 hover:bg-opacity-80"
+          style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}`, color: COLORS.text, opacity: disabled ? 0.6 : 1 }}>
+          <XCircle className="h-4 w-4" /> رفض
         </button>
       </div>
     </li>
@@ -528,5 +757,52 @@ function StatusPill({ status }: { status: "pending" | "approved" | "rejected" })
           style={{ background: bg, border: `1px solid ${bd}`, color: txt }}>
       {status === "pending" ? "قيد المراجعة" : status === "approved" ? "مقبول" : "مرفوض"}
     </span>
+  );
+}
+
+/* كارت طلب الخروج */
+function LeaveCard({
+  title,
+  subtitle,
+  onApprove,
+  onReject,
+  disabled,
+}: {
+  title: string;
+  subtitle: string;
+  onApprove: () => void;
+  onReject: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <li className="rounded-2xl p-5 flex items-center justify-between transition-all duration-200 hover:shadow-md"
+        style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+      <div className="flex items-center gap-4">
+        <div className="h-12 w-12 rounded-xl grid place-items-center flex-shrink-0"
+             style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+          <BadgeCheck className="h-6 w-6" style={{ color: COLORS.primary }} />
+        </div>
+        <div>
+          <div className="font-semibold text-base" style={{ color: COLORS.text }}>{title}</div>
+          <div className="text-sm mt-0.5" style={{ color: COLORS.muted }}>{subtitle}</div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          disabled={!!disabled}
+          onClick={onApprove}
+          className="h-10 px-4 rounded-full flex items-center gap-2 font-medium transition-all duration-200 hover:opacity-90"
+          style={{ background: COLORS.primary, color: "#FFFFFF", opacity: disabled ? 0.6 : 1 }}>
+          <BadgeCheck className="h-4 w-4" /> قبول
+        </button>
+        <button
+          disabled={!!disabled}
+          onClick={onReject}
+          className="h-10 px-4 rounded-full flex items-center gap-2 transition-all duration-200 hover:bg-opacity-80"
+          style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}`, color: COLORS.text, opacity: disabled ? 0.6 : 1 }}>
+          <XCircle className="h-4 w-4" /> رفض
+        </button>
+      </div>
+    </li>
   );
 }

@@ -69,6 +69,8 @@ export async function GET(req: NextRequest) {
   const status: "pending" | "approved" | "rejected" | "all" =
     (["pending", "approved", "rejected", "all"].includes(rawStatus) ? rawStatus : "all") as any;
 
+  const scope = (searchParams.get("scope") || "").toLowerCase();
+
   const where: string[] = [`r.action='leave_membership'`];
   const params: Record<string, any> = {};
 
@@ -77,8 +79,18 @@ export async function GET(req: NextRequest) {
     params["@status"] = status;
   }
 
+  // إذا كان scope=mine، المستخدم يريد رؤية طلباته فقط
+  if (scope === "mine") {
+    where.push(`r.createdBy=@userId`);
+    params["@userId"] = session.id;
+  }
+
+  // إذا كان scope=mine، لا نحتاج لفلترة حسب الدور
+  if (scope === "mine") {
+    // المستخدم يريد رؤية طلباته فقط - تم إضافة الشرط بالفعل في where
+  }
   // ✅ مسؤول الاتحاد: يرى كل الطلبات
-  if (session.role === "unionSupervisor") {
+  else if (session.role === "unionSupervisor") {
     // لا نضيف أي شرط إضافي، يرى كل شيء
     const entityIdParam = (searchParams.get("entityId") || "").trim();
     if (entityIdParam) {
@@ -89,6 +101,9 @@ export async function GET(req: NextRequest) {
   // ✅ مدير الكيان: يرى فقط طلبات كياناته
   else if (session.role === "entityManager") {
     const userId = session.id;
+    
+    // أولاً: جرب استخدام entityId من الـ session مباشرة
+    const sessionEntityId = session.entityId ? String(session.entityId) : null;
     
     // جلب الكيانات التي يديرها هذا المدير
     const managedEntities = db.prepare(`
@@ -101,15 +116,21 @@ export async function GET(req: NextRequest) {
       )
     `).all(userId, userId, userId) as { entityId: string }[];
 
+    // لو في entityId في الـ session، استخدمه
+    if (sessionEntityId) {
+      managedEntities.push({ entityId: sessionEntityId });
+    }
+
     if (managedEntities.length === 0) {
       // لا يدير أي كيان، لا يرى أي طلبات
       return NextResponse.json([]);
     }
 
-    const entityIds = managedEntities.map(e => e.entityId);
-    const placeholders = entityIds.map((_, i) => `@eid${i}`).join(',');
+    // إزالة التكرار
+    const uniqueEntityIds = Array.from(new Set(managedEntities.map(e => e.entityId)));
+    const placeholders = uniqueEntityIds.map((_, i) => `@eid${i}`).join(',');
     
-    entityIds.forEach((eid, i) => {
+    uniqueEntityIds.forEach((eid, i) => {
       params[`@eid${i}`] = eid;
     });
 

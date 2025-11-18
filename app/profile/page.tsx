@@ -297,139 +297,194 @@ export default function ProfilePage() {
 
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8">
         <div
-          className="rounded-[22px] p-5 md:p-6 flex items-center justify-between"
+          className="rounded-[22px] p-6 md:p-8"
           style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}
         >
-          <div className="flex items-center gap-3">
-            <span className="h-10 w-10 rounded-xl grid place-items-center" style={{ backgroundColor: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
-              <Users className="h-5 w-5" color={COLORS.text} />
-            </span>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-extrabold" style={{ color: COLORS.text }}>الملف الشخصي</h1>
-              <p className="text-sm" style={{ color: COLORS.muted }}>عرض بيانات حسابك</p>
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-2xl grid place-items-center" style={{ backgroundColor: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                <User className="h-7 w-7" color={COLORS.primary} />
+              </div>
+              <div>
+                <h1 className="text-3xl md:text-4xl font-extrabold" style={{ color: COLORS.text }}>الملف الشخصي</h1>
+                <p className="text-sm mt-1" style={{ color: COLORS.muted }}>إدارة معلوماتك الشخصية وإعدادات حسابك</p>
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-2">
-            {(managerSuspended || userSuspended) && (
-              <span className="inline-flex items-center gap-1 rounded-full px-3 h-8 text-sm"
-                    style={{ background: "#FFF0F0", border: "1px solid #F5C2C7", color: "#7A0010" }}>
-                موقوف مؤقتًا
-              </span>
-            )}
+            <div className="flex items-center gap-3">
+              {(managerSuspended || userSuspended) && (
+                <span className="inline-flex items-center gap-2 rounded-full px-4 h-10 text-sm font-medium"
+                      style={{ background: "#FFF0F0", border: "1px solid #F5C2C7", color: "#7A0010" }}>
+                  <AlertTriangle className="h-4 w-4" />
+                  موقوف مؤقتًا
+                </span>
+              )}
 
-            <button
-              onClick={() => {
-                if (managerSuspended) {
-                  alert("الكيان متوقف — لا يمكن تنفيذ الإجراء حاليًا");
-                  return;
-                }
-                router.push("/profile/edit");
-              }}
-              className="h-9 px-3 rounded-full inline-flex items-center gap-2 font-semibold disabled:opacity-60"
-              style={{ background: COLORS.primary, color: "#FFFFFF" }}
-              disabled={managerSuspended}
-              title={managerSuspended ? "الكيان متوقف — لا يمكن تنفيذ الإجراء حاليًا" : undefined}
-            >
-              <Pencil className="h-4 w-4" />
-              تعديل
-            </button>
+              <button
+                onClick={() => {
+                  if (managerSuspended) {
+                    alert("الكيان متوقف — لا يمكن تنفيذ الإجراء حاليًا");
+                    return;
+                  }
+                  router.push("/profile/edit");
+                }}
+                className="h-10 px-5 rounded-full inline-flex items-center gap-2 font-semibold disabled:opacity-60 transition-all duration-200 hover:opacity-90"
+                style={{ background: COLORS.primary, color: "#FFFFFF" }}
+                disabled={managerSuspended}
+                title={managerSuspended ? "الكيان متوقف — لا يمكن تنفيذ الإجراء حاليًا" : undefined}
+              >
+                <Pencil className="h-4 w-4" />
+                تعديل البيانات
+              </button>
+            </div>
           </div>
         </div>
       </section>
 
       <main className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-6 pb-10 flex-1">
         <Card className="rounded-[22px] bg-white border border-[#E7E2DC] text-[#1D1D1D] shadow-[0_8px_18px_rgba(0,0,0,0.05)]">
-          <CardHeader>
-            <CardTitle>بيانات الحساب</CardTitle>
-            <CardDescription className="text-[#6B6B6B]">معلوماتك الأساسية وطرق التواصل</CardDescription>
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-xl">بيانات الحساب</CardTitle>
+                <CardDescription className="text-[#6B6B6B] mt-1">معلوماتك الأساسية وطرق التواصل</CardDescription>
+              </div>
+              {!loading && me && (
+                <div className="h-10 px-4 rounded-full grid place-items-center text-sm font-medium"
+                     style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}`, color: COLORS.text }}>
+                  {roleLabel[me.role] || me.role}
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="h-28 rounded-2xl animate-pulse" style={{ background: "#0000000A" }} />
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-20 rounded-2xl animate-pulse" style={{ background: COLORS.soft }} />
+                ))}
+              </div>
             ) : !me ? (
-              <div className="text-sm" style={{ color: COLORS.muted }}>لا يمكن تحميل البيانات حالياً.</div>
+              <div className="text-center py-12">
+                <div className="text-sm font-medium mb-1" style={{ color: COLORS.text }}>لا يمكن تحميل البيانات</div>
+                <div className="text-sm" style={{ color: COLORS.muted }}>حاول مرة أخرى لاحقاً</div>
+              </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-5">
+              <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
                 {/* العمود الأيسر: الصورة + الأزرار */}
-                <div className="rounded-2xl p-4 flex flex-col items-stretch"
-                     style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                <div className="rounded-2xl p-6 flex flex-col items-stretch"
+                     style={{ background: COLORS.soft, border: `1px solid ${COLORS.border}` }}>
                   <button
                     type="button"
                     onClick={me.avatar ? openAvatarModal : undefined}
-                    className="w-28 h-28 rounded-2xl overflow-hidden grid place-items-center mx-auto focus:outline-none"
-                    style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}`, cursor: me.avatar ? "zoom-in" : "default" }}
+                    className="w-32 h-32 rounded-2xl overflow-hidden grid place-items-center mx-auto focus:outline-none transition-all duration-200 hover:scale-105"
+                    style={{ background: COLORS.card, border: `2px solid ${COLORS.border}`, cursor: me.avatar ? "zoom-in" : "default", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}
                     aria-label={me.avatar ? "تكبير الصورة الشخصية" : "الصورة الشخصية"}
                   >
                     {me.avatar ? (
                       <img src={me.avatar} alt={me.name} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-4xl font-bold" style={{ color: COLORS.muted }}>
+                      <span className="text-5xl font-bold" style={{ color: COLORS.primary }}>
                         {me.name?.trim()?.charAt(0) || "?"}
                       </span>
                     )}
                   </button>
 
-                  <div className="text-center mt-3">
-                    <div className="font-semibold text-lg">{me.name}</div>
-                    <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
+                  <div className="text-center mt-4">
+                    <div className="font-bold text-xl" style={{ color: COLORS.text }}>{me.name}</div>
+                    <div className="text-sm mt-1.5 px-3 py-1 rounded-full inline-block" style={{ background: COLORS.card, color: COLORS.muted }}>
                       {me.role === "entityManager" && managerSuspended ? "مسؤول كيان — (موقوف)" : (roleLabel[me.role] || me.role)}
                     </div>
                   </div>
 
                   {/* الأزرار الجانبية */}
                   {["user", "entityManager", "unionSupervisor"].includes(me.role) && (
-                    <>
+                    <div className="mt-6 space-y-2">
                       <button
                         onClick={() => router.push("/profile/history")}
-                        className="mt-4 h-9 px-3 rounded-xl inline-flex items-center justify-center gap-2 font-semibold"
+                        className="w-full h-11 px-4 rounded-xl inline-flex items-center justify-center gap-2 font-semibold transition-all duration-200 hover:bg-opacity-80"
                         style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text }}
                         title="عرض سجل المنصة والعضوية"
                       >
-                        <Clock className="h-4 w-4" />
+                        <Clock className="h-5 w-5" />
                         سجل المنصّة
                       </button>
 
                       <button
                         onClick={() => router.push("/profile/card")}
-                        className="mt-2 h-9 px-3 rounded-xl inline-flex items-center justify-center gap-2 font-semibold"
+                        className="w-full h-11 px-4 rounded-xl inline-flex items-center justify-center gap-2 font-semibold transition-all duration-200 hover:bg-opacity-80"
                         style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text }}
                         title="عرض كارت العضوية"
                       >
-                        <IdCard className="h-4 w-4" />
+                        <IdCard className="h-5 w-5" />
                         كارت العضوية
                       </button>
-                    </>
+                    </div>
                   )}
                 </div>
 
                 {/* العمود الأيمن: معلومات */}
-                <div className="rounded-2xl p-4 space-y-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-                  <InfoRow icon={<User className="h-4 w-4" />} label="الاسم" value={me.name || "-"} />
-                  <InfoRow icon={<Mail className="h-4 و-4" />} label="البريد الإلكتروني" value={me.email || "-"} />
-                  <InfoRow icon={<Hash className="h-4 w-4" />} label="الرقم القومي" value={shownNationalId || "-"} />
-                  <InfoRow icon={<Phone className="h-4 w-4" />} label="الهاتف" value={me.phone || "-"} />
-                  <InfoRow icon={<MapPin className="h-4 w-4" />} label="المدينة" value={me.city || "-"} />
-                  <InfoRow icon={<Layers className="h-4 w-4" />} label="الكيان الحالي" custom={entityField} />
-                  <InfoRow
-                    icon={<Tag className="h-4 w-4" />}
-                    label="الاهتمامات"
-                    value={(me.interests && me.interests.length > 0) ? undefined : "لا توجد اهتمامات محددة"}
-                    custom={(me.interests && me.interests.length > 0) ? (
-                      <div className="flex flex-wrap gap-2">
-                        {me.interests.map((t, i) => (
-                          <span key={i} className="text-xs rounded-full px-3 h-7 inline-flex items-center"
-                                style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}`, color: COLORS.text }}>
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    ) : undefined}
-                  />
-                  {me.bio && (
-                    <div className="rounded-xl p-3" style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
-                      <div className="text-xs" style={{ color: COLORS.muted }}>نبذة</div>
-                      <div className="mt-1 text-sm">{me.bio}</div>
+                <div className="space-y-4">
+                  {/* Personal Information Card */}
+                  <div className="rounded-2xl p-5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                    <h3 className="font-bold text-base mb-4 flex items-center gap-2" style={{ color: COLORS.text }}>
+                      <User className="h-5 w-5" style={{ color: COLORS.primary }} />
+                      المعلومات الشخصية
+                    </h3>
+                    <div className="space-y-3">
+                      <InfoRow icon={<User className="h-4 w-4" />} label="الاسم" value={me.name || "-"} />
+                      <InfoRow icon={<Mail className="h-4 w-4" />} label="البريد الإلكتروني" value={me.email || "-"} />
+                      <InfoRow icon={<Hash className="h-4 w-4" />} label="الرقم القومي" value={shownNationalId || "-"} />
+                    </div>
+                  </div>
+
+                  {/* Contact Information Card */}
+                  <div className="rounded-2xl p-5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                    <h3 className="font-bold text-base mb-4 flex items-center gap-2" style={{ color: COLORS.text }}>
+                      <Phone className="h-5 w-5" style={{ color: COLORS.primary }} />
+                      معلومات الاتصال
+                    </h3>
+                    <div className="space-y-3">
+                      <InfoRow icon={<Phone className="h-4 w-4" />} label="الهاتف" value={me.phone || "-"} />
+                      <InfoRow icon={<MapPin className="h-4 w-4" />} label="المدينة" value={me.city || "-"} />
+                    </div>
+                  </div>
+
+                  {/* Entity Information Card */}
+                  <div className="rounded-2xl p-5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                    <h3 className="font-bold text-base mb-4 flex items-center gap-2" style={{ color: COLORS.text }}>
+                      <Layers className="h-5 w-5" style={{ color: COLORS.primary }} />
+                      معلومات الكيان
+                    </h3>
+                    <InfoRow icon={<Layers className="h-4 w-4" />} label="الكيان الحالي" custom={entityField} />
+                  </div>
+
+                  {/* Interests Card */}
+                  {((me.interests && me.interests.length > 0) || me.bio) && (
+                    <div className="rounded-2xl p-5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                      <h3 className="font-bold text-base mb-4 flex items-center gap-2" style={{ color: COLORS.text }}>
+                        <Tag className="h-5 w-5" style={{ color: COLORS.primary }} />
+                        الاهتمامات والنبذة
+                      </h3>
+                      {me.interests && me.interests.length > 0 && (
+                        <div className="mb-4">
+                          <div className="text-sm mb-2" style={{ color: COLORS.muted }}>الاهتمامات</div>
+                          <div className="flex flex-wrap gap-2">
+                            {me.interests.map((t, i) => (
+                              <span key={i} className="text-sm rounded-full px-4 h-8 inline-flex items-center font-medium"
+                                    style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}`, color: COLORS.text }}>
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {me.bio && (
+                        <div className="rounded-xl p-4" style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                          <div className="text-sm font-medium mb-2" style={{ color: COLORS.muted }}>نبذة شخصية</div>
+                          <div className="text-sm leading-relaxed" style={{ color: COLORS.text }}>{me.bio}</div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

@@ -707,6 +707,46 @@ export async function GET(req: NextRequest) {
     };
   });
 
+  // ——— ملء بيانات النشاط (آخر المنضمّين والخارجين) ———
+  if (role === "unionSupervisor" || (role === "entityManager" && myEntityId)) {
+    // آخر المنضمّين (من entity_members)
+    const joinsQuery = role === "unionSupervisor"
+      ? `SELECT em.id, em.userId, em.entityId, em.joinedAt, u.name AS userName, u.email AS userEmail, e.name AS entityName
+         FROM entity_members em
+         LEFT JOIN users u ON u.id = em.userId
+         LEFT JOIN entities e ON e.id = em.entityId
+         ORDER BY datetime(em.joinedAt) DESC
+         LIMIT 200`
+      : `SELECT em.id, em.userId, em.entityId, em.joinedAt, u.name AS userName, u.email AS userEmail, e.name AS entityName
+         FROM entity_members em
+         LEFT JOIN users u ON u.id = em.userId
+         LEFT JOIN entities e ON e.id = em.entityId
+         WHERE em.entityId = ?
+         ORDER BY datetime(em.joinedAt) DESC
+         LIMIT 200`;
+    
+    const joinsParams = role === "entityManager" && myEntityId ? [myEntityId] : [];
+    activity.recentJoins = db.prepare(joinsQuery).all(...joinsParams) as any[];
+
+    // آخر الخارجين (من membership_events)
+    const leavesQuery = role === "unionSupervisor"
+      ? `SELECT me.id, me.userId, me.entityId, me.entityName, me.createdAt AS leftAt, me.meta, u.name AS userName, u.email AS userEmail
+         FROM membership_events me
+         LEFT JOIN users u ON u.id = me.userId
+         WHERE me.type = 'left'
+         ORDER BY datetime(me.createdAt) DESC
+         LIMIT 200`
+      : `SELECT me.id, me.userId, me.entityId, me.entityName, me.createdAt AS leftAt, me.meta, u.name AS userName, u.email AS userEmail
+         FROM membership_events me
+         LEFT JOIN users u ON u.id = me.userId
+         WHERE me.type = 'left' AND me.entityId = ?
+         ORDER BY datetime(me.createdAt) DESC
+         LIMIT 200`;
+    
+    const leavesParams = role === "entityManager" && myEntityId ? [myEntityId] : [];
+    activity.recentLeaves = db.prepare(leavesQuery).all(...leavesParams) as any[];
+  }
+
   // ——— الإرجاع ———
   return NextResponse.json({
     ok: true,

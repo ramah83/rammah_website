@@ -6,6 +6,7 @@ export const revalidate = 0;
 import { NextRequest, NextResponse } from "next/server";
 import { getDB, uid } from "@/lib/server/sqlite";
 import { getSession, type Session } from "@/lib/server/session";
+import { notifyEntityManager } from "@/lib/server/notifications";
 
 export async function GET(req: NextRequest) {
   const db = getDB();
@@ -120,6 +121,7 @@ export async function POST(req: NextRequest) {
     if (!entity) return NextResponse.json({ error: "الكيان غير موجود" }, { status: 404 });
     const user = db.prepare(`SELECT id, name, email FROM users WHERE id = ?`).get(session.id) as any;
     if (!user) return NextResponse.json({ error: "المستخدم غير موجود" }, { status: 404 });
+    const requestId = uid();
     db.prepare(
       `
       INSERT INTO join_requests
@@ -127,7 +129,21 @@ export async function POST(req: NextRequest) {
       VALUES
         (?,  ?,      ?,        ?,         ?,        ?,          NULL, 'pending', datetime('now'), NULL,     NULL,       NULL,       NULL,   NULL,  NULL)
     `
-    ).run(uid(), user.id, user.name, user.email, entity.id, entity.name);
+    ).run(requestId, user.id, user.name, user.email, entity.id, entity.name);
+    
+    // إرسال إشعار لمدير الكيان
+    try {
+      notifyEntityManager(entity.id, {
+        type: "join_request",
+        title: "طلب انضمام جديد",
+        message: `${user.name} يريد الانضمام إلى ${entity.name}`,
+        link: `/dashboard/requests`,
+        metadata: { requestId, userId: user.id, entityId: entity.id },
+      });
+    } catch (e) {
+      console.error("Failed to send notification:", e);
+    }
+    
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || "خطأ غير متوقع" }, { status: 500 });

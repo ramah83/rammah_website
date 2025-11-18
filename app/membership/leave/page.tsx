@@ -110,7 +110,7 @@ export default function LeaveMembershipPage() {
     }
     setSubmitting(true);
     try {
-      const r = await fetch("/api/membership/leave", withSession({
+      const r = await fetch("/api/membership/leave-requests", withSession({
         method: "POST",
         body: JSON.stringify({ reason: reason.trim() || null })
       }));

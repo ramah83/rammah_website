@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { NotificationBell } from "@/components/NotificationBell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -645,7 +646,7 @@ function HeaderBar() {
   return (
     <header className="relative z-10">
       <div className="mx-auto max-w-6xl px-4">
-        <div className="mt-4 h-14 w-full rounded-ص2 flex items-center justify-between px-4 bg-white border border-[#E7E2DC] shadow-[0_6px_12px_rgba(0,0,0,0.04)]">
+        <div className="mt-4 h-14 w-full rounded-2xl flex items-center justify-between px-4 bg-white border border-[#E7E2DC] shadow-[0_6px_12px_rgba(0,0,0,0.04)]">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-[#F6F6F6] border border-[#E5E5E5]">
               <Users className="h-5 w-5 text-[#1D1D1D]" />
@@ -654,18 +655,21 @@ function HeaderBar() {
               منصة الكيانات الشبابية
             </Link>
           </div>
-          <nav className="hidden sm:flex items-center gap-1 text-sm">
-            {[
-              { href: "/profile", label: "الملف الشخصى" },
-              { href: "/dashboard", label: "لوحة التحكم" },
-              { href: "/support", label: "الدعم" },
-              { href: "/about", label: "عن المنصة" },
-            ].map((l) => (
-              <Link key={l.href} href={l.href} className={`px-3 py-1 rounded-lg transition ${active(l.href) ? "bg-[#EC1A24] text-white" : "text-[#1D1D1D]"}`}>
-                {l.label}
-              </Link>
-            ))}
-          </nav>
+          <div className="flex items-center gap-3">
+            <nav className="hidden sm:flex items-center gap-1 text-sm">
+              {[
+                { href: "/profile", label: "الملف الشخصى" },
+                { href: "/dashboard", label: "لوحة التحكم" },
+                { href: "/support", label: "الدعم" },
+                { href: "/about", label: "عن المنصة" },
+              ].map((l) => (
+                <Link key={l.href} href={l.href} className={`px-3 py-1 rounded-lg transition ${active(l.href) ? "bg-[#EC1A24] text-white" : "text-[#1D1D1D]"}`}>
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+            <NotificationBell />
+          </div>
         </div>
       </div>
     </header>

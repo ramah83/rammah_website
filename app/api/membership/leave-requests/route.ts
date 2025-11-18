@@ -5,6 +5,7 @@ export const revalidate = 0;
 import { NextRequest, NextResponse } from "next/server";
 import { getDB, uid } from "@/lib/server/sqlite";
 import { getSession, fromBase64Any, toCoreRole } from "@/lib/server/session";
+import { notifyEntityManager, createNotification } from "@/lib/server/notifications";
 
 type Sess = {
   id: string;
@@ -15,7 +16,6 @@ type Sess = {
 };
 
 async function readSession(req: NextRequest): Promise<Sess | null> {
-  // Prefer normalized session via server util
   try {
     const s = (await getSession(req)) as any;
     if (s?.id) {
@@ -29,7 +29,6 @@ async function readSession(req: NextRequest): Promise<Sess | null> {
     }
   } catch {}
 
-  // Fallback: header (base64url)
   const b64 = req.headers.get("x-session-b64") || "";
   if (b64) {
     try {
@@ -50,12 +49,6 @@ async function readSession(req: NextRequest): Promise<Sess | null> {
   return null;
 }
 
-/* ===================== GET: list leave requests =====================
-
-  ✅ التعديل:
-  - unionSupervisor: يعرض كل طلبات المغادرة
-  - entityManager: يعرض فقط طلبات المغادرة من الكيانات التي يديرها
-*/
 export async function GET(req: NextRequest) {
   const session = await readSession(req);
   if (!session?.id) {
@@ -70,27 +63,27 @@ export async function GET(req: NextRequest) {
     (["pending", "approved", "rejected", "all"].includes(rawStatus) ? rawStatus : "all") as any;
 
   const where: string[] = [`r.action='leave_membership'`];
-  const params: Record<string, any> = {};
+  const params: any[] = [];
 
   if (status !== "all") {
-    where.push(`r.status=@status`);
-    params["@status"] = status;
+    where.push(`r.status=?`);
+    params.push(status);
   }
 
-  // ✅ مسؤول الاتحاد: يرى كل الطلبات
   if (session.role === "unionSupervisor") {
-    // لا نضيف أي شرط إضافي، يرى كل شيء
     const entityIdParam = (searchParams.get("entityId") || "").trim();
     if (entityIdParam) {
-      params["@entityId"] = entityIdParam;
-      where.push(`r.targetEntityId=@entityId`);
+      where.push(`r.targetEntityId=?`);
+      params.push(entityIdParam);
     }
   }
-  // ✅ مدير الكيان: يرى فقط طلبات كياناته
   else if (session.role === "entityManager") {
     const userId = session.id;
     
-    // جلب الكيانات التي يديرها هذا المدير
+    // أولاً: جرب استخدام entityId من الـ session مباشرة
+    const sessionEntityId = session.entityId ? String(session.entityId) : null;
+    
+    // ثانياً: جيب كل الكيانات اللي المدير بيديرها
     const managedEntities = db.prepare(`
       SELECT DISTINCT entityId FROM (
         SELECT id AS entityId FROM entities WHERE managerUserId = ?
@@ -101,21 +94,23 @@ export async function GET(req: NextRequest) {
       )
     `).all(userId, userId, userId) as { entityId: string }[];
 
+    // لو في entityId في الـ session، استخدمه
+    if (sessionEntityId) {
+      managedEntities.push({ entityId: sessionEntityId });
+    }
+
     if (managedEntities.length === 0) {
       // لا يدير أي كيان، لا يرى أي طلبات
       return NextResponse.json([]);
     }
 
-    const entityIds = managedEntities.map(e => e.entityId);
-    const placeholders = entityIds.map((_, i) => `@eid${i}`).join(',');
+    // إزالة التكرار
+    const uniqueEntityIds = Array.from(new Set(managedEntities.map(e => e.entityId)));
+    const placeholders = uniqueEntityIds.map(() => '?').join(',');
     
-    entityIds.forEach((eid, i) => {
-      params[`@eid${i}`] = eid;
-    });
-
     where.push(`r.targetEntityId IN (${placeholders})`);
+    params.push(...uniqueEntityIds);
   } 
-  // المستخدم العادي: لا يرى شيئًا هنا
   else {
     return NextResponse.json([]);
   }
@@ -146,7 +141,7 @@ export async function GET(req: NextRequest) {
     LIMIT 500
   `;
 
-  const rows = db.prepare(sql).all(params) as any[];
+  const rows = db.prepare(sql).all(...params) as any[];
   const mapped = rows.map((r) => {
     let payload: any = {};
     try {
@@ -171,7 +166,6 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(mapped);
 }
 
-/* ===================== POST: create leave request ===================== */
 export async function POST(req: NextRequest) {
   const s = await readSession(req);
   if (!s?.id) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
@@ -248,6 +242,20 @@ export async function POST(req: NextRequest) {
     ).run(uid(), entityId, reason, s.id, s.name || s.email || "مستخدم", s.role);
   } catch {}
 
+  // إرسال إشعار لمدير الكيان
+  try {
+    const entityName = mem.entityName || entityId;
+    notifyEntityManager(entityId, {
+      type: "leave_request",
+      title: "طلب مغادرة جديد",
+      message: `${s.name || s.email} يريد مغادرة ${entityName}`,
+      link: `/dashboard/requests`,
+      metadata: { requestId: rid, userId: s.id, entityId },
+    });
+  } catch (e) {
+    console.error("Failed to send notification:", e);
+  }
+
   return NextResponse.json(
     {
       ok: true,
@@ -260,12 +268,6 @@ export async function POST(req: NextRequest) {
   );
 }
 
-/* ===================== PATCH: decide (approve / reject) =====================
-
-   لم يتم تغيير منطق الصلاحيات:
-   - unionSupervisor: مسموح دائمًا
-   - entityManager: فقط للكيانات التي يديرها/مسجّل كمدير/أدمن فيها
-*/
 export async function PATCH(req: NextRequest) {
   const s = await readSession(req);
   if (!s) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
@@ -327,6 +329,23 @@ export async function PATCH(req: NextRequest) {
         VALUES (?, ?, 'leave_rejected', NULL, NULL, ?, ?, ?, ?, datetime('now'))
       `
       ).run(uid(), String(reqRow.targetEntityId), note, s.id, s.name || s.email || "مستخدم", s.role || "unknown");
+      
+      // إرسال إشعار للعضو بالرفض
+      try {
+        const userId = payload?.userId || reqRow.createdBy;
+        if (userId) {
+          createNotification({
+            userId: String(userId),
+            type: "leave_rejected",
+            title: "تم رفض طلب المغادرة",
+            message: `تم رفض طلبك لمغادرة الكيان`,
+            link: `/profile/history`,
+            metadata: { requestId: rid, entityId: reqRow.targetEntityId },
+          });
+        }
+      } catch (e) {
+        console.error("Failed to send notification:", e);
+      }
     }
     return NextResponse.json({ ok: true, status: "rejected" });
   }
@@ -382,6 +401,54 @@ export async function PATCH(req: NextRequest) {
         VALUES (?, ?, 'member_left', NULL, NULL, ?, ?, ?, ?, datetime('now'))
       `
       ).run(uid(), entityId, note, s.id, s.name || s.email || "مستخدم", actorRole);
+
+      // إرسال إشعار للعضو بالموافقة
+      try {
+        createNotification({
+          userId: String(userId),
+          type: "leave_approved",
+          title: "تمت الموافقة على طلب المغادرة",
+          message: `تمت الموافقة على طلبك لمغادرة الكيان`,
+          link: `/profile/history`,
+          metadata: { requestId: rid, entityId },
+        });
+      } catch (e) {
+        console.error("Failed to send notification:", e);
+      }
+
+      // إذا كان هناك طلب انضمام معلق (pending_leave)، قم بتفعيله الآن
+      const pendingJoinRequest = db.prepare(`
+        SELECT * FROM join_requests 
+        WHERE userId=? AND status='pending_leave' 
+        ORDER BY datetime(decidedAt) DESC 
+        LIMIT 1
+      `).get(userId) as any;
+
+      if (pendingJoinRequest) {
+        // تفعيل طلب الانضمام الجديد
+        db.prepare(`
+          UPDATE join_requests
+             SET status='approved',
+                 note = COALESCE(note,'') || CASE WHEN note IS NULL OR note='' THEN '' ELSE ' | ' END || 'تم الموافقة تلقائيًا بعد الخروج من الكيان السابق'
+           WHERE id=?
+        `).run(pendingJoinRequest.id);
+
+        // إضافة العضو للكيان الجديد
+        db.prepare(`
+          INSERT OR IGNORE INTO entity_members (id, entityId, userId, joinedAt)
+          VALUES (?, ?, ?, datetime('now'))
+        `).run(uid(), pendingJoinRequest.entityId, userId);
+
+        // إغلاق أي طلبات انضمام أخرى معلقة
+        db.prepare(`
+          UPDATE join_requests
+             SET status='joined_elsewhere',
+                 decidedAt=datetime('now'),
+                 decidedBy='system',
+                 note=COALESCE(NULLIF(note,''),'تم إغلاق الطلب تلقائيًا لانضمام المستخدم إلى كيان آخر')
+           WHERE userId=? AND status='pending' AND id<>?
+        `).run(userId, pendingJoinRequest.id);
+      }
     });
     tx();
 

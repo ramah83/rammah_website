@@ -319,7 +319,7 @@ export default function NewEvaluationPage() {
       <main className="mx-auto max-w-6xl w-full px-4 mt-6 pb-10">
         <Card className="rounded-[22px] bg-white" style={{ borderColor: PALETTE.border, boxShadow:"0 8px 18px rgba(0,0,0,0.05)" }}>
           <CardHeader className="pb-0">
-            <CardTitle className="text-lg" style={{ color: PALETTE.black }}>تقييم فعالية — نموذج جديد</CardTitle>
+            <CardTitle className="text-lg" style={{ color: PALETTE.black }}>تقييم فعالية </CardTitle>
             <CardDescription className="text-sm" style={{ color: PALETTE.gray }}>اختر فعالية من كياناتك وقدّم تقييمك.</CardDescription>
           </CardHeader>
           <CardContent className="pt-4">

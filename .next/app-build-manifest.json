@@ -12,6 +12,11 @@
       "static/css/app/page.css",
       "static/chunks/app/page.js"
     ],
+    "/api/notifications/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/notifications/route.js"
+    ],
     "/api/entities/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -33,47 +38,31 @@
       "static/css/app/dashboard/page.css",
       "static/chunks/app/dashboard/page.js"
     ],
-    "/iso/page": [
+    "/api/auth/login/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/css/app/iso/page.css",
-      "static/chunks/app/iso/page.js"
-    ],
-    "/api/stats/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/stats/route.js"
+      "static/chunks/app/api/auth/login/route.js"
     ],
     "/api/me/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/me/route.js"
     ],
-    "/api/iso/route": [
+    "/api/stats/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/iso/route.js"
-    ],
-    "/api/membership/my/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/membership/my/route.js"
-    ],
-    "/api/events/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/events/route.js"
-    ],
-    "/api/members/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/members/route.js"
+      "static/chunks/app/api/stats/route.js"
     ],
     "/profile/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/css/app/profile/page.css",
       "static/chunks/app/profile/page.js"
+    ],
+    "/api/iso/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/iso/route.js"
     ]
   }
 }

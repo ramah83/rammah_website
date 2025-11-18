@@ -359,34 +359,36 @@ export default function HistoryPage() {
 
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8">
         <div
-          className="rounded-[22px] p-5 md:p-6 flex items-center justify-between transition-all duration-300 bg-white hover:shadow-lg animate-fade-in-up"
-          style={{ border: `1px solid ${COLORS.border}` }}
+          className="rounded-[22px] p-6 md:p-8 transition-all duration-300 bg-white animate-fade-in-up"
+          style={{ border: `1px solid ${COLORS.border}`, boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}
         >
-          <div className="flex items-center gap-3">
-            <span className="h-10 w-10 rounded-xl grid place-items-center" style={{ backgroundColor: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
-              <Users className="h-5 w-5" color={COLORS.text} />
-            </span>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-extrabold" style={{ color: COLORS.text }}>
-                {isSupervisor ? "سجل المنصّة ولوحة المراجعة"
-                  : isManager ? "سجل كيانك ولوحة المراجعة"
-                  : "سجل العضوية"}
-              </h1>
-              <p className="text-sm" style={{ color: COLORS.muted }}>
-                {isSupervisor ? "كل الكيانات، كل الطلبات، كل الأحداث."
-                  : isManager ? "كل ما يخص كيانك: الطلبات، الملفات، الأحداث والأعضاء."
-                  : "تاريخ الانضمام والخروج وحالة عضويتك، وأحداث الكيان."}
-              </p>
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-2xl grid place-items-center" style={{ backgroundColor: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                <Clock className="h-7 w-7" style={{ color: COLORS.primary }} />
+              </div>
+              <div>
+                <h1 className="text-3xl md:text-4xl font-extrabold" style={{ color: COLORS.text }}>
+                  {isSupervisor ? "سجل المنصّة ولوحة المراجعة"
+                    : isManager ? "سجل الكيان ولوحة المراجعة"
+                    : "سجل العضوية والأنشطة"}
+                </h1>
+                <p className="text-sm mt-1" style={{ color: COLORS.muted }}>
+                  {isSupervisor ? "متابعة شاملة لجميع الأنشطة والطلبات عبر المنصة"
+                    : isManager ? "تتبع كامل لأنشطة كيانك والطلبات والأعضاء"
+                    : "تاريخ عضويتك الكامل وجميع الأنشطة المتعلقة بك"}
+                </p>
+              </div>
             </div>
+            <button
+              onClick={() => router.push("/profile")}
+              className="h-10 px-5 rounded-full inline-flex items-center gap-2 font-semibold transition-all duration-200 hover:opacity-80"
+              style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}`, color: COLORS.text }}
+            >
+              <ArrowRight className="h-4 w-4" />
+              رجوع
+            </button>
           </div>
-          <button
-            onClick={() => router.push("/profile")}
-            className="h-9 px-3 rounded-full inline-flex items-center gap-2 font-semibold transition-all duration-200 hover:translate-x-0.5"
-            style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text }}
-          >
-            رجوع
-            <ArrowRight className="h-4 w-4" />
-          </button>
         </div>
       </section>
 
@@ -394,44 +396,64 @@ export default function HistoryPage() {
         <div className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-5">
 
           {/* الحالة الحالية / ملخص */}
-          <Card className="rounded-[22px] bg-white border border-[#E7E2DC] text-[#1D1D1D] shadow-[0_8px_18px_rgba(0,0,0,0.05)] transition-all duration-300 hover:shadow-lg animate-fade-in-up">
-            <CardHeader>
-              <CardTitle>{isSupervisor ? "ملخص المنصّة" : "الحالة الحالية"}</CardTitle>
-              <CardDescription className="text-[#6B6B6B]">
-                {isSupervisor ? "عرض شامل لمؤشرات المراجعة" : "كيانك الحالي (إن وجد)"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isSupervisor ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                  <Stat label="طلبات انضمام" value={summary.joinPending} />
-                  <Stat label="طلبات فعاليات" value={summary.eventRequests} />
-                  <Stat label="ملفات ISO قيد المراجعة" value={summary.isoSubs} />
-                  <Stat label="حوكمة قيد المراجعة" value={summary.govSubs} />
-                  <Stat label="طلبات مدير معلّقة" value={summary.managerReqs} />
-                  <Stat label="طلبات كيانات معلّقة" value={summary.entityReqs} />
+          <div className="space-y-5">
+            <Card className="rounded-[22px] bg-white border border-[#E7E2DC] text-[#1D1D1D] shadow-[0_8px_18px_rgba(0,0,0,0.05)] animate-fade-in-up">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-5 w-5" style={{ color: COLORS.primary }} />
+                  <CardTitle className="text-lg">{isSupervisor ? "ملخص المنصّة" : "الحالة الحالية"}</CardTitle>
                 </div>
-              ) : (current?.entityId || myEntityId) ? (
-                <div className="space-y-2 text-sm">
-                  <div>الكيان: <strong>{prettyEntityName}</strong></div>
-                  <div>
-                    الحالة:{" "}
-                    <span className="px-2 py-0.5 rounded-full text-xs" style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
-                      {entityStatusLabel || current?.status || "فعّال"}
-                    </span>
+                <CardDescription className="text-[#6B6B6B] mt-1">
+                  {isSupervisor ? "مؤشرات المراجعة والطلبات المعلقة" : "معلومات كيانك الحالي"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isSupervisor ? (
+                  <div className="grid grid-cols-1 gap-3">
+                    <StatCard icon={<Users className="h-5 w-5" />} label="طلبات انضمام" value={summary.joinPending} color={COLORS.primary} />
+                    <StatCard icon={<FileText className="h-5 w-5" />} label="طلبات فعاليات" value={summary.eventRequests} color={COLORS.primary} />
+                    <StatCard icon={<ShieldCheck className="h-5 w-5" />} label="ملفات ISO" value={summary.isoSubs} color={COLORS.primary} />
+                    <StatCard icon={<CheckCircle2 className="h-5 w-5" />} label="حوكمة" value={summary.govSubs} color={COLORS.primary} />
+                    <StatCard icon={<UserCheck className="h-5 w-5" />} label="طلبات مدير" value={summary.managerReqs} color={COLORS.primary} />
+                    <StatCard icon={<Layers className="h-5 w-5" />} label="طلبات كيانات" value={summary.entityReqs} color={COLORS.primary} />
                   </div>
-                </div>
-              ) : (
-                <div className="text-sm" style={{ color: COLORS.muted }}>غير منضم لأي كيان حالياً.</div>
-              )}
-            </CardContent>
-          </Card>
+                ) : (current?.entityId || myEntityId) ? (
+                  <div className="space-y-4">
+                    <div className="rounded-xl p-4" style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                      <div className="text-xs font-medium mb-2" style={{ color: COLORS.muted }}>الكيان</div>
+                      <div className="font-bold text-lg" style={{ color: COLORS.text }}>{prettyEntityName}</div>
+                    </div>
+                    <div className="rounded-xl p-4" style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                      <div className="text-xs font-medium mb-2" style={{ color: COLORS.muted }}>الحالة</div>
+                      <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium" 
+                            style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text }}>
+                        <CheckCircle2 className="h-4 w-4" style={{ color: COLORS.primary }} />
+                        {entityStatusLabel || current?.status || "فعّال"}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="h-12 w-12 rounded-full mx-auto grid place-items-center mb-3"
+                         style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                      <Users className="h-6 w-6" style={{ color: COLORS.muted }} />
+                    </div>
+                    <div className="text-sm font-medium" style={{ color: COLORS.text }}>غير منضم لأي كيان</div>
+                    <div className="text-xs mt-1" style={{ color: COLORS.muted }}>يمكنك تقديم طلب انضمام</div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
           {/* الخط الزمني */}
-          <Card className="rounded-[22px] bg-white border border-[#E7E2DC] text-[#1D1D1D] shadow-[0_8px_18px_rgba(0,0,0,0.05)] transition-all duration-300 hover:shadow-lg animate-fade-in-up">
-            <CardHeader>
-              <CardTitle>الخط الزمني</CardTitle>
-              <CardDescription className="text-[#6B6B6B]">
+          <Card className="rounded-[22px] bg-white border border-[#E7E2DC] text-[#1D1D1D] shadow-[0_8px_18px_rgba(0,0,0,0.05)] animate-fade-in-up">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5" style={{ color: COLORS.primary }} />
+                <CardTitle className="text-lg">الخط الزمني</CardTitle>
+              </div>
+              <CardDescription className="text-[#6B6B6B] mt-1">
                 {isSupervisor ? "أحدث أحداث العضوية والمنصّة"
                  : isManager ? "طلبات ومغادرات مرتبطة بكيانك"
                  : "أحداث عضويتك مرتبة زمنياً"}
@@ -439,26 +461,56 @@ export default function HistoryPage() {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <Skeleton className="h-28 rounded-2xl" />
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-20 rounded-xl animate-pulse" style={{ background: COLORS.soft }} />
+                  ))}
+                </div>
               ) : timeline.length === 0 ? (
-                <div className="text-sm" style={{ color: COLORS.muted }}>لا توجد أحداث ضمن النطاق.</div>
+                <div className="text-center py-12">
+                  <div className="h-14 w-14 rounded-full mx-auto grid place-items-center mb-3"
+                       style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                    <Clock className="h-7 w-7" style={{ color: COLORS.muted }} />
+                  </div>
+                  <div className="font-semibold mb-1" style={{ color: COLORS.text }}>لا توجد أحداث</div>
+                  <div className="text-sm" style={{ color: COLORS.muted }}>لم يتم تسجيل أي أحداث حتى الآن</div>
+                </div>
               ) : (
-                <ul className="space-y-4">
+                <ul className="space-y-3">
                   {timeline.map((item, idx) => (
-                    <li key={item.id} className="flex gap-3 animate-stagger" style={{ animationDelay: `${idx * 40}ms` }}>
-                      <span className="h-9 w-9 rounded-xl grid place-items-center shrink-0"
-                            style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                    <li key={item.id} className="rounded-xl p-4 flex gap-4 transition-all duration-200 hover:shadow-sm animate-stagger" 
+                        style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}`, animationDelay: `${idx * 40}ms` }}>
+                      <span className="h-11 w-11 rounded-xl grid place-items-center shrink-0"
+                            style={{ background: COLORS.card, border: `1px solid ${COLORS.line}` }}>
                         {iconFor(item.type)}
                       </span>
-                      <div className="flex-1">
-                        <div className="text-sm">{renderTitle(item, { showNames: isSupervisor || isManager, usersMap })}</div>
-                        <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
-                          {formatDate(item.at)} • {item.entityName}{" "}
-                          {(isSupervisor || isManager) ? `• العضو: ${displayUser(item.userId, item.userName, usersMap)}` : ""}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium" style={{ color: COLORS.text }}>
+                          {renderTitle(item, { showNames: isSupervisor || isManager, usersMap })}
+                        </div>
+                        <div className="text-xs mt-1.5 flex flex-wrap items-center gap-2" style={{ color: COLORS.muted }}>
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatDate(item.at)}
+                          </span>
+                          <span>•</span>
+                          <span className="inline-flex items-center gap-1">
+                            <Layers className="h-3 w-3" />
+                            {item.entityName}
+                          </span>
+                          {(isSupervisor || isManager) && (
+                            <>
+                              <span>•</span>
+                              <span className="inline-flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                {displayUser(item.userId, item.userName, usersMap)}
+                              </span>
+                            </>
+                          )}
                         </div>
                         {"note" in item && item.note && (
-                          <div className="mt-2 text-xs rounded-lg p-2" style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
-                            ملاحظة: {item.note}
+                          <div className="mt-3 text-xs rounded-lg p-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text }}>
+                            <span className="font-medium">ملاحظة:</span> {item.note}
                           </div>
                         )}
                       </div>
@@ -469,22 +521,36 @@ export default function HistoryPage() {
             </CardContent>
           </Card>
 
-          {/* ——— NEW: سير طلبات الانضمام ——— */}
+          {/* ——— سير طلبات الانضمام ——— */}
           <div className="xl:col-span-2">
-            <Card className="rounded-[22px] bg-white border border-[#E7E2DC] text-[#1D1D1D] shadow-[0_8px_18px_rgba(0,0,0,0.05)] transition-all duration-300 hover:shadow-lg animate-fade-in-up">
-              <CardHeader>
-                <CardTitle>طلبات الانضمام وسير المراجعة</CardTitle>
-                <CardDescription className="text-[#6B6B6B]">
-                  {isSupervisor ? "كل طلبات الانضمام عبر المنصّة خطوة بخطوة."
-                   : isManager ? "طلبات الانضمام إلى كيانك وما تم بشأنها."
-                   : "رحلة طلب الانضمام الخاص بك حتى التنفيذ النهائي."}
+            <Card className="rounded-[22px] bg-white border border-[#E7E2DC] text-[#1D1D1D] shadow-[0_8px_18px_rgba(0,0,0,0.05)] animate-fade-in-up">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="h-5 w-5" style={{ color: COLORS.primary }} />
+                  <CardTitle className="text-lg">طلبات الانضمام وسير المراجعة</CardTitle>
+                </div>
+                <CardDescription className="text-[#6B6B6B] mt-1">
+                  {isSupervisor ? "تتبع كامل لجميع طلبات الانضمام عبر المنصّة"
+                   : isManager ? "متابعة طلبات الانضمام إلى كيانك ومراحل الموافقة"
+                   : "رحلة طلب الانضمام الخاص بك من البداية حتى التنفيذ"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {flowsLoading ? (
-                  <Skeleton className="h-28 rounded-2xl" />
+                  <div className="space-y-3">
+                    {[1, 2].map((i) => (
+                      <div key={i} className="h-32 rounded-xl animate-pulse" style={{ background: COLORS.soft }} />
+                    ))}
+                  </div>
                 ) : joinFlows.length === 0 ? (
-                  <div className="text-sm" style={{ color: COLORS.muted }}>لا توجد طلبات انضمام للعرض.</div>
+                  <div className="text-center py-12">
+                    <div className="h-14 w-14 rounded-full mx-auto grid place-items-center mb-3"
+                         style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                      <UserCheck className="h-7 w-7" style={{ color: COLORS.muted }} />
+                    </div>
+                    <div className="font-semibold mb-1" style={{ color: COLORS.text }}>لا توجد طلبات انضمام</div>
+                    <div className="text-sm" style={{ color: COLORS.muted }}>لم يتم تقديم أي طلبات انضمام حتى الآن</div>
+                  </div>
                 ) : (
                   <ul className="space-y-4">
                     {joinFlows.map((flow) => {
@@ -503,19 +569,34 @@ export default function HistoryPage() {
                           ? "قرار مسؤول الاتحاد"
                           : "قرار الجهة المسؤولة";
                       return (
-                        <li key={flow.key} className="rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-                          <div className="text-sm font-semibold">
-                            العضو: <PersonChip name={displayUser(flow.userId, flow.userName || null, usersMap)} />{" "}
-                            <span className="mx-1">•</span>
-                            الكيان: <EntityChip name={flow.entityName || flow.entityId} />
-                          </div>
-                          {flow.finalJoinedAt ? (
-                            <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
-                              تم الانضمام نهائيًا في {formatDate(flow.finalJoinedAt)}
+                        <li key={flow.key} className="rounded-xl p-5 transition-all duration-200 hover:shadow-md" 
+                            style={{ background: COLORS.soft, border: `1px solid ${COLORS.border}` }}>
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="h-8 w-8 rounded-lg grid place-items-center" 
+                                     style={{ background: COLORS.card, border: `1px solid ${COLORS.line}` }}>
+                                  <Users className="h-4 w-4" style={{ color: COLORS.primary }} />
+                                </div>
+                                <div className="text-sm font-semibold" style={{ color: COLORS.text }}>
+                                  {displayUser(flow.userId, flow.userName || null, usersMap)}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs" style={{ color: COLORS.muted }}>
+                                <Layers className="h-3 w-3" />
+                                <span>{flow.entityName || flow.entityId}</span>
+                              </div>
                             </div>
-                          ) : null}
+                            {flow.finalJoinedAt && (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+                                    style={{ background: "#EAF8F0", border: "1px solid #CBEBDD", color: "#0F5132" }}>
+                                <CheckCircle2 className="h-3 w-3" />
+                                تم الانضمام
+                              </span>
+                            )}
+                          </div>
 
-                          <div className="mt-3 grid grid-cols-1 lg:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                            <FlowStepItem
   title="طلب انضمام"
   icon={<PlusCircle className="h-4 w-4" />}
@@ -569,36 +650,65 @@ export default function HistoryPage() {
 
           {/* ——— سير طلبات الخروج ——— */}
           <div className="xl:col-span-2">
-            <Card className="rounded-[22px] bg-white border border-[#E7E2DC] text-[#1D1D1D] shadow-[0_8px_18px_rgba(0,0,0,0.05)] transition-all duration-300 hover:shadow-lg animate-fade-in-up">
-              <CardHeader>
-                <CardTitle>طلبات الخروج وسير المراجعة</CardTitle>
-                <CardDescription className="text-[#6B6B6B]">
-                  {isSupervisor ? "كل طلبات الخروج عبر المنصّة خطوة بخطوة."
-                   : isManager ? "طلبات الخروج من كيانك وما تم بشأنها."
-                   : "رحلة طلب الخروج الخاص بك حتى التنفيذ النهائي."}
+            <Card className="rounded-[22px] bg-white border border-[#E7E2DC] text-[#1D1D1D] shadow-[0_8px_18px_rgba(0,0,0,0.05)] animate-fade-in-up">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2">
+                  <LogOut className="h-5 w-5" style={{ color: COLORS.primary }} />
+                  <CardTitle className="text-lg">طلبات الخروج وسير المراجعة</CardTitle>
+                </div>
+                <CardDescription className="text-[#6B6B6B] mt-1">
+                  {isSupervisor ? "تتبع كامل لجميع طلبات الخروج عبر المنصّة"
+                   : isManager ? "متابعة طلبات الخروج من كيانك ومراحل الموافقة"
+                   : "رحلة طلب الخروج الخاص بك من البداية حتى التنفيذ"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {flowsLoading ? (
-                  <Skeleton className="h-28 rounded-2xl" />
+                  <div className="space-y-3">
+                    {[1, 2].map((i) => (
+                      <div key={i} className="h-32 rounded-xl animate-pulse" style={{ background: COLORS.soft }} />
+                    ))}
+                  </div>
                 ) : leaveFlows.length === 0 ? (
-                  <div className="text-sm" style={{ color: COLORS.muted }}>لا توجد طلبات خروج للعرض.</div>
+                  <div className="text-center py-12">
+                    <div className="h-14 w-14 rounded-full mx-auto grid place-items-center mb-3"
+                         style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                      <LogOut className="h-7 w-7" style={{ color: COLORS.muted }} />
+                    </div>
+                    <div className="font-semibold mb-1" style={{ color: COLORS.text }}>لا توجد طلبات خروج</div>
+                    <div className="text-sm" style={{ color: COLORS.muted }}>لم يتم تقديم أي طلبات خروج حتى الآن</div>
+                  </div>
                 ) : (
                   <ul className="space-y-4">
                     {leaveFlows.map((flow) => (
-                      <li key={flow.key} className="rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-                        <div className="text-sm font-semibold">
-                          العضو: <PersonChip name={displayUser(flow.userId, flow.userName || null, usersMap)} />{" "}
-                          <span className="mx-1">•</span>
-                          الكيان: <EntityChip name={flow.entityName || flow.entityId} />
-                        </div>
-                        {flow.finalLeftAt ? (
-                          <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
-                            تم الخروج نهائيًا في {formatDate(flow.finalLeftAt)}
+                      <li key={flow.key} className="rounded-xl p-5 transition-all duration-200 hover:shadow-md" 
+                          style={{ background: COLORS.soft, border: `1px solid ${COLORS.border}` }}>
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="h-8 w-8 rounded-lg grid place-items-center" 
+                                   style={{ background: COLORS.card, border: `1px solid ${COLORS.line}` }}>
+                                <UserMinus className="h-4 w-4" style={{ color: COLORS.primary }} />
+                              </div>
+                              <div className="text-sm font-semibold" style={{ color: COLORS.text }}>
+                                {displayUser(flow.userId, flow.userName || null, usersMap)}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs" style={{ color: COLORS.muted }}>
+                              <Layers className="h-3 w-3" />
+                              <span>{flow.entityName || flow.entityId}</span>
+                            </div>
                           </div>
-                        ) : null}
+                          {flow.finalLeftAt && (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+                                  style={{ background: "#FFF0F0", border: "1px solid #F5C2C7", color: "#7A0010" }}>
+                              <XCircle className="h-3 w-3" />
+                              تم الخروج
+                            </span>
+                          )}
+                        </div>
 
-                        <div className="mt-3 grid grid-cols-1 lg:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
                           <FlowStepItem
                             title="طلب خروج"
                             icon={<LogOut className="h-4 w-4" />}
@@ -638,41 +748,95 @@ export default function HistoryPage() {
 
           {/* أحداث الكيان (موحّدة) */}
           <div className="xl:col-span-2">
-            <Card className="rounded-[22px] bg-white border border-[#E7E2DC] text-[#1D1D1D] shadow-[0_8px_18px_rgba(0,0,0,0.05)] transition-all duration-300 hover:shadow-lg animate-fade-in-up">
-              <CardHeader>
-                <CardTitle>أحداث الكيانات</CardTitle>
-                <CardDescription className="text-[#6B6B6B]">
-                  {isSupervisor ? "أحدث تغييرات ووثائق وطلبات كل الكيانات."
-                   : myEntityId ? <>كل ما يحدث لكيان: <strong>{prettyEntityName}</strong></>
-                   : "أحداث الكيان المرتبط بعضويتك الحالية (إن وُجد)."}
+            <Card className="rounded-[22px] bg-white border border-[#E7E2DC] text-[#1D1D1D] shadow-[0_8px_18px_rgba(0,0,0,0.05)] animate-fade-in-up">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-5 w-5" style={{ color: COLORS.primary }} />
+                  <CardTitle className="text-lg">أحداث الكيانات</CardTitle>
+                </div>
+                <CardDescription className="text-[#6B6B6B] mt-1">
+                  {isSupervisor ? "أحدث التغييرات والوثائق والطلبات عبر جميع الكيانات"
+                   : myEntityId ? `جميع الأنشطة والتحديثات لكيان: ${prettyEntityName}`
+                   : "أحداث الكيان المرتبط بعضويتك الحالية"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {(!isSupervisor && !myEntityId) ? (
-                  <div className="text-sm" style={{ color: COLORS.muted }}>انضم إلى كيان أو أدِر كيانًا لعرض الأحداث هنا.</div>
+                  <div className="text-center py-12">
+                    <div className="h-14 w-14 rounded-full mx-auto grid place-items-center mb-3"
+                         style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                      <Layers className="h-7 w-7" style={{ color: COLORS.muted }} />
+                    </div>
+                    <div className="font-semibold mb-1" style={{ color: COLORS.text }}>لا توجد أحداث</div>
+                    <div className="text-sm" style={{ color: COLORS.muted }}>انضم إلى كيان لعرض الأحداث</div>
+                  </div>
                 ) : loading ? (
-                  <Skeleton className="h-28 rounded-2xl" />
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-20 rounded-xl animate-pulse" style={{ background: COLORS.soft }} />
+                    ))}
+                  </div>
                 ) : moduleEvents.length === 0 ? (
-                  <div className="text-sm" style={{ color: COLORS.muted }}>لا توجد أحداث ضمن النطاق المحدد.</div>
+                  <div className="text-center py-12">
+                    <div className="h-14 w-14 rounded-full mx-auto grid place-items-center mb-3"
+                         style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                      <FileText className="h-7 w-7" style={{ color: COLORS.muted }} />
+                    </div>
+                    <div className="font-semibold mb-1" style={{ color: COLORS.text }}>لا توجد أحداث</div>
+                    <div className="text-sm" style={{ color: COLORS.muted }}>لم يتم تسجيل أي أحداث حتى الآن</div>
+                  </div>
                 ) : (
-                  <ul className="space-y-4">
+                  <ul className="space-y-3">
                     {moduleEvents.map((ev, idx) => (
-                      <li key={ev.id} className="flex gap-3 animate-stagger" style={{ animationDelay: `${idx * 40}ms` }}>
-                        <span className="h-9 w-9 rounded-xl grid place-items-center shrink-0"
-                              style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+                      <li key={ev.id} className="rounded-xl p-4 flex gap-4 transition-all duration-200 hover:shadow-sm animate-stagger" 
+                          style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}`, animationDelay: `${idx * 40}ms` }}>
+                        <span className="h-11 w-11 rounded-xl grid place-items-center shrink-0"
+                              style={{ background: COLORS.card, border: `1px solid ${COLORS.line}` }}>
                           {moduleIcon(ev.kind, ev.title)}
                         </span>
-                        <div className="flex-1">
-                          <div className="text-sm">
-                            <strong className="opacity-70">[{kindLabel(ev.kind)}]</strong> {ev.title}
-                            {ev.status ? <> • الحالة: <strong>{ev.status}</strong></> : null}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium mb-1" style={{ color: COLORS.text }}>
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium mr-2"
+                                  style={{ background: COLORS.card, border: `1px solid ${COLORS.line}` }}>
+                              {kindLabel(ev.kind)}
+                            </span>
+                            {ev.title}
+                            {ev.status && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ml-2"
+                                    style={{ background: COLORS.card, border: `1px solid ${COLORS.line}` }}>
+                                {ev.status}
+                              </span>
+                            )}
                           </div>
-                          <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
-                            {formatDate(ev.at)}
-                            {ev.entityName ? ` • ${ev.entityName}` : ""}
-                            {ev.actorName ? ` • بواسطة: ${ev.actorName}` : ""}
-                            {ev.reason ? ` • السبب: ${ev.reason}` : ""}
+                          <div className="text-xs flex flex-wrap items-center gap-2" style={{ color: COLORS.muted }}>
+                            <span className="inline-flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {formatDate(ev.at)}
+                            </span>
+                            {ev.entityName && (
+                              <>
+                                <span>•</span>
+                                <span className="inline-flex items-center gap-1">
+                                  <Layers className="h-3 w-3" />
+                                  {ev.entityName}
+                                </span>
+                              </>
+                            )}
+                            {ev.actorName && (
+                              <>
+                                <span>•</span>
+                                <span className="inline-flex items-center gap-1">
+                                  <Users className="h-3 w-3" />
+                                  {ev.actorName}
+                                </span>
+                              </>
+                            )}
                           </div>
+                          {ev.reason && (
+                            <div className="mt-2 text-xs rounded-lg p-2" style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text }}>
+                              <span className="font-medium">السبب:</span> {ev.reason}
+                            </div>
+                          )}
                         </div>
                       </li>
                     ))}
@@ -685,28 +849,73 @@ export default function HistoryPage() {
           {/* نشاط سريع */}
           {(isManager || isSupervisor) && (
             <div className="xl:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <ReviewList title="آخر المنضمّين" items={activity.recentJoins} render={(r: any) => {
-                const id = r?.userId || r?.memberId || r?.user || r?.id;
-                return (
-                  <>
-                    <PersonChip name={displayUser(id, r.userName, usersMap)} />
-                    <span className="mx-1">انضم إلى</span>
-                    <EntityChip name={r.entityName || r.entityId} />
-                    <div className="text-xs mt-1" style={{ color: COLORS.muted }}>{formatDate(r.joinedAt || r.createdAt)}</div>
-                  </>
-                );
-              }} />
-              <ReviewList title="آخر الخارجين/المزالين" items={activity.recentLeaves} render={(r: any) => {
-                const id = r?.userId || r?.memberId || r?.user || r?.id;
-                return (
-                  <>
-                    <PersonChip name={displayUser(id, r.userName, usersMap)} />
-                    <span className="mx-1">{r.type === "removed" ? "تمت إزالته من" : "خرج من"}</span>
-                    <EntityChip name={r.entityName || r.entityId} />
-                    <div className="text-xs mt-1" style={{ color: COLORS.muted }}>{formatDate(r.createdAt || r.leftAt)}</div>
-                  </>
-                );
-              }} />
+              <ReviewList 
+                title="آخر المنضمّين" 
+                items={activity.recentJoins}
+                icon={<UserCheck className="h-5 w-5" style={{ color: COLORS.primary }} />}
+                render={(r: any) => {
+                  const id = r?.userId || r?.memberId || r?.user || r?.id;
+                  return (
+                    <div className="flex items-start gap-3">
+                      <div className="h-9 w-9 rounded-lg grid place-items-center shrink-0"
+                           style={{ background: COLORS.card, border: `1px solid ${COLORS.line}` }}>
+                        <Users className="h-4 w-4" style={{ color: COLORS.primary }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium mb-1" style={{ color: COLORS.text }}>
+                          {displayUser(id, r.userName, usersMap)}
+                        </div>
+                        <div className="text-xs flex items-center gap-2" style={{ color: COLORS.muted }}>
+                          <span>انضم إلى</span>
+                          <span className="font-medium" style={{ color: COLORS.text }}>{r.entityName || r.entityId}</span>
+                        </div>
+                        <div className="text-xs mt-1 flex items-center gap-1" style={{ color: COLORS.muted }}>
+                          <Clock className="h-3 w-3" />
+                          {formatDate(r.joinedAt || r.createdAt)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }} 
+              />
+              <ReviewList 
+                title="آخر الخارجين" 
+                items={activity.recentLeaves}
+                icon={<LogOut className="h-5 w-5" style={{ color: COLORS.primary }} />}
+                render={(r: any) => {
+                  const id = r?.userId || r?.memberId || r?.user || r?.id;
+                  let meta: any = {};
+                  try {
+                    meta = r.meta ? JSON.parse(r.meta) : {};
+                  } catch {}
+                  return (
+                    <div className="flex items-start gap-3">
+                      <div className="h-9 w-9 rounded-lg grid place-items-center shrink-0"
+                           style={{ background: COLORS.card, border: `1px solid ${COLORS.line}` }}>
+                        <UserMinus className="h-4 w-4" style={{ color: COLORS.primary }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium mb-1" style={{ color: COLORS.text }}>
+                          {displayUser(id, r.userName, usersMap)}
+                        </div>
+                        <div className="text-xs flex items-center gap-2" style={{ color: COLORS.muted }}>
+                          <span>خرج من</span>
+                          <span className="font-medium" style={{ color: COLORS.text }}>{r.entityName || r.entityId}</span>
+                        </div>
+                        <div className="text-xs mt-1 flex items-center gap-1" style={{ color: COLORS.muted }}>
+                          <Clock className="h-3 w-3" />
+                          {formatDate(r.leftAt || r.createdAt)}
+                        </div>
+                        {meta.reason && (
+                          <div className="text-xs mt-2 rounded-lg p-2" style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, color: COLORS.text }}>
+                            <span className="font-medium">السبب:</span> {meta.reason}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }} 
+              />
             </div>
           )}
 
@@ -749,6 +958,29 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
+function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
+  return (
+    <div className="rounded-xl p-4 flex items-center justify-between transition-all duration-200 hover:shadow-sm"
+         style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+      <div className="flex items-center gap-3">
+        <div className="h-10 w-10 rounded-lg grid place-items-center" style={{ background: COLORS.card, color }}>
+          {icon}
+        </div>
+        <div>
+          <div className="text-xs font-medium" style={{ color: COLORS.muted }}>{label}</div>
+          <div className="text-xl font-bold mt-0.5" style={{ color: COLORS.text }}>{value}</div>
+        </div>
+      </div>
+      {value > 0 && (
+        <div className="h-6 w-6 rounded-full grid place-items-center text-xs font-bold"
+             style={{ background: color, color: "#FFFFFF" }}>
+          {value}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PersonChip({ name }: { name: string }) {
   return (
     <span className="text-xs rounded-full px-2 h-6 inline-flex items-center"
@@ -766,20 +998,32 @@ function EntityChip({ name }: { name: string }) {
   );
 }
 
-function ReviewList({ title, items, render }: { title: string; items: any[] | undefined; render: (x: any) => React.ReactNode }) {
+function ReviewList({ title, items, render, icon }: { title: string; items: any[] | undefined; render: (x: any) => React.ReactNode; icon?: React.ReactNode }) {
   return (
-    <Card className="rounded-[22px] bg-white border border-[#E7E2DC] text-[#1D1D1D] shadow-[0_8px_18px_rgba(0,0,0,0.05)] transition-all duration-300 hover:shadow-lg animate-fade-in-up">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription className="text-[#6B6B6B]">أحدث العناصر (بحد أقصى 200)</CardDescription>
+    <Card className="rounded-[22px] bg-white border border-[#E7E2DC] text-[#1D1D1D] shadow-[0_8px_18px_rgba(0,0,0,0.05)] animate-fade-in-up">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-2">
+          {icon || <Users className="h-5 w-5" style={{ color: COLORS.primary }} />}
+          <CardTitle className="text-lg">{title}</CardTitle>
+        </div>
+        <CardDescription className="text-[#6B6B6B] mt-1">
+          {items && items.length > 0 ? `${items.length} عنصر` : "أحدث العناصر"}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {!items || items.length === 0 ? (
-          <div className="text-sm" style={{ color: COLORS.muted }}>لا يوجد عناصر للعرض.</div>
+          <div className="text-center py-8">
+            <div className="h-12 w-12 rounded-full mx-auto grid place-items-center mb-3"
+                 style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
+              {icon || <Users className="h-6 w-6" style={{ color: COLORS.muted }} />}
+            </div>
+            <div className="font-semibold mb-1" style={{ color: COLORS.text }}>لا توجد عناصر</div>
+            <div className="text-sm" style={{ color: COLORS.muted }}>لم يتم تسجيل أي نشاط حتى الآن</div>
+          </div>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-2 max-h-96 overflow-y-auto">
             {items.map((r, i) => (
-              <li key={r.id || i} className="rounded-xl p-3 transition-all duration-200 hover:bg-white/70"
+              <li key={r.id || i} className="rounded-xl p-3 transition-all duration-200 hover:shadow-sm"
                   style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}` }}>
                 {render(r)}
               </li>
