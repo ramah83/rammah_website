@@ -1,12 +1,13 @@
 {
   "/api/notifications/route": "app/api/notifications/route.js",
-  "/api/entities/route": "app/api/entities/route.js",
-  "/api/admin/current-admins/route": "app/api/admin/current-admins/route.js",
-  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/events/route": "app/api/events/route.js",
   "/api/me/route": "app/api/me/route.js",
-  "/api/stats/route": "app/api/stats/route.js",
+  "/api/entities/route": "app/api/entities/route.js",
+  "/api/membership/my/route": "app/api/membership/my/route.js",
   "/api/iso/route": "app/api/iso/route.js",
+  "/entities/page": "app/entities/page.js",
   "/page": "app/page.js",
-  "/profile/page": "app/profile/page.js",
-  "/dashboard/page": "app/dashboard/page.js"
+  "/evaluations/new/page": "app/evaluations/new/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/dashboard/requests/page": "app/dashboard/requests/page.js"
 }

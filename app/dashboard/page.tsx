@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { NotificationBell } from "@/components/NotificationBell";
+import DeveloperFooter from "@/components/DeveloperFooter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -18,7 +19,7 @@ import {
   LogOut,
   Check,
   AlertTriangle,
-  LogOut as LogOutIcon,
+  Mail,
 } from "lucide-react";
 import { Cairo } from "next/font/google";
 
@@ -285,6 +286,28 @@ export default function DashboardPage() {
 
   return (
     <div className={`${cairo.className} relative min-h-screen overflow-hidden flex flex-col bg-[#EFE6DE]`}>
+      {/* Add keyframe animations */}
+      <style jsx global>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+        @keyframes shimmer {
+          0% { background-position: -1000px 0; }
+          100% { background-position: 1000px 0; }
+        }
+      `}</style>
+      
       <HeaderBar />
 
       {(managerSuspended || userSuspended) && (
@@ -316,19 +339,35 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-6">
-        <div className="rounded-[22px] p-4 md:p-6 flex items-center justify-between bg-white border border-[#E7E2DC] shadow-[0_8px_18px_rgba(0,0,0,0.05)]">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-[#1D1D1D]">لوحة التحكم</h1>
-            <p className="text-sm md:text-base text-[#595959]">{session ? <>مرحباً {session.name} 👋 — ادارة المنصة حسب دورك وصلاحياتك</> : " "}</p>
+      <section className="relative z-[1] mx-auto max-w-6xl w-full px-4 pt-6">
+        <div className="group rounded-[28px] p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between bg-gradient-to-br from-white via-white to-[#FFF8F8] border border-[#E7E2DC] shadow-[0_20px_40px_rgba(0,0,0,0.08)] backdrop-blur-sm relative overflow-hidden">
+          {/* Animated background pattern */}
+          <div className="absolute inset-0 opacity-5 pointer-events-none">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[#EC1A24] rounded-full blur-3xl animate-pulse"></div>
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#EC1A24] rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="relative z-10 mb-4 md:mb-0">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-[#EC1A24] to-[#C41620] flex items-center justify-center shadow-lg animate-bounce" style={{ animationDuration: '3s' }}>
+                <BarChart3 className="h-6 w-6 text-white" />
+              </div>
+              <h1 className="text-3xl md:text-4xl font-extrabold bg-gradient-to-r from-[#1D1D1D] to-[#EC1A24] bg-clip-text text-transparent">
+                لوحة التحكم
+              </h1>
+            </div>
+            <p className="text-base md:text-lg text-[#595959] font-medium">
+              {session ? <>مرحباً <span className="font-bold text-[#EC1A24]">{session.name}</span> 👋 — إدارة المنصة حسب دورك وصلاحياتك</> : " "}
+            </p>
+          </div>
+          
+          <div className="relative z-10 flex flex-wrap items-center gap-2">
             {session && (
               <>
-                <span className="inline-flex items-center rounded-full px-3 h-8 text-sm bg-[#F6F6F6] text-[#1D1D1D] border border-[#E5E5E5]">
+                <span className="inline-flex items-center rounded-full px-4 h-10 text-sm font-semibold bg-white text-[#1D1D1D] border-2 border-[#E5E5E5] shadow-md hover:shadow-lg transition-all">
                   {session.role === "entityManager" && managedEntityName ? (
                     <>
-                      مسؤول كيان — <span className="font-semibold ms-1">{managedEntityName}</span>
+                      مسؤول كيان — <span className="font-bold ms-1 text-[#EC1A24]">{managedEntityName}</span>
                     </>
                   ) : (
                     roleLabel[session.role]
@@ -336,13 +375,13 @@ export default function DashboardPage() {
                 </span>
 
                 {(managerSuspended || userSuspended) && (
-                  <span className="inline-flex items-center gap-1 rounded-full px-3 h-8 text-sm bg-[#FFF0F0] text-[#7A0010] border border-[#F5C2C7]">
-                    موقوف مؤقتًا
+                  <span className="inline-flex items-center gap-1 rounded-full px-4 h-10 text-sm font-semibold bg-[#FFF0F0] text-[#7A0010] border-2 border-[#F5C2C7] animate-pulse">
+                    <AlertTriangle className="h-4 w-4" /> موقوف مؤقتًا
                   </span>
                 )}
 
                 {showAcceptedBadge && (
-                  <span className="inline-flex items-center gap-1 rounded-full px-3 h-8 text-sm bg-[#E8F7EE] text-[#0F5132] border border-[#CBE9D6]">
+                  <span className="inline-flex items-center gap-1 rounded-full px-4 h-10 text-sm font-semibold bg-[#E8F7EE] text-[#0F5132] border-2 border-[#CBE9D6] shadow-md">
                     <Check className="h-4 w-4" /> مقبول في {approvedCount} كيان
                   </span>
                 )}
@@ -355,7 +394,7 @@ export default function DashboardPage() {
                 } catch {}
                 router.replace("/");
               }}
-              className="inline-flex items-center gap-2 h-9 px-3 rounded-full font-semibold bg-[#EC1A24] text-white"
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-full font-bold bg-gradient-to-r from-[#EC1A24] to-[#C41620] text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all"
             >
               <LogOut className="h-4 w-4" /> تسجيل الخروج
             </button>
@@ -363,8 +402,9 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <main className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-6 space-y-6 pb-10">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <main className="relative z-[1] mx-auto max-w-6xl w-full px-4 mt-8 space-y-8 pb-10">
+        {/* Stats Grid with staggered animation */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6" style={{ animation: 'fadeInUp 0.6s ease-out' }}>
           <StatCard
             title="الكيانات"
             icon={<Building2 className="h-5 w-5 text-[#1D1D1D]" />}
@@ -508,25 +548,9 @@ export default function DashboardPage() {
                 {session?.role === "unionSupervisor" && (
                   <UnitCard
                     icon={<Users className="h-5 w-5 text-[#1D1D1D]" />}
-                    title="طلبات الانضمام لكل الكيانات"
-                    desc="استعراض جميع طلبات الانضمام المعلّقة على مستوى المنصّة والموافقة/الرفض."
+                    title="طلبات الانضمام و المغادرة لكل الكيانات"
+                    desc="استعراض جميع طلبات الانضمام و المغادرة المعلّقة على مستوى المنصّة والموافقة/الرفض."
                     href="/dashboard/requests"
-                    onOpen={(href) => guardNavigate(href)}
-                  />
-                )}
-
-                {/* ✅ جديد: صفحة طلبات مغادرة العضوية */}
-                {(session?.role === "unionSupervisor" || session?.role === "entityManager") && (
-                  <UnitCard
-                    icon={<LogOutIcon className="h-5 w-5 text-[#1D1D1D]" />}
-                    title={session?.role === "unionSupervisor" ? "طلبات مغادرة من الكيانات" : "طلبات مغادرة كيانك"}
-                    desc={
-                      session?.role === "unionSupervisor"
-                        ? "قائمة بالأعضاء الذين تم تصعيد طلباتهم لك للموافقة النهائية على المغادرة."
-                        : "طلبات مغادرة كيانك من الأعضاء — وافق أو ارفض (سيتم تصعيد الموافق للاتحاد)."
-                    }
-                    href="/dashboard/leave-requests"
-                    blocked={false}
                     onOpen={(href) => guardNavigate(href)}
                   />
                 )}
@@ -575,12 +599,7 @@ export default function DashboardPage() {
                   onOpen={(href) => guardNavigate(href)}
                 />
 
-                <div
-                  className="rounded-xl px-3 py-3 flex items-center justify-between bg-[#F6F6F6] border border-[#E7E2DC]"
-                  style={{ boxShadow: "0 6px 12px rgba(0,0,0,0.04)" }}
-                >
-
-                </div>
+              
               </TabsContent>
 
               {/* ISO */}
@@ -623,19 +642,33 @@ export default function DashboardPage() {
 
               {/* التقارير */}
               <TabsContent value="reports">
-                <UnitCard
-                  icon={<BarChart3 className="h-5 w-5 text-[#1D1D1D]" />}
-                  title="التقارير ولوحات البيانات (Dashboards)"
-                  desc={session?.role === "entityManager" ? "تقارير كيانك" : "ملخصات عامة للأرقام والرسوم البيانية"}
-                  href="/reports"
-                  blocked={suspendedAny}
-                  onOpen={(href) => guardNavigate(href)}
-                />
+                <div className="space-y-3">
+                  <UnitCard
+                    icon={<BarChart3 className="h-5 w-5 text-[#1D1D1D]" />}
+                    title="التقارير ولوحات البيانات (Dashboards)"
+                    desc={session?.role === "entityManager" ? "تقارير كيانك" : "ملخصات عامة للأرقام والرسوم البيانية"}
+                    href="/reports"
+                    blocked={suspendedAny}
+                    onOpen={(href) => guardNavigate(href)}
+                  />
+                  
+                  {(session?.role === "unionSupervisor" || session?.role === "entityManager") && (
+                    <UnitCard
+                      icon={<Mail className="h-5 w-5 text-[#1D1D1D]" />}
+                      title="رسائل التواصل والدعم"
+                      desc="عرض والرد على رسائل المستخدمين والاستفسارات المرسلة من صفحة الدعم"
+                      href="/dashboard/contact-messages"
+                      onOpen={(href) => guardNavigate(href)}
+                    />
+                  )}
+                </div>
               </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
       </main>
+
+      <DeveloperFooter />
     </div>
   );
 }
@@ -644,7 +677,7 @@ function HeaderBar() {
   const pathname = usePathname();
   const active = (href: string) => pathname === href;
   return (
-    <header className="relative z-10">
+    <header className="relative z-[100001]">
       <div className="mx-auto max-w-6xl px-4">
         <div className="mt-4 h-14 w-full rounded-2xl flex items-center justify-between px-4 bg-white border border-[#E7E2DC] shadow-[0_6px_12px_rgba(0,0,0,0.04)]">
           <div className="flex items-center gap-3">
@@ -660,7 +693,7 @@ function HeaderBar() {
               {[
                 { href: "/profile", label: "الملف الشخصى" },
                 { href: "/dashboard", label: "لوحة التحكم" },
-                { href: "/support", label: "الدعم" },
+                { href: "/dashboard/contact-messages", label: "الرسائل" },
                 { href: "/about", label: "عن المنصة" },
               ].map((l) => (
                 <Link key={l.href} href={l.href} className={`px-3 py-1 rounded-lg transition ${active(l.href) ? "bg-[#EC1A24] text-white" : "text-[#1D1D1D]"}`}>
@@ -678,19 +711,36 @@ function HeaderBar() {
 
 function StatCard({ title, icon, value, extra }: { title: string; icon: React.ReactNode; value: number; extra?: React.ReactNode }) {
   return (
-    <div className="rounded-2xl p-4 bg-white border border-[#E7E2DC] shadow text-[#1D1D1D]">
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-[#6B6B6B]">{title}</span>
-        <span className="h-8 w-8 rounded-xl flex items-center justify-center bg-[#F6F6F6] border border-[#E5E5E5]">{icon}</span>
+    <div className="group rounded-2xl p-5 bg-white border border-[#E7E2DC] shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 relative overflow-hidden">
+      {/* Animated gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#EC1A24]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+      
+      {/* Content */}
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm font-semibold text-[#6B6B6B]">{title}</span>
+          <span className="h-12 w-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-[#F6F6F6] to-[#FFFFFF] border border-[#E5E5E5] shadow-md group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+            {icon}
+          </span>
+        </div>
+        <div className="text-3xl font-extrabold bg-gradient-to-br from-[#1D1D1D] to-[#EC1A24] bg-clip-text text-transparent">{value}</div>
+        <div className="text-xs mt-2 text-[#7A7A7A] font-medium">{extra ? extra : <>إجمالي {title}</>}</div>
       </div>
-      <div className="mt-2 text-2xl font-extrabold">{value}</div>
-      <div className="text-xs mt-1 text-[#7A7A7A]">{extra ? extra : <>إجمالي {title}</>}</div>
+
+      {/* Shine effect */}
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none"></div>
     </div>
   );
 }
 
 function SurfaceCard({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-2xl bg-white border border-[#E7E2DC] shadow-[0_8px_18px_rgba(0,0,0,0.05)] text-[#1D1D1D]">{children}</div>;
+  return (
+    <div className="group rounded-2xl bg-white border border-[#E7E2DC] shadow-[0_8px_18px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.12)] text-[#1D1D1D] transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+      {/* Subtle gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-[#EC1A24]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+      <div className="relative z-10">{children}</div>
+    </div>
+  );
 }
 
 function QuickButton({
@@ -707,11 +757,15 @@ function QuickButton({
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center justify-between w-full h-11 rounded-xl px-4 transition group bg-white text-[#1D1D1D] border border-[#E7E2DC] shadow-[0_4px_10px_rgba(0,0,0,0.04)] disabled:opacity-60"
+      className="group inline-flex items-center justify-between w-full h-12 rounded-xl px-4 transition-all duration-300 bg-white text-[#1D1D1D] border border-[#E7E2DC] shadow-[0_4px_10px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_20px_rgba(236,26,36,0.15)] hover:border-[#EC1A24]/30 disabled:opacity-60 hover:-translate-y-0.5 relative overflow-hidden"
       disabled={!!blocked}
       title={blocked ? titleWhenBlocked || "الكيان متوقف — لا يمكن تنفيذ الإجراء حاليًا" : undefined}
     >
-      {children}
+      {/* Gradient overlay on hover */}
+      <div className="absolute inset-0 bg-gradient-to-r from-[#EC1A24]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+      <div className="relative z-10 flex items-center justify-between w-full">
+        {children}
+      </div>
     </button>
   );
 }
@@ -736,10 +790,13 @@ function UnitCard({
   const router = useRouter();
   const open = () => (onOpen ? onOpen(href) : router.push(href));
   return (
-    <div className="rounded-2xl p-5 flex items-start justify-between gap-4 bg-white border border-[#E7E2DC] shadow-[0_8px_18px_rgba(0,0,0,0.05)] text-[#1D1D1D]">
-      <div className="space-y-2">
-        <div className="flex items-center gap-2 font-semibold">
-          <span className="h-9 w-9 rounded-xl flex items-center justify-center bg-[#F6F6F6] border border-[#E5E5E5]">{icon}</span>
+    <div className="group rounded-2xl p-6 flex items-start justify-between gap-4 bg-white border border-[#E7E2DC] shadow-[0_8px_18px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.12)] text-[#1D1D1D] transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+      {/* Animated background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-[#EC1A24]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+      
+      <div className="relative z-10 space-y-2 flex-1">
+        <div className="flex items-center gap-3 font-semibold">
+          <span className="h-12 w-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-[#F6F6F6] to-white border border-[#E5E5E5] shadow-md group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">{icon}</span>
           <span className="text-base md:text-lg">{title}</span>
         </div>
         <p className="text-sm text-[#595959]">{desc}</p>

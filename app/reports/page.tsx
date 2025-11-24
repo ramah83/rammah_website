@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
+import DeveloperFooter from "@/components/DeveloperFooter"
 
 import { Users, Building2, CalendarDays, ShieldCheck, Filter } from "lucide-react"
 
@@ -309,16 +310,71 @@ const daysFromNowText = (dateStr?: string | null) => {
 }
   return (
     <div dir="rtl" className={`${cairo.className} relative min-h-screen overflow-hidden flex flex-col`} style={{ backgroundColor: "#EFE6DE" }}>
+      {/* Animated Background */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 w-96 h-96 rounded-full opacity-10 animate-pulse" style={{ background: "radial-gradient(circle, #EC1A24 0%, transparent 70%)", animation: "float 8s ease-in-out infinite" }} />
+        <div className="absolute bottom-20 right-10 w-80 h-80 rounded-full opacity-10 animate-pulse" style={{ background: "radial-gradient(circle, #EC1A24 0%, transparent 70%)", animation: "float 10s ease-in-out infinite reverse" }} />
+        <div className="absolute top-1/2 left-1/2 w-72 h-72 rounded-full opacity-5" style={{ background: "radial-gradient(circle, #1D1D1D 0%, transparent 70%)", animation: "float 12s ease-in-out infinite", transform: "translate(-50%, -50%)" }} />
+      </div>
+
+      <style jsx>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) scale(1); }
+          50% { transform: translateY(-30px) scale(1.1); }
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes scaleIn {
+          from { opacity: 0; transform: scale(0.9); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        .animate-slide-up {
+          animation: slideUp 0.6s ease-out forwards;
+        }
+        .animate-scale-in {
+          animation: scaleIn 0.5s ease-out forwards;
+        }
+      `}</style>
+
       <HeaderBar />
 
-      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8">
-        <div className="rounded-[22px] p-5 md:p-6 flex items-center justify-between"
-             style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold" style={{ color: "#1D1D1D" }}>التقارير ولوحات البيانات</h1>
-            <p className="text-sm" style={{ color: "#6B6B6B" }}>
-              {errMsg ? errMsg : "ملخصات ديناميكية مبنية على البيانات الحالية"}
-            </p>
+      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8 animate-slide-up">
+        <div 
+          className="rounded-[28px] p-8 md:p-10 relative overflow-hidden group transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl"
+          style={{ 
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E7E2DC",
+            boxShadow: "0 24px 48px rgba(0,0,0,0.12)"
+          }}
+        >
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" style={{ background: "radial-gradient(circle at center, rgba(236,26,36,0.05) 0%, transparent 70%)" }} />
+          
+          <div className="relative z-10 flex items-center gap-6">
+            <div 
+              className="h-20 w-20 rounded-3xl flex items-center justify-center relative group-hover:scale-110 group-hover:rotate-6 transition-all duration-500"
+              style={{ 
+                background: "linear-gradient(135deg, #EC1A24 0%, #C41820 100%)",
+                boxShadow: "0 12px 24px rgba(236,26,36,0.4)"
+              }}
+            >
+              <CalendarDays className="h-10 w-10" color="#FFFFFF" />
+              <div className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 100%)" }} />
+            </div>
+            
+            <div>
+              <h1 className="text-4xl md:text-5xl font-extrabold mb-2" style={{ color: "#1D1D1D" }}>
+                التقارير ولوحات البيانات
+              </h1>
+              <p className="text-base md:text-lg" style={{ color: "#6B6B6B" }}>
+                {errMsg ? errMsg : "ملخصات ديناميكية مبنية على البيانات الحالية"}
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -478,15 +534,26 @@ const daysFromNowText = (dateStr?: string | null) => {
               ) : (
                 <ul className="space-y-2">
                   {upcomingList.map((ev) => (
-                    <li key={ev.id} className="rounded-xl p-3 border" style={{ borderColor:"#E7E2DC", background:"#fff" }}>
+                    <li 
+                      key={ev.id} 
+                      className="rounded-xl p-3 border transition-all duration-300 hover:scale-[1.02] hover:shadow-lg cursor-pointer group" 
+                      style={{ borderColor:"#E7E2DC", background:"#FFFFFF" }}
+                    >
                       <div className="flex items-center justify-between">
-                        <div className="font-semibold">{ev.title}</div>
-                        <span className="text-xs px-2 py-0.5 rounded-full border" style={{ borderColor:"#E7E2DC", color:"#1D1D1D" }}>
+                        <div className="font-semibold group-hover:text-[#EC1A24] transition-colors duration-300">{ev.title}</div>
+                        <span 
+                          className="text-xs px-3 py-1 rounded-full font-semibold transition-all duration-300 group-hover:scale-110" 
+                          style={{ 
+                            background: "linear-gradient(135deg, #FFF0F0 0%, #FFE2E2 100%)",
+                            color:"#EC1A24",
+                            border: "1px solid #FFE2E2"
+                          }}
+                        >
                           {daysFromNowText(ev.date)}
                         </span>
                       </div>
                       <div className="text-xs mt-1" style={{ color:"#6B6B6B" }}>
-                        {ev.date ? new Date(parseDate(ev.date)!).toLocaleDateString("ar-EG") : "بدون تاريخ"}
+                        {ev.date ? new Date(parseDate(ev.date)!).toLocaleDateString("ar-EG", { timeZone: "Africa/Cairo" }) : "بدون تاريخ"}
                       </div>
                     </li>
                   ))}
@@ -506,15 +573,26 @@ const daysFromNowText = (dateStr?: string | null) => {
               ) : (
                 <ul className="space-y-2">
                   {recentList.map((ev) => (
-                    <li key={ev.id} className="rounded-xl p-3 border" style={{ borderColor:"#E7E2DC", background:"#fff" }}>
+                    <li 
+                      key={ev.id} 
+                      className="rounded-xl p-3 border transition-all duration-300 hover:scale-[1.02] hover:shadow-lg cursor-pointer group" 
+                      style={{ borderColor:"#E7E2DC", background:"#FFFFFF" }}
+                    >
                       <div className="flex items-center justify-between">
-                        <div className="font-semibold">{ev.title}</div>
-                        <span className="text-xs px-2 py-0.5 rounded-full border" style={{ borderColor:"#E7E2DC", color:"#1D1D1D" }}>
+                        <div className="font-semibold group-hover:text-[#EC1A24] transition-colors duration-300">{ev.title}</div>
+                        <span 
+                          className="text-xs px-3 py-1 rounded-full font-semibold transition-all duration-300 group-hover:scale-110" 
+                          style={{ 
+                            backgroundColor: "#F6F6F6",
+                            color:"#6B6B6B",
+                            border: "1px solid #E7E2DC"
+                          }}
+                        >
                           {daysFromNowText(ev.date)}
                         </span>
                       </div>
                       <div className="text-xs mt-1" style={{ color:"#6B6B6B" }}>
-                        {ev.date ? new Date(parseDate(ev.date)!).toLocaleDateString("ar-EG") : "بدون تاريخ"}
+                        {ev.date ? new Date(parseDate(ev.date)!).toLocaleDateString("ar-EG", { timeZone: "Africa/Cairo" }) : "بدون تاريخ"}
                       </div>
                     </li>
                   ))}
@@ -526,6 +604,8 @@ const daysFromNowText = (dateStr?: string | null) => {
 
         <Separator className="opacity-0" />
       </main>
+
+      <DeveloperFooter />
     </div>
   )
 }
@@ -558,23 +638,33 @@ function HeaderBar() {
   }, [])
 
   return (
-    <header className="relative z-10">
+    <header className="relative z-[100001]">
       <div className="mx-auto max-w-6xl px-4">
         <div
-          className="mt-4 h-14 w-full rounded-2xl flex items-center justify-between px-4"
-          style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 6px 12px rgba(0,0,0,0.04)" }}
+          className="mt-4 h-16 w-full rounded-2xl flex items-center justify-between px-5 transition-all duration-300 hover:scale-[1.01] hover:shadow-2xl"
+          style={{ 
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E7E2DC",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.08)"
+          }}
         >
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg grid place-items-center" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>
-              <Building2 className="h-5 w-5" color="#1D1D1D" />
+            <div 
+              className="h-10 w-10 rounded-xl grid place-items-center transition-all duration-300 hover:rotate-12 hover:scale-110"
+              style={{ 
+                background: "linear-gradient(135deg, #EC1A24 0%, #C41820 100%)",
+                boxShadow: "0 4px 12px rgba(236,26,36,0.3)"
+              }}
+            >
+              <Building2 className="h-5 w-5" color="#FFFFFF" />
             </div>
-            <Link href="/" className="font-semibold" style={{ color: "#1D1D1D" }}>
+            <Link href="/" className="font-bold text-lg" style={{ color: "#1D1D1D" }}>
               منصة الكيانات الشبابية
             </Link>
           </div>
 
-          <div className="flex items-center gap-3">
-            <nav className="hidden sm:flex items_center gap-1 text-sm">
+          <div className="flex items-center gap-2">
+            <nav className="hidden sm:flex items-center gap-1 text-sm">
               {[
                 { href: "/", label: "الرئيسية" },
                 { href: "/about", label: "عن المنصة" },
@@ -585,8 +675,12 @@ function HeaderBar() {
                 <Link
                   key={l.href}
                   href={l.href}
-                  className="px-3 py-1 rounded-lg transition"
-                  style={{ color: active(l.href) ? "#FFFFFF" : "#1D1D1D", backgroundColor: active(l.href) ? "#EC1A24" : "transparent" }}
+                  className="px-4 py-2 rounded-xl font-semibold transition-all duration-300 hover:scale-105"
+                  style={{ 
+                    color: active(l.href) ? "#FFFFFF" : "#1D1D1D",
+                    background: active(l.href) ? "linear-gradient(135deg, #EC1A24 0%, #C41820 100%)" : "transparent",
+                    boxShadow: active(l.href) ? "0 4px 12px rgba(236,26,36,0.3)" : "none"
+                  }}
                 >
                   {l.label}
                 </Link>
@@ -601,8 +695,22 @@ function HeaderBar() {
 
 function SurfaceCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl ${className}`} style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
-      {children}
+    <div 
+      className={`rounded-2xl relative overflow-hidden group transition-all duration-500 hover:scale-[1.01] hover:shadow-2xl animate-slide-up ${className}`}
+      style={{ 
+        backgroundColor: "#FFFFFF",
+        border: "1px solid #E7E2DC",
+        boxShadow: "0 12px 24px rgba(0,0,0,0.08)"
+      }}
+    >
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" style={{ background: "radial-gradient(circle at top right, rgba(236,26,36,0.03) 0%, transparent 70%)" }} />
+      
+      {/* 3D depth effect */}
+      <div className="absolute -inset-1 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none blur-xl" style={{ background: "linear-gradient(135deg, rgba(236,26,36,0.1) 0%, transparent 100%)", zIndex: -1 }} />
+      
+      <div className="relative z-10" style={{ color: "#1D1D1D" }}>
+        {children}
+      </div>
     </div>
   )
 }
@@ -618,17 +726,40 @@ function Field({ label, children, className = "" }: { label: string; children: R
 
 function SurfaceStat({ title, subtitle, icon, value }: { title: string; subtitle: string; icon: React.ReactNode; value: number | string }) {
   return (
-    <div className="rounded-2xl p-4" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <div className="text-sm" style={{ color: "#6B6B6B" }}>{title}</div>
-          <div className="text-xs" style={{ color: "#7A7A7A" }}>{subtitle}</div>
+    <div 
+      className="rounded-2xl p-5 relative overflow-hidden group transition-all duration-500 hover:scale-105 hover:-translate-y-2 cursor-pointer animate-scale-in"
+      style={{ 
+        backgroundColor: "#FFFFFF",
+        border: "1px solid #E7E2DC",
+        boxShadow: "0 12px 24px rgba(0,0,0,0.08)"
+      }}
+    >
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(236,26,36,0.05) 0%, transparent 100%)" }} />
+      
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-4">
+          <div className="space-y-1">
+            <div className="text-sm font-semibold" style={{ color: "#1D1D1D" }}>{title}</div>
+            <div className="text-xs" style={{ color: "#6B6B6B" }}>{subtitle}</div>
+          </div>
+          <div 
+            className="h-12 w-12 rounded-xl grid place-items-center group-hover:rotate-12 group-hover:scale-110 transition-all duration-500"
+            style={{ 
+              background: "linear-gradient(135deg, #FFF0F0 0%, #FFE2E2 100%)",
+              border: "1px solid #FFE2E2",
+              boxShadow: "0 4px 12px rgba(236,26,36,0.15)"
+            }}
+          >
+            <div style={{ color: "#EC1A24" }}>{icon}</div>
+          </div>
         </div>
-        <div className="h-9 w-9 rounded-xl grid place-items-center" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>
-          {icon}
+        <div className="text-3xl font-extrabold" style={{ color: "#1D1D1D" }}>{value}</div>
+        
+        {/* Shimmer effect */}
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(236,26,36,0.1) 50%, transparent 100%)", animation: "shimmer 2s infinite" }} />
         </div>
       </div>
-      <div className="mt-3 text-2xl font-extrabold" style={{ color: "#1D1D1D" }}>{value}</div>
     </div>
   )
 }
@@ -636,8 +767,18 @@ function SurfaceStat({ title, subtitle, icon, value }: { title: string; subtitle
 function SurfaceBar({ value = 0, max = 1 }: { value: number; max: number }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0
   return (
-    <div className="w-full h-2 rounded-full overflow-hidden" style={{ backgroundColor: "#F1EFEA", border: "1px solid #E7E2DC" }}>
-      <div className="h-full" style={{ width: `${pct}%`, backgroundColor: "#EC1A24" }} />
+    <div className="w-full h-3 rounded-full overflow-hidden relative" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E7E2DC" }}>
+      <div 
+        className="h-full transition-all duration-1000 ease-out relative overflow-hidden"
+        style={{ 
+          width: `${pct}%`,
+          background: "linear-gradient(90deg, #EC1A24 0%, #FF6B6B 100%)",
+          boxShadow: "0 2px 8px rgba(236,26,36,0.3)"
+        }}
+      >
+        {/* Animated shimmer effect */}
+        <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)", animation: "shimmer 2s infinite" }} />
+      </div>
     </div>
   )
 }

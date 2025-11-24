@@ -16,8 +16,11 @@ export type Member = {
 
 };
 
-
-const nowSql = () => new Date().toISOString().slice(0, 19).replace("T", " ");
+// Get current time in Egypt timezone (UTC+2) for SQL storage
+const nowSql = () => {
+  const egyptTime = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
+  return egyptTime.toISOString().slice(0, 19).replace("T", " ");
+};
 
 function canRead(session: Session, memberEntityId: string | null) {
   if (session.role === "systemAdmin") return true;

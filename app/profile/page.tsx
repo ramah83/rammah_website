@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import type { Session } from "@/lib/types";
 import { Cairo } from "next/font/google";
+import DeveloperFooter from "@/components/DeveloperFooter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Users, Pencil, Mail, Phone, MapPin, User, Hash, Layers, Tag, Clock, X, AlertTriangle, IdCard } from "lucide-react";
 
@@ -517,6 +518,7 @@ export default function ProfilePage() {
       )}
 
       <FooterBar />
+      <DeveloperFooter />
     </div>
   );
 }

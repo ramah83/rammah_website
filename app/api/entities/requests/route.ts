@@ -71,7 +71,8 @@ export async function GET(req: NextRequest) {
 
   const scope = (searchParams.get("scope") || "").toLowerCase();
 
-  const where: string[] = [`r.action='leave_membership'`];
+  // ✅ عرض كل أنواع الطلبات: create, update, delete, leave_membership
+  const where: string[] = [];
   const params: Record<string, any> = {};
 
   if (status !== "all") {
@@ -98,7 +99,7 @@ export async function GET(req: NextRequest) {
       where.push(`r.targetEntityId=@entityId`);
     }
   }
-  // ✅ مدير الكيان: يرى فقط طلبات كياناته
+  // ✅ مدير الكيان: يرى طلبات كياناته + طلباته الشخصية (مثل إنشاء كيان جديد)
   else if (session.role === "entityManager") {
     const userId = session.id;
     
@@ -121,26 +122,32 @@ export async function GET(req: NextRequest) {
       managedEntities.push({ entityId: sessionEntityId });
     }
 
-    if (managedEntities.length === 0) {
-      // لا يدير أي كيان، لا يرى أي طلبات
-      return NextResponse.json([]);
-    }
-
     // إزالة التكرار
     const uniqueEntityIds = Array.from(new Set(managedEntities.map(e => e.entityId)));
-    const placeholders = uniqueEntityIds.map((_, i) => `@eid${i}`).join(',');
     
-    uniqueEntityIds.forEach((eid, i) => {
-      params[`@eid${i}`] = eid;
-    });
+    if (uniqueEntityIds.length === 0) {
+      // لا يدير أي كيان، يرى فقط طلباته الشخصية (مثل إنشاء كيان جديد)
+      where.push(`r.createdBy=@userId`);
+      params["@userId"] = userId;
+    } else {
+      // يرى طلبات كياناته + طلباته الشخصية
+      const placeholders = uniqueEntityIds.map((_, i) => `@eid${i}`).join(',');
+      
+      uniqueEntityIds.forEach((eid, i) => {
+        params[`@eid${i}`] = eid;
+      });
 
-    where.push(`r.targetEntityId IN (${placeholders})`);
+      where.push(`(r.targetEntityId IN (${placeholders}) OR r.createdBy=@userId)`);
+      params["@userId"] = userId;
+    }
   } 
   // المستخدم العادي: لا يرى شيئًا هنا
   else {
     return NextResponse.json([]);
   }
 
+  const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+  
   const sql = `
     SELECT
       r.id,
@@ -148,6 +155,7 @@ export async function GET(req: NextRequest) {
       r.targetEntityId,
       COALESCE(
         e.name,
+        json_extract(r.payload,'$.name'),
         (SELECT name FROM entities ee WHERE ee.id = json_extract(r.payload,'$.entityId')),
         NULL
       ) AS entityName,
@@ -162,7 +170,7 @@ export async function GET(req: NextRequest) {
     FROM entity_requests r
     LEFT JOIN entities e ON e.id = r.targetEntityId
     LEFT JOIN users u    ON u.id = r.createdBy
-    WHERE ${where.join(" AND ")}
+    ${whereClause}
     ORDER BY r.createdAt DESC
     LIMIT 500
   `;
@@ -353,6 +361,119 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
+    // ✅ Handle create entity request
+    if (action === "create") {
+      if (!payload || !payload.name) {
+        throw new Error("بيانات الكيان غير مكتملة");
+      }
+
+      const newEntityId = uid();
+      const tx = db.transaction(() => {
+        // Create the entity
+        db.prepare(`
+          INSERT INTO entities (id, name, type, contactEmail, phone, location, documents, managerUserId, createdAt)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        `).run(
+          newEntityId,
+          payload.name || "",
+          payload.type || "",
+          payload.contactEmail || null,
+          payload.phone || null,
+          payload.location || null,
+          JSON.stringify(payload.documents || []),
+          reqRow.createdBy
+        );
+
+        // Update request status
+        db.prepare(`
+          UPDATE entity_requests
+          SET status='approved', decidedAt=datetime('now'), decidedBy=?, note=COALESCE(note,?)
+          WHERE id=?
+        `).run(s.id, note, rid);
+
+        // Log event
+        db.prepare(`
+          INSERT INTO entity_events (id, entityId, action, fromStatus, toStatus, reason, actorId, actorName, actorRole, createdAt)
+          VALUES (?, ?, 'created', NULL, 'active', ?, ?, ?, ?, datetime('now'))
+        `).run(uid(), newEntityId, note, s.id, s.name || s.email || "مستخدم", s.role || "unknown");
+      });
+      tx();
+
+      return NextResponse.json({ ok: true, status: "approved", entityId: newEntityId });
+    }
+
+    // ✅ Handle update entity request
+    if (action === "update") {
+      const entityId = String(reqRow.targetEntityId || "");
+      if (!entityId || !payload) {
+        throw new Error("بيانات التحديث غير مكتملة");
+      }
+
+      const tx = db.transaction(() => {
+        // Update entity fields
+        const updates: string[] = [];
+        const values: any[] = [];
+        
+        if (payload.name) { updates.push("name=?"); values.push(payload.name); }
+        if (payload.type) { updates.push("type=?"); values.push(payload.type); }
+        if (payload.contactEmail !== undefined) { updates.push("contactEmail=?"); values.push(payload.contactEmail); }
+        if (payload.phone !== undefined) { updates.push("phone=?"); values.push(payload.phone); }
+        if (payload.location !== undefined) { updates.push("location=?"); values.push(payload.location); }
+        if (payload.documents) { updates.push("documents=?"); values.push(JSON.stringify(payload.documents)); }
+
+        if (updates.length > 0) {
+          values.push(entityId);
+          db.prepare(`UPDATE entities SET ${updates.join(", ")} WHERE id=?`).run(...values);
+        }
+
+        // Update request status
+        db.prepare(`
+          UPDATE entity_requests
+          SET status='approved', decidedAt=datetime('now'), decidedBy=?, note=COALESCE(note,?)
+          WHERE id=?
+        `).run(s.id, note, rid);
+
+        // Log event
+        db.prepare(`
+          INSERT INTO entity_events (id, entityId, action, fromStatus, toStatus, reason, actorId, actorName, actorRole, createdAt)
+          VALUES (?, ?, 'updated', NULL, NULL, ?, ?, ?, ?, datetime('now'))
+        `).run(uid(), entityId, note, s.id, s.name || s.email || "مستخدم", s.role || "unknown");
+      });
+      tx();
+
+      return NextResponse.json({ ok: true, status: "approved" });
+    }
+
+    // ✅ Handle delete entity request
+    if (action === "delete") {
+      const entityId = String(reqRow.targetEntityId || "");
+      if (!entityId) {
+        throw new Error("معرف الكيان غير موجود");
+      }
+
+      const tx = db.transaction(() => {
+        // Soft delete: mark as deleted or remove
+        db.prepare(`DELETE FROM entities WHERE id=?`).run(entityId);
+
+        // Update request status
+        db.prepare(`
+          UPDATE entity_requests
+          SET status='approved', decidedAt=datetime('now'), decidedBy=?, note=COALESCE(note,?)
+          WHERE id=?
+        `).run(s.id, note, rid);
+
+        // Log event
+        db.prepare(`
+          INSERT INTO entity_events (id, entityId, action, fromStatus, toStatus, reason, actorId, actorName, actorRole, createdAt)
+          VALUES (?, ?, 'deleted', NULL, NULL, ?, ?, ?, ?, datetime('now'))
+        `).run(uid(), entityId, note, s.id, s.name || s.email || "مستخدم", s.role || "unknown");
+      });
+      tx();
+
+      return NextResponse.json({ ok: true, status: "approved" });
+    }
+
+    // ✅ Handle leave_membership request
     if (action !== "leave_membership")
       return NextResponse.json({ error: "أكشن غير مدعوم" }, { status: 400 });
 

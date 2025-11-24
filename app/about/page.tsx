@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Users } from "lucide-react";
+import DeveloperFooter from "@/components/DeveloperFooter";
 
 export default function AboutPage() {
   return (
@@ -13,41 +14,44 @@ export default function AboutPage() {
     >
       <HeaderBar />
 
-      {}
-      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8 md:pt-12">
+      {/* Hero Section */}
+      <section className="relative z-[1] mx-auto max-w-6xl w-full px-4 pt-12 md:pt-16">
         <div
-          className="rounded-[24px] p-6 md:p-10"
+          className="rounded-[28px] p-8 md:p-12 text-center backdrop-blur-sm"
           style={{
-            backgroundColor: "#FFFFFF",
-            border: "1px solid #E7E2DC",
-            boxShadow: "0 12px 24px rgba(0,0,0,0.06)",
+            backgroundColor: "rgba(255,255,255,0.98)",
+            border: "1px solid rgba(231,226,220,0.8)",
+            boxShadow: "0 24px 48px rgba(0,0,0,0.12), 0 0 0 1px rgba(255,255,255,0.5) inset",
           }}
         >
-          <div className="flex items-center gap-3 mb-4">
+          {/* Icon with glow */}
+          <div className="mx-auto mb-6 relative w-fit">
+            <div className="absolute inset-0 rounded-2xl blur-2xl opacity-20" style={{ backgroundColor: "#EC1A24" }}></div>
             <div
-              className="h-10 w-10 rounded-xl flex items-center justify-center"
-              style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}
+              className="relative h-20 w-20 rounded-2xl flex items-center justify-center mx-auto"
+              style={{ backgroundColor: "#FFFFFF", border: "2px solid #E7E2DC", boxShadow: "0 8px 20px rgba(236,26,36,0.15)" }}
             >
-              <Users className="h-5 w-5" color="#1D1D1D" />
+              <Users className="h-10 w-10" color="#EC1A24" />
             </div>
-            <span className="text-sm" style={{ color: "#6B6B6B" }}>
-              عن المنصة
-            </span>
+          </div>
+
+          <div className="inline-flex items-center h-8 px-4 rounded-full text-xs font-semibold mb-4" style={{ backgroundColor: "#FFF0F0", color: "#EC1A24", border: "1px solid #FFE2E2" }}>
+            عن المنصة
           </div>
 
           <h1
-            className="text-3xl md:text-4xl font-extrabold leading-tight"
+            className="text-4xl md:text-5xl font-extrabold leading-tight mb-6"
             style={{ color: "#1D1D1D" }}
           >
             منصة الكيانات الشبابية
           </h1>
-          <p className="mt-3 md:text-lg leading-relaxed" style={{ color: "#595959" }}>
+          <p className="max-w-3xl mx-auto text-lg md:text-xl leading-relaxed mb-8" style={{ color: "#595959" }}>
             منصّة رقمية متكاملة تساعد الكيانات الشبابية على الإدارة، التنظيم، قياس الأثر،
             وتقديم البرامج بكفاءة. نجمع بين سهولة الاستخدام وقوة التحليلات لتسريع نمو
             المجتمع الشبابي.
           </p>
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-3">
             <Badge>إدارة الكيانات</Badge>
             <Badge>برامج وتسجيل</Badge>
             <Badge>لوحات متابعة</Badge>
@@ -56,19 +60,21 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {}
-      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-8 md:mt-12">
-        <h2
-          className="text-2xl md:text-3xl font-bold mb-2"
-          style={{ color: "#1D1D1D" }}
-        >
-          ماذا نقدّم؟
-        </h2>
-        <p className="mb-6" style={{ color: "#6B6B6B" }}>
-          أدوات متكاملة لإدارة الأعضاء والفعاليات والبرامج، مع تقارير لحظية ولوحات قياس أثر.
-        </p>
+      {/* Features Section */}
+      <section className="relative z-[1] mx-auto max-w-6xl w-full px-4 mt-12 md:mt-16">
+        <div className="text-center mb-10">
+          <h2
+            className="text-3xl md:text-4xl font-extrabold mb-3"
+            style={{ color: "#1D1D1D" }}
+          >
+            ماذا نقدّم؟
+          </h2>
+          <p className="text-lg max-w-2xl mx-auto" style={{ color: "#6B6B6B" }}>
+            أدوات متكاملة لإدارة الأعضاء والفعاليات والبرامج، مع تقارير لحظية ولوحات قياس أثر
+          </p>
+        </div>
 
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-3 gap-6">
           <FeatureCard
             title="إدارة الأعضاء والكيانات"
             desc="سجلات ذكية للأعضاء، أدوار وصلاحيات، وربط بين الكيانات والبرامج."
@@ -96,17 +102,17 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {}
-      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-8 md:mt-12">
+      {/* Stats Section */}
+      <section className="relative z-[1] mx-auto max-w-6xl w-full px-4 mt-12 md:mt-16">
         <div
-          className="rounded-2xl p-5 md:p-7"
+          className="rounded-[28px] p-8 md:p-10 backdrop-blur-sm"
           style={{
-            backgroundColor: "#FFFFFF",
-            border: "1px solid #E7E2DC",
-            boxShadow: "0 8px 18px rgba(0,0,0,0.05)",
+            backgroundColor: "rgba(255,255,255,0.98)",
+            border: "1px solid rgba(231,226,220,0.8)",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
           }}
         >
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <Stat title="كيان مسجّل" value="120+" />
             <Stat title="برنامج مُدار" value="450+" />
             <Stat title="مشارك نشط" value="20K+" />
@@ -185,6 +191,7 @@ export default function AboutPage() {
       </section>
 
       <FooterBar />
+      <DeveloperFooter />
     </div>
   );
 }
@@ -274,11 +281,12 @@ function FooterBar() {
 function Badge({ children }: { children: React.ReactNode }) {
   return (
     <span
-      className="inline-flex items-center h-8 px-3 rounded-full text-xs"
+      className="inline-flex items-center h-9 px-4 rounded-full text-sm font-semibold transition-all hover:scale-105"
       style={{
         backgroundColor: "#F6F6F6",
         color: "#1D1D1D",
         border: "1px solid #E3E3E3",
+        boxShadow: "0 2px 4px rgba(0,0,0,0.04)",
       }}
     >
       {children}
@@ -289,17 +297,20 @@ function Badge({ children }: { children: React.ReactNode }) {
 function FeatureCard({ title, desc }: { title: string; desc: string }) {
   return (
     <div
-      className="rounded-2xl p-5"
+      className="rounded-2xl p-6 transition-all hover:shadow-2xl hover:-translate-y-1 group"
       style={{
         backgroundColor: "#FFFFFF",
         border: "1px solid #E7E2DC",
         boxShadow: "0 8px 18px rgba(0,0,0,0.05)",
       }}
     >
-      <h3 className="font-semibold text-lg" style={{ color: "#1D1D1D" }}>
+      <div className="h-12 w-12 rounded-xl mb-4 flex items-center justify-center transition-all group-hover:scale-110" style={{ backgroundColor: "#FFF0F0", border: "1px solid #FFE2E2" }}>
+        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: "#EC1A24" }}></div>
+      </div>
+      <h3 className="font-bold text-lg mb-2" style={{ color: "#1D1D1D" }}>
         {title}
       </h3>
-      <p className="mt-1 text-sm leading-relaxed" style={{ color: "#595959" }}>
+      <p className="text-sm leading-relaxed" style={{ color: "#595959" }}>
         {desc}
       </p>
     </div>
@@ -308,11 +319,11 @@ function FeatureCard({ title, desc }: { title: string; desc: string }) {
 
 function Stat({ title, value }: { title: string; value: string }) {
   return (
-    <div className="space-y-1">
-      <div className="text-2xl md:text-3xl font-extrabold" style={{ color: "#1D1D1D" }}>
+    <div className="space-y-2">
+      <div className="text-3xl md:text-4xl font-extrabold" style={{ color: "#EC1A24" }}>
         {value}
       </div>
-      <div className="text-sm" style={{ color: "#6B6B6B" }}>
+      <div className="text-sm font-semibold" style={{ color: "#6B6B6B" }}>
         {title}
       </div>
     </div>

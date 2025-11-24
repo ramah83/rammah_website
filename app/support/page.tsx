@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Mail, Phone, MessageSquare, Users, MapPin, Clock, Facebook, Github } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Cairo } from "next/font/google";
+import DeveloperFooter from "@/components/DeveloperFooter";
 
 const cairo = Cairo({ subsets: ["arabic"], weight: ["400", "600", "700", "800"] });
 
@@ -12,28 +13,38 @@ export default function SupportPage() {
   return (
     <div dir="rtl" className={`${cairo.className} relative min-h-screen overflow-hidden flex flex-col`} style={{ backgroundColor: "#EFE6DE" }}>
       <HeaderBar />
-      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8 md:pt-12">
-        <div className="rounded-[24px] p-6 md:p-10" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 12px 24px rgba(0,0,0,0.06)" }}>
-          <h1 className="text-3xl md:text-4xl font-extrabold leading-tight" style={{ color: "#1D1D1D" }}>الدعم والمساعدة</h1>
-          <p className="mt-3 md:text-lg leading-relaxed" style={{ color: "#595959" }}>
-            احنا هنا علشان نساعدك. تواصل معنا عبر البريد أو الهاتف، أو ابعتلنا رسالة من النموذج، وهيرد عليك فريقنا بأسرع وقت.
+      <section className="relative z-[1] mx-auto max-w-6xl w-full px-4 pt-8 md:pt-12">
+        <div className="rounded-[24px] p-8 md:p-12 text-center" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 12px 24px rgba(0,0,0,0.06)" }}>
+          <div className="h-16 w-16 rounded-2xl mx-auto mb-4 grid place-items-center" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>
+            <MessageSquare className="h-8 w-8" color="#EC1A24" />
+          </div>
+          <h1 className="text-3xl md:text-5xl font-extrabold leading-tight mb-4" style={{ color: "#1D1D1D" }}>الدعم والمساعدة</h1>
+          <p className="max-w-2xl mx-auto md:text-lg leading-relaxed mb-8" style={{ color: "#595959" }}>
+            نحن هنا لمساعدتك في أي وقت. تواصل معنا عبر البريد الإلكتروني أو الهاتف، أو أرسل لنا رسالة من النموذج أدناه، وسيرد عليك فريقنا في أقرب وقت ممكن.
           </p>
-          <div className="mt-6 grid sm:grid-cols-3 gap-4">
-            <ContactTile icon={<Mail className="h-5 w-5" color="#1D1D1D" />} title="البريد الإلكتروني" value="support@youth-platform.com" href="mailto:support@youth-platform.com" />
-            <ContactTile icon={<Phone className="h-5 w-5" color="#1D1D1D" />} title="الهاتف" value="+20 100 000 0000" href="tel:+201000000000" />
-            <ContactTile icon={<MessageSquare className="h-5 w-5" color="#1D1D1D" />} title="المحادثة" value="ابدأ محادثة فورية" href="#contact" />
+          <div className="grid sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
+            <ContactTile icon={<Mail className="h-5 w-5" color="#EC1A24" />} title="البريد الإلكتروني" value="support@youth-platform.com" href="mailto:support@youth-platform.com" />
+            <ContactTile icon={<Phone className="h-5 w-5" color="#EC1A24" />} title="الهاتف" value="+20 100 000 0000" href="tel:+201000000000" />
+            <ContactTile icon={<MessageSquare className="h-5 w-5" color="#EC1A24" />} title="المحادثة" value="ابدأ محادثة فورية" href="#contact" />
           </div>
         </div>
       </section>
 
-      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-8 md:mt-12 grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 rounded-2xl p-6" id="contact" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
-          <h2 className="text-2xl font-bold mb-1" style={{ color: "#1D1D1D" }}>راسلنا</h2>
-          <p className="mb-5 text-sm" style={{ color: "#6B6B6B" }}>املأ البيانات وسيتم الرد عليك عبر البريد.</p>
+      <section className="relative z-[1] mx-auto max-w-6xl w-full px-4 mt-8 md:mt-12 grid lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 rounded-2xl p-8" id="contact" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="h-12 w-12 rounded-xl grid place-items-center" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>
+              <Mail className="h-6 w-6" color="#EC1A24" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold" style={{ color: "#1D1D1D" }}>راسلنا</h2>
+              <p className="text-sm" style={{ color: "#6B6B6B" }}>املأ البيانات وسيتم الرد عليك عبر البريد</p>
+            </div>
+          </div>
           <ContactForm />
         </div>
 
-        <aside className="rounded-2xl p-6 space-y-6" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
+        <aside className="rounded-2xl p-8 space-y-8" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
           <div>
             <h3 className="font-semibold text-lg mb-2 flex items-center gap-2" style={{ color: "#1D1D1D" }}>
               <Clock className="h-5 w-5" color="#1D1D1D" /> ساعات العمل
@@ -90,6 +101,7 @@ export default function SupportPage() {
       </section>
 
       <FooterBar />
+      <DeveloperFooter />
     </div>
   );
 }
@@ -184,13 +196,13 @@ function FooterBar() {
 
 function ContactTile({ icon, title, value, href }: { icon: React.ReactNode; title: string; value: string; href: string }) {
   return (
-    <Link href={href} className="rounded-2xl transition p-4 flex items-center gap-3" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)", color: "#1D1D1D" }}>
-      <span className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>
+    <Link href={href} className="rounded-2xl transition-all hover:shadow-xl p-5 flex flex-col items-center text-center gap-3 group" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)", color: "#1D1D1D" }}>
+      <span className="h-14 w-14 rounded-xl flex items-center justify-center transition-all group-hover:scale-110" style={{ backgroundColor: "#FFF0F0", border: "1px solid #FFE2E2" }}>
         {icon}
       </span>
       <span>
-        <div className="text-sm" style={{ color: "#6B6B6B" }}>{title}</div>
-        <div className="font-semibold" style={{ color: "#1D1D1D" }}>{value}</div>
+        <div className="text-xs font-medium mb-1" style={{ color: "#6B6B6B" }}>{title}</div>
+        <div className="font-bold text-sm" style={{ color: "#1D1D1D" }}>{value}</div>
       </span>
     </Link>
   );
@@ -205,11 +217,33 @@ function SocialIcon({ href, label, children }: { href: string; label: string; ch
 }
 
 function ContactForm() {
-  const [state, setState] = useState<{ name: string; email: string; subject: string; message: string; sent?: boolean }>({ name: "", email: "", subject: "", message: "" });
+  const [state, setState] = useState<{ name: string; email: string; subject: string; message: string; sent?: boolean; sending?: boolean; error?: string }>({ name: "", email: "", subject: "", message: "" });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setState((s) => ({ ...s, sent: true }));
+    setState((s) => ({ ...s, sending: true, error: undefined }));
+    
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: state.name,
+          email: state.email,
+          subject: state.subject,
+          message: state.message,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("فشل إرسال الرسالة");
+      }
+
+      setState({ name: "", email: "", subject: "", message: "", sent: true, sending: false });
+      setTimeout(() => setState((s) => ({ ...s, sent: false })), 3000);
+    } catch (error: any) {
+      setState((s) => ({ ...s, sending: false, error: error.message || "حدث خطأ" }));
+    }
   };
 
   const inputCls = "w-full rounded-xl px-3 py-2 transition focus:outline-none focus:ring-2";
@@ -260,15 +294,35 @@ function ContactForm() {
           onChange={(e) => setState((s) => ({ ...s, message: e.target.value }))}
         />
       </Field>
-      <div className="md:col-span-2 flex items-center gap-3">
-        <button
-          type="submit"
-          className="inline-flex items-center justify-center h-11 px-6 rounded-full font-semibold"
-          style={{ backgroundColor: "#EC1A24", color: "#FFFFFF" }}
-        >
-          إرسال الرسالة
-        </button>
-        {state.sent && <span className="text-sm" style={{ color: "#1D1D1D" }}>✔ تم الإرسال (تجريبي)</span>}
+      <div className="md:col-span-2 flex flex-col gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            type="submit"
+            disabled={state.sending}
+            className="inline-flex items-center justify-center h-11 px-6 rounded-full font-semibold disabled:opacity-50 transition-all hover:shadow-lg"
+            style={{ backgroundColor: "#EC1A24", color: "#FFFFFF" }}
+          >
+            {state.sending ? "جاري الإرسال..." : "إرسال الرسالة"}
+          </button>
+          {state.sent && (
+            <>
+              <span className="text-sm font-semibold" style={{ color: "#0F5132" }}>✔ تم الإرسال بنجاح!</span>
+              <Link
+                href="/dashboard/contact-messages"
+                className="inline-flex items-center gap-2 h-11 px-4 rounded-full text-sm font-semibold transition-all hover:shadow-lg"
+                style={{ background: "#E8F7EE", color: "#0F5132", border: "1px solid #CBE9D6" }}
+              >
+                <MessageSquare className="h-4 w-4" />
+                عرض رسائلي
+              </Link>
+            </>
+          )}
+        </div>
+        {state.error && (
+          <div className="text-sm font-medium" style={{ color: "#EC1A24" }}>
+            ✗ {state.error}
+          </div>
+        )}
       </div>
     </form>
   );

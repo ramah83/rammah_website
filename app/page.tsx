@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { Users } from "lucide-react";
+import { Users, AlertTriangle } from "lucide-react";
 
 type UserRole = "unionSupervisor" | "entityManager" | "user";
 
@@ -461,14 +461,25 @@ export default function HomePage() {
         <main className="flex-1 flex items-center justify-center p-4">
           <div className="relative z-10 w-full max-w-[580px]">
             <Card
-              className="rounded-[22px] border"
-              style={{ backgroundColor: "#FFFFFF", borderColor: "#E7E2DC", boxShadow: "0 12px 24px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.05)" }}
+              className="rounded-[28px] border backdrop-blur-sm overflow-hidden"
+              style={{ backgroundColor: "rgba(255,255,255,0.98)", borderColor: "rgba(231,226,220,0.8)", boxShadow: "0 24px 48px rgba(0,0,0,0.12), 0 0 0 1px rgba(255,255,255,0.5) inset" }}
             >
-              <CardHeader className="text-center space-y-3 pb-3">
-                <div className="mx-auto mb-2 h-14 w-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: PALETTE.white, border: `1px solid #E5E5E5` }}>
-                  <Users className="h-8 w-8" color={PALETTE.black} />
+              <CardHeader className="text-center space-y-6 pb-6 pt-10 px-8">
+                {/* Logo with glow effect */}
+                <div className="mx-auto mb-2 relative">
+                  <div className="absolute inset-0 rounded-2xl blur-2xl opacity-20" style={{ backgroundColor: PALETTE.red }}></div>
+                  <div className="relative h-20 w-20 rounded-2xl flex items-center justify-center" style={{ backgroundColor: PALETTE.white, border: `2px solid #E7E2DC`, boxShadow: "0 8px 20px rgba(236,26,36,0.15)" }}>
+                    <Users className="h-10 w-10" color={PALETTE.red} />
+                  </div>
                 </div>
 
+                {/* Platform name */}
+                <div className="space-y-1">
+                  <h1 className="text-xl font-bold" style={{ color: PALETTE.black }}>منصة الكيانات الشبابية</h1>
+                  <p className="text-xs" style={{ color: "#6B6B6B" }}>إدارة وتنمية المواهب الشبابية</p>
+                </div>
+
+                {/* Tabs */}
                 <Tabs
                   value={tab}
                   onValueChange={(v) => {
@@ -476,43 +487,47 @@ export default function HomePage() {
                     setError("");
                   }}
                 >
-                  <TabsList className="grid w-full grid-cols-2 rounded-full p-1" style={{ backgroundColor: PALETTE.white }}>
+                  <TabsList className="grid w-full grid-cols-2 rounded-full p-1.5 gap-1" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E7E2DC" }}>
                     <TabsTrigger
                       value="login"
-                      className="h-10 rounded-full data-[state=active]:shadow"
-                      style={{ color: PALETTE.black, backgroundColor: "transparent" }}
-                      disabled={showBootstrapModal} // لا تسمح بالدخول بدون مسؤول
+                      className="h-11 rounded-full font-semibold transition-all data-[state=active]:shadow-lg"
+                      style={{ color: PALETTE.black }}
+                      disabled={showBootstrapModal}
                     >
                       تسجيل الدخول
                     </TabsTrigger>
-                    <TabsTrigger value="register" className="h-10 rounded-full data-[state=active]:shadow" style={{ color: PALETTE.black, backgroundColor: "transparent" }}>
-                      تسجيل عضو
+                    <TabsTrigger value="register" className="h-11 rounded-full font-semibold transition-all data-[state=active]:shadow-lg" style={{ color: PALETTE.black }}>
+                      تسجيل جديد
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>
 
-                <CardTitle className="text-2xl font-extrabold tracking-wide" style={{ color: PALETTE.black }}>
-                  {tab === "login" ? "مرحباً بعودتك" : "أنشئ حسابك"}
-                </CardTitle>
-                <CardDescription style={{ color: "#6B6B6B" }}>
-                  {tab === "login" ? "ادخل للوصول إلى لوحة التحكم" : "اختر دورك المناسب وأكمل بياناتك"}
-                </CardDescription>
+                {/* Title & Description */}
+                <div className="space-y-2">
+                  <CardTitle className="text-3xl font-extrabold tracking-tight" style={{ color: PALETTE.black }}>
+                    {tab === "login" ? "مرحباً بعودتك 👋" : "انضم إلينا 🚀"}
+                  </CardTitle>
+                  <CardDescription className="text-sm leading-relaxed" style={{ color: "#6B6B6B" }}>
+                    {tab === "login" ? "سجل دخولك للوصول إلى لوحة التحكم الخاصة بك" : "أنشئ حسابك الآن وابدأ رحلتك في تطوير المواهب"}
+                  </CardDescription>
+                </div>
               </CardHeader>
 
-              <CardContent className="pt-0">
+              <CardContent className="pt-0 px-8 pb-10">
                 {error && !showBootstrapModal && (
-                  <div className="mb-4 p-3 rounded-lg text-sm" style={{ color: PALETTE.red, background: "#FDEBEC", border: `1px solid ${PALETTE.red}33` }}>
-                    {error}
+                  <div className="mb-6 p-4 rounded-2xl text-sm font-medium flex items-start gap-3" style={{ color: PALETTE.red, background: "#FFF0F0", border: `1px solid ${PALETTE.red}33` }}>
+                    <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+                    <span>{error}</span>
                   </div>
                 )}
 
                 {tab === "login" && (
-                  <form onSubmit={handleLogin} className="space-y-4">
+                  <form onSubmit={handleLogin} className="space-y-5">
                     <div className="space-y-2">
-                      <Label className="text-sm" style={{ color: PALETTE.black }}>البريد الإلكتروني</Label>
+                      <Label className="text-sm font-semibold" style={{ color: PALETTE.black }}>البريد الإلكتروني</Label>
                       <Input
-                        className="h-11 rounded-xl"
-                        style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3" }}
+                        className="h-12 rounded-xl transition-all focus:ring-2 focus:ring-offset-2"
+                        style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3", boxShadow: "0 2px 4px rgba(0,0,0,0.04)" }}
                         value={login.email}
                         onChange={(e) => setLogin((p) => ({ ...p, email: e.target.value }))}
                         placeholder="username@email.com"
@@ -520,43 +535,48 @@ export default function HomePage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm" style={{ color: PALETTE.black }}>كلمة المرور</Label>
+                      <Label className="text-sm font-semibold" style={{ color: PALETTE.black }}>كلمة المرور</Label>
                       <Input
                         type="password"
-                        className="h-11 rounded-xl"
-                        style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3" }}
+                        className="h-12 rounded-xl transition-all focus:ring-2 focus:ring-offset-2"
+                        style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3", boxShadow: "0 2px 4px rgba(0,0,0,0.04)" }}
                         value={login.password}
                         onChange={(e) => setLogin((p) => ({ ...p, password: e.target.value }))}
                         placeholder="••••••••"
                         disabled={showBootstrapModal}
                       />
                     </div>
-                    <Button type="submit" className="w-full h-11 rounded-full font-semibold" disabled={isLoading || showBootstrapModal} style={{ backgroundColor: PALETTE.red, color: "#FFFFFF" }}>
-                      {isLoading ? "جاري التحميل..." : "تسجيل الدخول"}
+                    <Button 
+                      type="submit" 
+                      className="w-full h-12 rounded-full font-bold text-base transition-all hover:shadow-lg disabled:opacity-50" 
+                      disabled={isLoading || showBootstrapModal} 
+                      style={{ backgroundColor: PALETTE.red, color: "#FFFFFF", boxShadow: "0 4px 12px rgba(236,26,36,0.3)" }}
+                    >
+                      {isLoading ? "جاري التحميل..." : "تسجيل الدخول →"}
                     </Button>
                   </form>
                 )}
 
                 {tab === "register" && (
-                  <form onSubmit={handleRegister} className="space-y-5">
+                  <form onSubmit={handleRegister} className="space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="text-sm" style={{ color: PALETTE.black }}>الاسم الكامل</Label>
+                        <Label className="text-sm font-semibold" style={{ color: PALETTE.black }}>الاسم الكامل</Label>
                         <Input
-                          className="h-11 rounded-xl"
-                          style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3" }}
+                          className="h-12 rounded-xl transition-all focus:ring-2 focus:ring-offset-2"
+                          style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3", boxShadow: "0 2px 4px rgba(0,0,0,0.04)" }}
                           value={registerForm.name}
                           onChange={(e) => setRegisterForm((p) => ({ ...p, name: e.target.value }))}
-                          placeholder="اكتب اسمك"
+                          placeholder="اكتب اسمك الكامل"
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-sm" style={{ color: PALETTE.black }}>البريد الإلكتروني</Label>
+                        <Label className="text-sm font-semibold" style={{ color: PALETTE.black }}>البريد الإلكتروني</Label>
                         <Input
                           type="email"
-                          className="h-11 rounded-xl"
-                          style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3" }}
+                          className="h-12 rounded-xl transition-all focus:ring-2 focus:ring-offset-2"
+                          style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3", boxShadow: "0 2px 4px rgba(0,0,0,0.04)" }}
                           value={registerForm.email}
                           onChange={(e) => setRegisterForm((p) => ({ ...p, email: e.target.value }))}
                           placeholder="username@email.com"
@@ -564,11 +584,11 @@ export default function HomePage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-sm" style={{ color: PALETTE.black }}>كلمة المرور</Label>
+                        <Label className="text-sm font-semibold" style={{ color: PALETTE.black }}>كلمة المرور</Label>
                         <Input
                           type="password"
-                          className="h-11 rounded-xl"
-                          style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3" }}
+                          className="h-12 rounded-xl transition-all focus:ring-2 focus:ring-offset-2"
+                          style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3", boxShadow: "0 2px 4px rgba(0,0,0,0.04)" }}
                           value={registerForm.password}
                           onChange={(e) => setRegisterForm((p) => ({ ...p, password: e.target.value }))}
                           placeholder="••••••••"
@@ -576,13 +596,13 @@ export default function HomePage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-sm" style={{ color: PALETTE.black }}>الرقم القومي (14 رقم)</Label>
+                        <Label className="text-sm font-semibold" style={{ color: PALETTE.black }}>الرقم القومي (14 رقم)</Label>
                         <Input
                           inputMode="numeric"
                           pattern="\d{14}"
                           maxLength={14}
-                          className="h-11 rounded-xl"
-                          style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3" }}
+                          className="h-12 rounded-xl transition-all focus:ring-2 focus:ring-offset-2"
+                          style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3", boxShadow: "0 2px 4px rgba(0,0,0,0.04)" }}
                           value={registerForm.nationalId}
                           onChange={(e) => {
                             const onlyDigits = e.target.value.replace(/\D+/g, "").slice(0, 14);
@@ -593,10 +613,10 @@ export default function HomePage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-sm" style={{ color: PALETTE.black }}>الهاتف</Label>
+                        <Label className="text-sm font-semibold" style={{ color: PALETTE.black }}>الهاتف</Label>
                         <Input
-                          className="h-11 rounded-xl"
-                          style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3" }}
+                          className="h-12 rounded-xl transition-all focus:ring-2 focus:ring-offset-2"
+                          style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3", boxShadow: "0 2px 4px rgba(0,0,0,0.04)" }}
                           value={registerForm.phone}
                           onChange={(e) => setRegisterForm((p) => ({ ...p, phone: e.target.value }))}
                           placeholder="01XXXXXXXXX"
@@ -604,10 +624,10 @@ export default function HomePage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-sm" style={{ color: PALETTE.black }}>المدينة</Label>
+                        <Label className="text-sm font-semibold" style={{ color: PALETTE.black }}>المدينة</Label>
                         <Input
-                          className="h-11 rounded-xl"
-                          style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3" }}
+                          className="h-12 rounded-xl transition-all focus:ring-2 focus:ring-offset-2"
+                          style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3", boxShadow: "0 2px 4px rgba(0,0,0,0.04)" }}
                           value={registerForm.city}
                           onChange={(e) => setRegisterForm((p) => ({ ...p, city: e.target.value }))}
                           placeholder="القاهرة"
@@ -615,15 +635,15 @@ export default function HomePage() {
                       </div>
 
                       <div className="space-y-2 sm:col-span-2">
-                        <Label className="text-sm" style={{ color: PALETTE.black }}>الاهتمامات</Label>
+                        <Label className="text-sm font-semibold" style={{ color: PALETTE.black }}>الاهتمامات</Label>
                         <Input
-                          className="h-11 rounded-xl"
-                          style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3" }}
+                          className="h-12 rounded-xl transition-all focus:ring-2 focus:ring-offset-2"
+                          style={{ backgroundColor: PALETTE.white, color: PALETTE.black, borderColor: "#E3E3E3", boxShadow: "0 2px 4px rgba(0,0,0,0.04)" }}
                           value={registerForm.interestsText}
                           onChange={(e) => setRegisterForm((p) => ({ ...p, interestsText: e.target.value }))}
                           placeholder="تطوع, تدريب, مناظرات"
                         />
-                        <p className="text-xs" style={{ color: "#6B6B6B" }}>اكتب الاهتمامات مفصولة بفواصل.</p>
+                        <p className="text-xs" style={{ color: "#6B6B6B" }}>اكتب الاهتمامات مفصولة بفواصل</p>
                       </div>
 
                       <div className="space-y-2 sm:col-span-2">
@@ -672,8 +692,13 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    <Button type="submit" className="w-full h-11 rounded-full font-semibold" disabled={isLoading} style={{ backgroundColor: PALETTE.red, color: "#FFFFFF" }}>
-                      {isLoading ? "جاري إنشاء الحساب..." : "تسجيل الحساب"}
+                    <Button 
+                      type="submit" 
+                      className="w-full h-12 rounded-full font-bold text-base transition-all hover:shadow-lg disabled:opacity-50" 
+                      disabled={isLoading} 
+                      style={{ backgroundColor: PALETTE.red, color: "#FFFFFF", boxShadow: "0 4px 12px rgba(236,26,36,0.3)" }}
+                    >
+                      {isLoading ? "جاري إنشاء الحساب..." : "إنشاء الحساب →"}
                     </Button>
 
                     <p className="text-xs text-center" style={{ color: "#6B6B6B" }}>

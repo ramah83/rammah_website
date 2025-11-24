@@ -314,15 +314,47 @@ export default function NewEvaluationPage() {
   if (!session || session.role !== "user") return null;
 
   return (
-    <div dir="rtl" className={`${cairo.className} min-h-screen flex flex-col`} style={{ backgroundColor: PALETTE.beige }}>
+    <div dir="rtl" className={`${cairo.className} relative min-h-screen flex flex-col overflow-hidden`} style={{ backgroundColor: PALETTE.beige }}>
+      {/* Animated Background */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 w-96 h-96 rounded-full opacity-10 animate-pulse" style={{ background: "radial-gradient(circle, #EC1A24 0%, transparent 70%)", animation: "float 8s ease-in-out infinite" }} />
+        <div className="absolute bottom-20 right-10 w-80 h-80 rounded-full opacity-10 animate-pulse" style={{ background: "radial-gradient(circle, #EC1A24 0%, transparent 70%)", animation: "float 10s ease-in-out infinite reverse" }} />
+      </div>
+
+      <style jsx global>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) scale(1); }
+          50% { transform: translateY(-30px) scale(1.1); }
+        }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
+
       <HeaderBar />
-      <main className="mx-auto max-w-6xl w-full px-4 mt-6 pb-10">
-        <Card className="rounded-[22px] bg-white" style={{ borderColor: PALETTE.border, boxShadow:"0 8px 18px rgba(0,0,0,0.05)" }}>
-          <CardHeader className="pb-0">
-            <CardTitle className="text-lg" style={{ color: PALETTE.black }}>تقييم فعالية </CardTitle>
-            <CardDescription className="text-sm" style={{ color: PALETTE.gray }}>اختر فعالية من كياناتك وقدّم تقييمك.</CardDescription>
+      <main className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-6 pb-10">
+        <Card className="rounded-[28px] bg-white relative overflow-hidden group transition-all duration-500 hover:scale-[1.01] hover:shadow-2xl" style={{ borderColor: PALETTE.border, boxShadow:"0 24px 48px rgba(0,0,0,0.12)" }}>
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#EC1A24] to-transparent opacity-50" />
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" style={{ background: "radial-gradient(circle at center, rgba(236,26,36,0.03) 0%, transparent 70%)" }} />
+          
+          <CardHeader className="pb-0 px-6 pt-6 relative z-10">
+            <div className="flex items-center gap-4 mb-2">
+              <div className="h-14 w-14 rounded-2xl grid place-items-center transition-all duration-300 hover:scale-110 hover:rotate-6"
+                   style={{ background: "linear-gradient(135deg, #EC1A24 0%, #C41820 100%)", boxShadow: "0 12px 24px rgba(236,26,36,0.4)" }}>
+                <Users className="h-7 w-7" color="#FFFFFF" />
+              </div>
+              <div>
+                <CardTitle className="text-3xl font-extrabold" style={{ color: PALETTE.black }}>تقييم فعالية</CardTitle>
+                <CardDescription className="text-base" style={{ color: PALETTE.gray }}>اختر فعالية من كياناتك وقدّم تقييمك الشامل</CardDescription>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="pt-4">
+
+          <div className="mx-6 my-5 h-px relative overflow-hidden" style={{ backgroundColor: "#EDE8E1" }}>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#EC1A24] to-transparent opacity-30" style={{ animation: "shimmer 3s infinite" }} />
+          </div>
+          <CardContent className="pt-4 px-6 pb-6 relative z-10">
             {msg.err && <div className="mb-4 p-3 rounded-lg text-sm" style={{ color:"#EC1A24", background:"#FDEBEC", border:"1px solid #EC1A2433" }}>{msg.err}</div>}
             {msg.ok &&  <div className="mb-4 p-3 rounded-lg text-sm" style={{ color:"#0F5132", background:"#E8F7EE", border:"1px solid #CBE9D6" }}>{msg.ok}</div>}
 
@@ -432,15 +464,33 @@ export default function NewEvaluationPage() {
               {/* مرفقات */}
               <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* صور متعددة */}
-                <div className="space-y-2">
-                  <Label>رفع صور (يمكن عدة صور)</Label>
-                  <Input type="file" accept="image/*" onChange={(e)=>onUpload("photo", e.target.files?.[0] || null)} />
+                <div className="space-y-3 p-5 rounded-2xl border transition-all duration-300 hover:shadow-lg" style={{ backgroundColor: "#FAFAFA", borderColor: "#E7E2DC" }}>
+                  <Label className="text-base font-bold flex items-center gap-2" style={{ color: PALETTE.black }}>
+                    <span className="h-8 w-8 rounded-lg grid place-items-center" style={{ background: "linear-gradient(135deg, #FFF0F0 0%, #FFE2E2 100%)" }}>
+                      📷
+                    </span>
+                    رفع صور (يمكن عدة صور)
+                  </Label>
+                  <label className="block cursor-pointer">
+                    <div className="border-2 border-dashed rounded-xl p-6 text-center transition-all duration-300 hover:border-[#EC1A24] hover:bg-white group"
+                         style={{ borderColor: "#E3E3E3", backgroundColor: "#FFFFFF" }}>
+                      <div className="text-4xl mb-2 transition-transform duration-300 group-hover:scale-110">📸</div>
+                      <div className="text-sm font-semibold mb-1" style={{ color: PALETTE.black }}>اضغط لاختيار صورة</div>
+                      <div className="text-xs" style={{ color: PALETTE.gray }}>PNG, JPG, GIF حتى 10MB</div>
+                    </div>
+                    <Input type="file" accept="image/*" onChange={(e)=>onUpload("photo", e.target.files?.[0] || null)} className="hidden" />
+                  </label>
                   {!!form.photoUrls.length && (
                     <>
-                      <p className="text-xs text-green-700">تم رفع {form.photoUrls.length} صورة ✓</p>
-                      <div className="mt-2 grid grid-cols-3 gap-2">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold"
+                           style={{ background: "#E8F7EE", color: "#0F5132", border: "1px solid #CBE9D6" }}>
+                        ✓ تم رفع {form.photoUrls.length} صورة
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
                         {form.photoUrls.map((u, i) => (
-                          <a key={u+i} href={u} target="_blank" rel="noreferrer" className="block rounded overflow-hidden border" title="فتح الصورة">
+                          <a key={u+i} href={u} target="_blank" rel="noreferrer" 
+                             className="block rounded-xl overflow-hidden border transition-all duration-300 hover:scale-105 hover:shadow-lg" 
+                             style={{ borderColor: "#E7E2DC" }} title="فتح الصورة">
                             {isImage(u) ? <img src={u} alt="" className="w-full h-24 object-cover" /> : <div className="p-2 text-xs break-all">{u}</div>}
                           </a>
                         ))}
@@ -450,31 +500,44 @@ export default function NewEvaluationPage() {
                 </div>
 
                 {/* قائمة الحضور */}
-                <div className="space-y-2">
-                  <Label>قائمة الحضور (PDF/صورة)</Label>
-                  <Input type="file" accept="application/pdf,image/*" onChange={(e)=>onUpload("attendance", e.target.files?.[0] || null)} />
-                  {form.attendanceUrl && <TinyPreview url={form.attendanceUrl} />}
-                </div>
+                <FileUploadBox 
+                  label="قائمة الحضور" 
+                  icon="📋"
+                  accept="application/pdf,image/*"
+                  onChange={(e)=>onUpload("attendance", e.target.files?.[0] || null)}
+                  previewUrl={form.attendanceUrl}
+                  hint="PDF أو صورة"
+                />
 
                 {/* استطلاع الرأي */}
-                <div className="space-y-2">
-                  <Label>تقرير استطلاع الرأي (PDF/صورة)</Label>
-                  <Input type="file" accept="application/pdf,image/*" onChange={(e)=>onUpload("survey", e.target.files?.[0] || null)} />
-                  {form.surveyUrl && <TinyPreview url={form.surveyUrl} />}
-                </div>
+                <FileUploadBox 
+                  label="تقرير استطلاع الرأي" 
+                  icon="📊"
+                  accept="application/pdf,image/*"
+                  onChange={(e)=>onUpload("survey", e.target.files?.[0] || null)}
+                  previewUrl={form.surveyUrl}
+                  hint="PDF أو صورة"
+                />
 
-                {/* تقرير نهائي + ميزانية */}
-                <div className="space-y-2">
-                  <Label>التقرير النهائي (PDF)</Label>
-                  <Input type="file" accept="application/pdf" onChange={(e)=>onUpload("finalReport", e.target.files?.[0] || null)} />
-                  {form.finalReportUrl && <TinyPreview url={form.finalReportUrl} />}
-                </div>
+                {/* تقرير نهائي */}
+                <FileUploadBox 
+                  label="التقرير النهائي" 
+                  icon="📄"
+                  accept="application/pdf"
+                  onChange={(e)=>onUpload("finalReport", e.target.files?.[0] || null)}
+                  previewUrl={form.finalReportUrl}
+                  hint="PDF فقط"
+                />
 
-                <div className="space-y-2">
-                  <Label>تقرير الميزانية/المصروفات (PDF)</Label>
-                  <Input type="file" accept="application/pdf" onChange={(e)=>onUpload("budgetReport", e.target.files?.[0] || null)} />
-                  {form.budgetReportUrl && <TinyPreview url={form.budgetReportUrl} />}
-                </div>
+                {/* تقرير الميزانية */}
+                <FileUploadBox 
+                  label="تقرير الميزانية/المصروفات" 
+                  icon="💰"
+                  accept="application/pdf"
+                  onChange={(e)=>onUpload("budgetReport", e.target.files?.[0] || null)}
+                  previewUrl={form.budgetReportUrl}
+                  hint="PDF فقط"
+                />
               </section>
 
               {/* روابط التغطية/الألبومات */}
@@ -500,8 +563,12 @@ export default function NewEvaluationPage() {
                 </div>
               </section>
 
-              <div>
-                <Button disabled={saving || !form.eventId} className="h-11 rounded-full font-semibold" style={{ background:PALETTE.red, color:"#fff" }}>
+              <div className="pt-4">
+                <Button disabled={saving || !form.eventId} 
+                        className="h-14 px-10 rounded-full font-bold text-lg transition-all duration-300 hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden group"
+                        style={{ background: "linear-gradient(135deg, #EC1A24 0%, #C41820 100%)", color:"#fff", boxShadow: "0 4px 12px rgba(236,26,36,0.3)" }}>
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                  <Users className="h-5 w-5 inline mr-2" />
                   {saving ? "جارٍ الإرسال..." : "إرسال التقييم"}
                 </Button>
               </div>
@@ -566,9 +633,15 @@ function NumberField({ label, value, onChange, hint }:{
   label:string; value:string; onChange:(v:string)=>void; hint?:string;
 }) {
   return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <Input type="number" value={value} onChange={(e)=>onChange(e.target.value)} />
+    <div className="space-y-2 group">
+      <Label className="font-semibold">{label}</Label>
+      <div className="relative">
+        <Input type="number" value={value} onChange={(e)=>onChange(e.target.value)} 
+               className="h-12 rounded-xl transition-all duration-300 focus:scale-[1.02] focus:shadow-lg"
+               style={{ backgroundColor: "#F6F6F6", borderColor: "#E3E3E3" }} />
+        <div className="absolute inset-0 rounded-xl opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" 
+             style={{ boxShadow: "0 0 0 3px rgba(236,26,36,0.1)" }} />
+      </div>
       {hint && <p className="text-xs text-[#6B6B6B]">{hint}</p>}
     </div>
   );
@@ -578,13 +651,19 @@ function RatingField({ label, value, onChange }:{
   label:string; value:string; onChange:(v:string)=>void;
 }) {
   return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
+    <div className="space-y-2 group">
+      <Label className="font-semibold">{label}</Label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-11 rounded-xl" style={{ background:"#F6F6F6", borderColor:"#E3E3E3" }}>
+        <SelectTrigger className="h-12 rounded-xl transition-all duration-300 hover:scale-[1.02]" style={{ background:"#F6F6F6", borderColor:"#E3E3E3" }}>
           <SelectValue placeholder="اختر الدرجة" />
         </SelectTrigger>
-        <SelectContent>{["1","2","3","4","5"].map(s=><SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+        <SelectContent>
+          {["1","2","3","4","5"].map(s=>(
+            <SelectItem key={s} value={s} className="text-lg">
+              {"⭐".repeat(Number(s))} {s}
+            </SelectItem>
+          ))}
+        </SelectContent>
       </Select>
     </div>
   );
@@ -594,14 +673,47 @@ function TextAreaField({ label, value, onChange, wide=false }:{
   label:string; value:string; onChange:(v:string)=>void; wide?:boolean;
 }) {
   return (
-    <div className={wide ? "md:col-span-2" : ""}>
-      <Label>{label}</Label>
-      <textarea
-        className="w-full min-h-[110px] rounded-xl p-3 border"
-        style={{ background:"#F6F6F6", borderColor:"#E3E3E3" }}
-        value={value}
-        onChange={(e)=>onChange(e.target.value)}
-      />
+    <div className={`${wide ? "md:col-span-2" : ""} group`}>
+      <Label className="font-semibold">{label}</Label>
+      <div className="relative">
+        <textarea
+          className="w-full min-h-[110px] rounded-xl p-4 border transition-all duration-300 focus:scale-[1.01] focus:shadow-lg resize-none"
+          style={{ background:"#F6F6F6", borderColor:"#E3E3E3" }}
+          value={value}
+          onChange={(e)=>onChange(e.target.value)}
+        />
+        <div className="absolute inset-0 rounded-xl opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" 
+             style={{ boxShadow: "0 0 0 3px rgba(236,26,36,0.1)" }} />
+      </div>
+    </div>
+  );
+}
+
+function FileUploadBox({ label, icon, accept, onChange, previewUrl, hint }:{
+  label: string; icon: string; accept: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; previewUrl?: string; hint?: string;
+}) {
+  return (
+    <div className="space-y-3 p-5 rounded-2xl border transition-all duration-300 hover:shadow-lg" style={{ backgroundColor: "#FAFAFA", borderColor: "#E7E2DC" }}>
+      <Label className="text-base font-bold flex items-center gap-2" style={{ color: PALETTE.black }}>
+        <span className="h-8 w-8 rounded-lg grid place-items-center" style={{ background: "linear-gradient(135deg, #FFF0F0 0%, #FFE2E2 100%)" }}>
+          {icon}
+        </span>
+        {label}
+      </Label>
+      <label className="block cursor-pointer">
+        <div className="border-2 border-dashed rounded-xl p-6 text-center transition-all duration-300 hover:border-[#EC1A24] hover:bg-white group"
+             style={{ borderColor: "#E3E3E3", backgroundColor: "#FFFFFF" }}>
+          <div className="text-4xl mb-2 transition-transform duration-300 group-hover:scale-110">{icon}</div>
+          <div className="text-sm font-semibold mb-1" style={{ color: PALETTE.black }}>اضغط لاختيار ملف</div>
+          <div className="text-xs" style={{ color: PALETTE.gray }}>{hint || "اختر ملف"}</div>
+        </div>
+        <Input type="file" accept={accept} onChange={onChange} className="hidden" />
+      </label>
+      {previewUrl && (
+        <div className="rounded-xl overflow-hidden border" style={{ borderColor: "#E7E2DC" }}>
+          <TinyPreview url={previewUrl} />
+        </div>
+      )}
     </div>
   );
 }

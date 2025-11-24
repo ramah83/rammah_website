@@ -1074,7 +1074,7 @@ function renderTitle(i: TimelineItem, opts?: { showNames?: boolean; usersMap?: M
 }
 
 function formatDate(s: string) {
-  try { return new Date(s + (s.endsWith("Z") ? "" : "Z")).toLocaleString("ar-EG"); } catch { return s; }
+  try { return new Date(s + (s.endsWith("Z") ? "" : "Z")).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" }); } catch { return s; }
 }
 
 function eventIcon(action: EntityEvent["action"]) {

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Cairo } from "next/font/google";
+import DeveloperFooter from "@/components/DeveloperFooter";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -274,28 +275,50 @@ export default function GovernancePage() {
   };
 
   return (
-    <div dir="rtl" className={`${cairo.className} min-h-screen`} style={{ backgroundColor:"#EFE6DE" }}>
+    <div dir="rtl" className={`${cairo.className} relative min-h-screen overflow-hidden`} style={{ backgroundColor:"#EFE6DE" }}>
+      {/* Animated Background */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 w-96 h-96 rounded-full opacity-10 animate-pulse" style={{ background: "radial-gradient(circle, #EC1A24 0%, transparent 70%)", animation: "float 8s ease-in-out infinite" }} />
+        <div className="absolute bottom-20 right-10 w-80 h-80 rounded-full opacity-10 animate-pulse" style={{ background: "radial-gradient(circle, #EC1A24 0%, transparent 70%)", animation: "float 10s ease-in-out infinite reverse" }} />
+        <div className="absolute top-1/2 left-1/2 w-72 h-72 rounded-full opacity-5" style={{ background: "radial-gradient(circle, #1D1D1D 0%, transparent 70%)", animation: "float 12s ease-in-out infinite", transform: "translate(-50%, -50%)" }} />
+      </div>
+
+      <style jsx global>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) scale(1); }
+          50% { transform: translateY(-30px) scale(1.1); }
+        }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
+
       <HeaderBar />
 
-      <section className="mx-auto max-w-6xl w-full px-4 pt-8">
-        <div className="rounded-[22px] p-5 md:p-6 flex items-center justify-between"
-             style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
-          <div className="flex items-center gap-3">
-            <span className="h-10 w-10 rounded-xl grid place-items-center" style={{ backgroundColor:"#F6F6F6", border:"1px solid #E5E5E5" }}>
-              <Gavel className="h-5 w-5" />
-            </span>
+      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8">
+        <div className="rounded-[28px] p-6 md:p-8 flex items-center justify-between relative overflow-hidden group transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl"
+             style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }}>
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" style={{ background: "radial-gradient(circle at center, rgba(236,26,36,0.05) 0%, transparent 70%)" }} />
+          
+          <div className="relative z-10 flex items-center gap-4">
+            <div className="h-16 w-16 rounded-3xl grid place-items-center group-hover:scale-110 group-hover:rotate-6 transition-all duration-500"
+                 style={{ background: "linear-gradient(135deg, #EC1A24 0%, #C41820 100%)", boxShadow: "0 12px 24px rgba(236,26,36,0.4)" }}>
+              <Gavel className="h-8 w-8" color="#FFFFFF" />
+            </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-extrabold" style={{ color:"#1D1D1D" }}>الحوكمة</h1>
-              <p className="text-sm" style={{ color:"#6B6B6B" }}>اللوائح، محاضر الاجتماعات، القرارات، وسير الاعتماد</p>
+              <h1 className="text-3xl md:text-4xl font-extrabold" style={{ color:"#1D1D1D" }}>الحوكمة</h1>
+              <p className="text-sm md:text-base" style={{ color:"#6B6B6B" }}>اللوائح، محاضر الاجتماعات، القرارات، وسير الاعتماد</p>
             </div>
           </div>
-          <div className="h-9 px-3 rounded-full flex items-center" style={{ backgroundColor:"#F6F6F6", border:"1px solid #E5E5E5", color:"#1D1D1D" }}>
+          <div className="relative z-10 h-11 px-5 rounded-full flex items-center font-bold transition-all duration-300 hover:scale-110" 
+               style={{ background: "linear-gradient(135deg, #FFF0F0 0%, #FFE2E2 100%)", border:"1px solid #FFE2E2", color:"#EC1A24" }}>
             {list.length} سجل
           </div>
         </div>
       </section>
 
-      <main className="mx-auto max-w-6xl w-full px-4 mt-6 space-y-6 pb-10" style={{ color:"#1D1D1D" }}>
+      <main className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-6 space-y-6 pb-10" style={{ color:"#1D1D1D" }}>
         {errMsg && (
           <div className="rounded-2xl p-3" style={{ backgroundColor:"#FFF8E8", border:"1px solid #F2E7C6", color:"#6B6B6B" }}>
             {errMsg}
@@ -304,14 +327,22 @@ export default function GovernancePage() {
 
         {canCreate(session.role) && (
           <SurfaceCard>
-            <CardHeader className="pb-0 px-5 pt-5">
-              <CardTitle className="flex items-center gap-2">
-                <ClipboardList className="h-5 w-5" /> إضافة سجل حوكمة
-              </CardTitle>
-              <CardDescription style={{ color:"#6B6B6B" }}>أدخل البيانات التالية لإنشاء عنصر جديد</CardDescription>
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#EC1A24] to-transparent opacity-50" />
+            
+            <CardHeader className="pb-0 px-6 pt-6">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-12 w-12 rounded-2xl grid place-items-center transition-all duration-300 hover:scale-110 hover:rotate-6"
+                     style={{ background: "linear-gradient(135deg, #FFF0F0 0%, #FFE2E2 100%)", border: "1px solid #FFE2E2" }}>
+                  <ClipboardList className="h-6 w-6" color="#EC1A24" />
+                </div>
+                <CardTitle className="text-2xl font-extrabold" style={{ color:"#1D1D1D" }}>إضافة سجل حوكمة</CardTitle>
+              </div>
+              <CardDescription className="text-sm" style={{ color:"#6B6B6B" }}>أدخل البيانات التالية لإنشاء عنصر جديد</CardDescription>
             </CardHeader>
 
-            <div className="mx-5 my-4 h-px" style={{ backgroundColor:"#EDE8E1" }} />
+            <div className="mx-6 my-5 h-px relative overflow-hidden" style={{ backgroundColor:"#EDE8E1" }}>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#EC1A24] to-transparent opacity-30" style={{ animation: "shimmer 3s infinite" }} />
+            </div>
 
             <CardContent className="px-5 pb-5">
               <form onSubmit={onSave} className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -410,29 +441,45 @@ export default function GovernancePage() {
           </SurfaceCard>
         )}
 
-        <SurfaceCard>
-          <CardHeader className="pb-0 px-5 pt-5">
-            <CardTitle>قائمة سجلات الحوكمة</CardTitle>
-            <CardDescription style={{ color:"#6B6B6B" }}>
-              فلترة حسب الكيان/الحالة/النوع أو البحث بالعنوان/المحتوى
-            </CardDescription>
+        <SurfaceCard className="relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#EC1A24] to-transparent opacity-50" />
+          
+          <CardHeader className="pb-0 px-6 pt-6">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-12 w-12 rounded-2xl grid place-items-center transition-all duration-300 hover:scale-110 hover:rotate-6"
+                   style={{ background: "linear-gradient(135deg, #FFF0F0 0%, #FFE2E2 100%)", border: "1px solid #FFE2E2" }}>
+                <FileText className="h-6 w-6" color="#EC1A24" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl font-extrabold" style={{ color:"#1D1D1D" }}>قائمة سجلات الحوكمة</CardTitle>
+                <CardDescription className="text-sm" style={{ color:"#6B6B6B" }}>
+                  فلترة حسب الكيان/الحالة/النوع أو البحث بالعنوان/المحتوى
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
 
-          <CardContent className="px-5 pb-5">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
-              <Field label="فلتر الكيان">
-                <Select value={filterEntity} onValueChange={setFilterEntity}>
-                  <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor:"#FFFFFF", border:"1px solid #E3E3E3" }}>
-                    <SelectValue placeholder="جميع الكيانات" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">جميع الكيانات</SelectItem>
-                    {entities.map((e)=>(
-                      <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
+          <div className="mx-6 my-5 h-px relative overflow-hidden" style={{ backgroundColor:"#EDE8E1" }}>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#EC1A24] to-transparent opacity-30" style={{ animation: "shimmer 3s infinite" }} />
+          </div>
+
+          <CardContent className="px-6 pb-6">
+            {/* فلاتر المشرف فقط */}
+            {session.role === "unionSupervisor" && (
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
+                <Field label="فلتر الكيان">
+                  <Select value={filterEntity} onValueChange={setFilterEntity}>
+                    <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor:"#FFFFFF", border:"1px solid #E3E3E3" }}>
+                      <SelectValue placeholder="جميع الكيانات" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">جميع الكيانات</SelectItem>
+                      {entities.map((e)=>(
+                        <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
 
               <Field label="فلتر الحالة">
                 <Select value={filterStatus} onValueChange={(v:GovStatus | "all") => setFilterStatus(v)}>
@@ -480,7 +527,72 @@ export default function GovernancePage() {
                   />
                 </div>
               </div>
-            </div>
+              </div>
+            )}
+
+            {/* فلاتر مدير الكيان */}
+            {session.role === "entityManager" && (
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
+                {/* شارة الكيان (ثابت) */}
+                <div>
+                  <Label className="text-sm">كيانك</Label>
+                  <div className="h-11 rounded-xl flex items-center px-3"
+                       style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5", color: "#1D1D1D" }}>
+                    <Building2 className="h-4 w-4 mr-1" />
+                    <span className="text-sm truncate">
+                      {entities.find((e)=> String(e.id)===String(session.entityId))?.name || "كيانك"}
+                    </span>
+                  </div>
+                </div>
+
+                <Field label="فلتر الحالة">
+                  <Select value={filterStatus} onValueChange={(v:GovStatus | "all") => setFilterStatus(v)}>
+                    <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor:"#FFFFFF", border:"1px solid #E3E3E3" }}>
+                      <SelectValue placeholder="كل الحالات" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">كل الحالات</SelectItem>
+                      <SelectItem value="draft">مسودة</SelectItem>
+                      <SelectItem value="submitted">مُقدَّم</SelectItem>
+                      <SelectItem value="review">قيد المراجعة</SelectItem>
+                      <SelectItem value="approved">معتمد</SelectItem>
+                      <SelectItem value="rejected">مرفوض</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                <Field label="فلتر النوع">
+                  <Select value={filterType} onValueChange={(v:GovType|"all")=>setFilterType(v)}>
+                    <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor:"#FFFFFF", border:"1px solid #E3E3E3" }}>
+                      <SelectValue placeholder="كل الأنواع" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">كل الأنواع</SelectItem>
+                      <SelectItem value="policy">سياسة/لائحة</SelectItem>
+                      <SelectItem value="procedure">إجراء</SelectItem>
+                      <SelectItem value="minutes">محضر اجتماع</SelectItem>
+                      <SelectItem value="decision">قرار</SelectItem>
+                      <SelectItem value="inquiry">استفسار</SelectItem>
+                      <SelectItem value="response">ردّ</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                <div className="md:col-span-2">
+                  <Label className="text-sm">بحث</Label>
+                  <div className="relative">
+                    <Search className="absolute top-1/2 -translate-y-1/2 right-3 h-4 w-4" />
+                    <Input
+                      placeholder="ابحث بالعنوان/المحتوى..."
+                      className="pr-9 h-11 rounded-xl"
+                      style={{ backgroundColor:"#FFFFFF", borderColor:"#E3E3E3" }}
+                      value={search}
+                      onChange={(e)=>setSearch(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {filtered.length === 0 ? (
               <div className="text-center py-10" style={{ color:"#7A7A7A" }}>
@@ -493,7 +605,10 @@ export default function GovernancePage() {
                   const acts = nextActions(f.status as GovStatus, session.role as UserRole);
                   const isEdit = editingId === f.id;
                   return (
-                    <li key={f.id} className="rounded-2xl p-4" style={{ backgroundColor:"#FFFFFF", border:"1px solid #E7E2DC", boxShadow:"0 6px 12px rgba(0,0,0,0.04)" }}>
+                    <li key={f.id} className="rounded-2xl p-5 relative overflow-hidden group transition-all duration-300 hover:scale-[1.01] hover:shadow-xl" 
+                        style={{ backgroundColor:"#FFFFFF", border:"1px solid #E7E2DC", boxShadow:"0 8px 18px rgba(0,0,0,0.06)" }}>
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" 
+                           style={{ background: "radial-gradient(circle at top right, rgba(236,26,36,0.03) 0%, transparent 70%)" }} />
                       <div className="flex items-start justify-between gap-3">
                         <div className="w-full space-y-2">
                           {isEdit ? (
@@ -663,6 +778,7 @@ export default function GovernancePage() {
       </main>
 
       {showDetails && <DetailsModal onClose={()=>setShowDetails(null)} item={showDetails} />}
+      <DeveloperFooter />
     </div>
   );
 }
@@ -703,8 +819,8 @@ function DetailsModal({ item, onClose }:{ item:any; onClose: ()=>void }) {
               </div>
             )}
             <div className="text-xs text-[#777]">الحالة الحالية: {statusLabel[item.status as GovStatus] || item.status}</div>
-            <div className="text-xs text-[#777]">تاريخ الإنشاء: {new Date(item.createdAt).toLocaleString("ar-EG")}</div>
-            <div className="text-xs text-[#777]">آخر تحديث: {new Date(item.updatedAt).toLocaleString("ar-EG")}</div>
+            <div className="text-xs text-[#777]">تاريخ الإنشاء: {new Date(item.createdAt).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}</div>
+            <div className="text-xs text-[#777]">آخر تحديث: {new Date(item.updatedAt).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}</div>
           </div>
         </div>
       </div>

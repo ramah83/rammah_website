@@ -129,7 +129,7 @@ export async function getSession(req?: NextRequest): Promise<Session | null> {
   }
 
   try {
-    const h = nextHeaders();
+    const h = await nextHeaders();
     const s2 = readSessionFromHeadersLike(h as any);
     if (s2) return s2;
   } catch {}

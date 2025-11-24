@@ -115,7 +115,7 @@ export function NotificationBell() {
 
   useEffect(() => {
     loadNotifications();
-    const interval = setInterval(loadNotifications, 30000); // كل 30 ثانية
+    const interval = setInterval(loadNotifications, 30000); 
     return () => clearInterval(interval);
   }, [loadNotifications]);
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Cairo } from "next/font/google";
+import DeveloperFooter from "@/components/DeveloperFooter";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -565,37 +566,55 @@ export default function ISOPage() {
   // ====== UI ======
   return (
     <div dir="rtl" className={`${cairo.className} relative min-h-screen overflow-hidden flex flex-col`} style={{ backgroundColor: palette.beige }}>
+      {/* Animated Background */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 w-96 h-96 rounded-full opacity-10 animate-pulse" style={{ background: "radial-gradient(circle, #EC1A24 0%, transparent 70%)", animation: "float 8s ease-in-out infinite" }} />
+        <div className="absolute bottom-20 right-10 w-80 h-80 rounded-full opacity-10 animate-pulse" style={{ background: "radial-gradient(circle, #EC1A24 0%, transparent 70%)", animation: "float 10s ease-in-out infinite reverse" }} />
+        <div className="absolute top-1/2 left-1/2 w-72 h-72 rounded-full opacity-5" style={{ background: "radial-gradient(circle, #1D1D1D 0%, transparent 70%)", animation: "float 12s ease-in-out infinite", transform: "translate(-50%, -50%)" }} />
+      </div>
+
       <style jsx global>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) scale(1); }
+          50% { transform: translateY(-30px) scale(1.1); }
+        }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
         @keyframes popIn  { from { opacity: 0; transform: scale(.98) } to { opacity: 1; transform: scale(1) } }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
         .anim-fadeUp { animation: fadeUp .35s ease both }
         .anim-popIn { animation: popIn .28s ease both }
         .card-hover { transition: transform .25s ease, box-shadow .25s ease }
-        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.08) }
+        .card-hover:hover { transform: translateY(-4px) scale(1.01); box-shadow: 0 16px 32px rgba(0,0,0,.12) }
       `}</style>
 
       <HeaderBar />
 
       {/* Header card */}
       <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8 anim-fadeUp">
-        <div className="rounded-[22px] p-5 md:p-6 flex items-center justify-between card-hover"
-             style={{ backgroundColor: palette.white, border: `1px solid ${palette.border}`, boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
-          <div className="flex items-center gap-3">
-            <span className="h-10 w-10 rounded-xl grid place-items-center" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>
-              <ShieldCheck className="h-5 w-5" color={palette.black} />
-            </span>
+        <div className="rounded-[28px] p-6 md:p-8 flex items-center justify-between relative overflow-hidden group transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl"
+             style={{ backgroundColor: palette.white, border: `1px solid ${palette.border}`, boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }}>
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" style={{ background: "radial-gradient(circle at center, rgba(236,26,36,0.05) 0%, transparent 70%)" }} />
+          
+          <div className="relative z-10 flex items-center gap-4">
+            <div className="h-16 w-16 rounded-3xl grid place-items-center group-hover:scale-110 group-hover:rotate-6 transition-all duration-500"
+                 style={{ background: "linear-gradient(135deg, #EC1A24 0%, #C41820 100%)", boxShadow: "0 12px 24px rgba(236,26,36,0.4)" }}>
+              <ShieldCheck className="h-8 w-8" color="#FFFFFF" />
+            </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-extrabold" style={{ color: palette.black }}>نماذج ISO (إجراءات وسياسات)</h1>
-              <p className="text-sm" style={{ color: palette.mut }}>مكتبة النماذج، سير الاعتماد، وسجل التدقيق</p>
+              <h1 className="text-3xl md:text-4xl font-extrabold" style={{ color: palette.black }}>نماذج ISO (إجراءات وسياسات)</h1>
+              <p className="text-sm md:text-base" style={{ color: palette.mut }}>مكتبة النماذج، سير الاعتماد، وسجل التدقيق</p>
             </div>
           </div>
 
           {canCreate(session?.role) && (
-            <div className="flex items-center gap-2">
+            <div className="relative z-10 flex items-center gap-2">
               <button
                 onClick={()=>setShowImport(true)}
-                className="h-9 px-3 rounded-full text-sm text-white"
-                style={{ backgroundColor: palette.red, border:"1px solid #E5E5E5" }}
+                className="h-10 px-4 rounded-full text-sm font-semibold text-white transition-all duration-300 hover:scale-105 hover:shadow-lg"
+                style={{ background: "linear-gradient(135deg, #EC1A24 0%, #C41820 100%)", boxShadow: "0 4px 12px rgba(236,26,36,0.3)" }}
               >
                 استيراد من ملف
               </button>
@@ -614,91 +633,142 @@ export default function ISOPage() {
 
         {/* إنشاء يدوي */}
         {canCreate(session?.role) && (
-          <SurfaceCard className="mx-3 sm:mx-[1cm] anim-popIn card-hover">
-            <CardHeader className="pb-0 px-5 pt-5">
-              <CardTitle className="flex items-center gap-2">
-                <FilePlus2 className="h-5 w-5" color={palette.black} />
-                إنشاء نموذج ISO
-              </CardTitle>
-              <CardDescription style={{ color: palette.mut }}>أدخل بيانات النموذج وارفع الملف إن وُجد</CardDescription>
+          <SurfaceCard className="mx-3 sm:mx-[1cm] anim-popIn card-hover relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#EC1A24] to-transparent opacity-50" />
+            
+            <CardHeader className="pb-0 px-6 pt-6">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-12 w-12 rounded-2xl grid place-items-center transition-all duration-300 hover:scale-110 hover:rotate-6"
+                     style={{ background: "linear-gradient(135deg, #FFF0F0 0%, #FFE2E2 100%)", border: "1px solid #FFE2E2" }}>
+                  <FilePlus2 className="h-6 w-6" color="#EC1A24" />
+                </div>
+                <div>
+                  <CardTitle className="text-2xl font-extrabold" style={{ color: palette.black }}>
+                    إنشاء نموذج ISO
+                  </CardTitle>
+                  <CardDescription className="text-sm" style={{ color: palette.mut }}>
+                    أدخل بيانات النموذج وارفع الملف إن وُجد
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
 
-            <div className="mx-5 my-4 h-px" style={{ backgroundColor: "#EDE8E1" }} />
+            <div className="mx-6 my-5 h-px relative overflow-hidden" style={{ backgroundColor: "#EDE8E1" }}>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#EC1A24] to-transparent opacity-30" style={{ animation: "shimmer 3s infinite" }} />
+            </div>
 
-            <CardContent className="px-5 pb-5">
-              <form onSubmit={onSave} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <CardContent className="px-6 pb-6">
+              <form onSubmit={onSave} className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <Field label="كود النموذج">
-                  <Input value={form.code} onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))}
-                         className="h-11 rounded-xl" style={{ backgroundColor: palette.white, color: palette.black, borderColor: "#E3E3E3" }}/>
+                  <div className="relative group">
+                    <Input value={form.code} onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))}
+                           className="h-12 rounded-xl transition-all duration-300 focus:scale-[1.02] focus:shadow-lg" 
+                           style={{ backgroundColor: palette.white, color: palette.black, borderColor: "#E3E3E3" }}
+                           placeholder="ISO-001"/>
+                    <div className="absolute inset-0 rounded-xl opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" 
+                         style={{ boxShadow: "0 0 0 3px rgba(236,26,36,0.1)" }} />
+                  </div>
                 </Field>
 
                 <Field label="عنوان النموذج" className="md:col-span-2">
-                  <Input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-                         className="h-11 rounded-xl" style={{ backgroundColor: palette.white, color: palette.black, borderColor: "#E3E3E3" }}/>
+                  <div className="relative group">
+                    <Input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+                           className="h-12 rounded-xl transition-all duration-300 focus:scale-[1.02] focus:shadow-lg" 
+                           style={{ backgroundColor: palette.white, color: palette.black, borderColor: "#E3E3E3" }}
+                           placeholder="سياسة الحضور والانصراف"/>
+                    <div className="absolute inset-0 rounded-xl opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" 
+                         style={{ boxShadow: "0 0 0 3px rgba(236,26,36,0.1)" }} />
+                  </div>
                 </Field>
 
                 <Field label="النسخة">
-                  <Input value={form.version} onChange={(e) => setForm(p => ({ ...p, version: e.target.value }))}
-                         className="h-11 rounded-xl" style={{ backgroundColor: palette.white, color: palette.black, borderColor: "#E3E3E3" }}/>
+                  <div className="relative group">
+                    <Input value={form.version} onChange={(e) => setForm(p => ({ ...p, version: e.target.value }))}
+                           className="h-12 rounded-xl transition-all duration-300 focus:scale-[1.02] focus:shadow-lg" 
+                           style={{ backgroundColor: palette.white, color: palette.black, borderColor: "#E3E3E3" }}
+                           placeholder="1.0"/>
+                    <div className="absolute inset-0 rounded-xl opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" 
+                         style={{ boxShadow: "0 0 0 3px rgba(236,26,36,0.1)" }} />
+                  </div>
                 </Field>
 
                 <Field label="وسوم (مفصولة بفواصل)">
-                  <div className="relative">
-                    <Tag className="absolute top-1/2 -translate-y-1/2 right-3 h-4 w-4" color="#7A7A7A" />
+                  <div className="relative group">
+                    <Tag className="absolute top-1/2 -translate-y-1/2 right-3 h-5 w-5 transition-all duration-300 group-focus-within:scale-110" color="#EC1A24" />
                     <Input value={form.tags} onChange={(e) => setForm(p => ({ ...p, tags: e.target.value }))}
-                           className="pr-8 h-11 rounded-xl" style={{ backgroundColor: palette.white, color: palette.black, borderColor: "#E3E3E3" }}/>
+                           className="pr-10 h-12 rounded-xl transition-all duration-300 focus:scale-[1.02] focus:shadow-lg" 
+                           style={{ backgroundColor: palette.white, color: palette.black, borderColor: "#E3E3E3" }}
+                           placeholder="لوائح, حضور, سياسات"/>
+                    <div className="absolute inset-0 rounded-xl opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" 
+                         style={{ boxShadow: "0 0 0 3px rgba(236,26,36,0.1)" }} />
                   </div>
                 </Field>
 
                 {/* رابط أو رفع ملف */}
                 <Field label="ملف النموذج">
-                  <div className="grid grid-cols-1 gap-2">
-                    <div className="relative">
-                      <LinkIcon className="absolute top-1/2 -translate-y-1/2 right-3 h-4 w-4" color="#7A7A7A" />
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="relative group">
+                      <LinkIcon className="absolute top-1/2 -translate-y-1/2 right-3 h-5 w-5 transition-all duration-300 group-focus-within:scale-110" color="#EC1A24" />
                       <Input value={form.fileUrl} onChange={(e) => setForm(p => ({ ...p, fileUrl: e.target.value }))}
-                             className="pr-8 h-11 rounded-xl" style={{ backgroundColor: palette.white, color: palette.black, borderColor: "#E3E3E3" }}
-                             placeholder="https://… (أو ارفع ملفًا بالأسفل)"/>
+                             className="pr-10 h-12 rounded-xl transition-all duration-300 focus:scale-[1.02] focus:shadow-lg" 
+                             style={{ backgroundColor: palette.white, color: palette.black, borderColor: "#E3E3E3" }}
+                             placeholder="https://example.com/file.pdf"/>
+                      <div className="absolute inset-0 rounded-xl opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" 
+                           style={{ boxShadow: "0 0 0 3px rgba(236,26,36,0.1)" }} />
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="inline-flex items-center gap-2 h-10 px-3 rounded-full cursor-pointer"
-                             style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5", color: palette.black }}>
-                        <Upload className="h-4 w-4" />
-                        <span className="text-sm">رفع ملف</span>
+                      <label className="inline-flex items-center gap-2 h-11 px-4 rounded-full cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-lg"
+                             style={{ background: "linear-gradient(135deg, #FFF0F0 0%, #FFE2E2 100%)", border: "1px solid #FFE2E2", color: "#EC1A24" }}>
+                        <Upload className="h-5 w-5" />
+                        <span className="text-sm font-semibold">رفع ملف</span>
                         <input type="file" accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" className="hidden"
                                onChange={(e)=> onUploadNew(e.target.files?.[0] || null)} />
                       </label>
                       {!!form.fileUrl && (
-                        <a href={form.fileUrl} target="_blank" rel="noreferrer" className="text-xs underline">فتح الملف الحالي</a>
+                        <a href={form.fileUrl} target="_blank" rel="noreferrer" 
+                           className="text-xs underline hover:text-[#EC1A24] transition-colors">
+                          فتح الملف الحالي
+                        </a>
                       )}
                     </div>
                   </div>
                 </Field>
 
                 <Field label="الكيان المالك">
-                  <Select
-                    value={String(form.ownerEntityId)}
-                    onValueChange={(v) => setForm((p) => ({ ...p, ownerEntityId: v }))}
-                    disabled={session?.role === "entityManager"}
-                  >
-                    <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor: palette.white, border: "1px solid #E3E3E3", color: palette.black }}>
-                      <SelectValue placeholder={session?.role === "entityManager" ? "كيانك" : "اختر الكيان"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {session?.role === "unionSupervisor" && <SelectItem value="all">كل الكيانات (عام)</SelectItem>}
-                      {entities.map((e) => (<SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
+                  <div className="relative group">
+                    <Select
+                      value={String(form.ownerEntityId)}
+                      onValueChange={(v) => setForm((p) => ({ ...p, ownerEntityId: v }))}
+                      disabled={session?.role === "entityManager"}
+                    >
+                      <SelectTrigger className="h-12 rounded-xl transition-all duration-300 group-hover:scale-[1.02]" 
+                                     style={{ backgroundColor: palette.white, border: "1px solid #E3E3E3", color: palette.black }}>
+                        <SelectValue placeholder={session?.role === "entityManager" ? "كيانك" : "اختر الكيان"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {session?.role === "unionSupervisor" && <SelectItem value="all">كل الكيانات (عام)</SelectItem>}
+                        {entities.map((e) => (<SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </Field>
 
                 <Field label="الوصف" className="md:col-span-3">
-                  <textarea value={form.description} onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
-                            className="w-full min-h-[90px] rounded-xl p-3 border"
-                            style={{ backgroundColor: palette.white, color: palette.black, borderColor: "#E3E3E3" }}/>
+                  <div className="relative group">
+                    <textarea value={form.description} onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
+                              className="w-full min-h-[100px] rounded-xl p-4 border transition-all duration-300 focus:scale-[1.01] focus:shadow-lg resize-none"
+                              style={{ backgroundColor: palette.white, color: palette.black, borderColor: "#E3E3E3" }}
+                              placeholder="وصف مختصر للنموذج..."/>
+                    <div className="absolute inset-0 rounded-xl opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" 
+                         style={{ boxShadow: "0 0 0 3px rgba(236,26,36,0.1)" }} />
+                  </div>
                 </Field>
 
                 <Field label="الحالة">
-                  <Select value={form.status} onValueChange={(v: ISOStatus) => setForm((p) => ({ ...p, status: v }))}>
-                    <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor: palette.white, border: "1px solid #E3E3E3", color: palette.black }}>
+                  <div className="relative group">
+                    <Select value={form.status} onValueChange={(v: ISOStatus) => setForm((p) => ({ ...p, status: v }))}>
+                      <SelectTrigger className="h-12 rounded-xl transition-all duration-300 group-hover:scale-[1.02]" 
+                                     style={{ backgroundColor: palette.white, border: "1px solid #E3E3E3", color: palette.black }}>
                       <SelectValue placeholder="اختر الحالة" />
                     </SelectTrigger>
                     <SelectContent>
@@ -713,13 +783,16 @@ export default function ISOPage() {
                       )}
                     </SelectContent>
                   </Select>
+                  </div>
                 </Field>
 
-                <div className="md:col-span-3 flex items-center gap-3 pt-2">
+                <div className="md:col-span-3 flex items-center gap-3 pt-4">
                   <Button type="submit" disabled={saving || loading || !form.ownerEntityId}
-                          className="gap-2 h-11 rounded-full font-semibold"
-                          style={{ backgroundColor: palette.red, color: "#FFFFFF" }}>
-                    {saving ? "جارٍ الحفظ..." : "حفظ"}
+                          className="gap-2 h-12 px-8 rounded-full font-bold text-base transition-all duration-300 hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden group"
+                          style={{ background: "linear-gradient(135deg, #EC1A24 0%, #C41820 100%)", color: "#FFFFFF", boxShadow: "0 4px 12px rgba(236,26,36,0.3)" }}>
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                    <FilePlus2 className="h-5 w-5" />
+                    {saving ? "جارٍ الحفظ..." : "حفظ النموذج"}
                   </Button>
                 </div>
 
@@ -742,19 +815,33 @@ export default function ISOPage() {
         )}
 
         {/* القائمة + الفلاتر */}
-        <SurfaceCard className="mx-3 sm:mx-[1cm] anim-popIn card-hover">
-          <CardHeader className="pb-0 px-5 pt-5">
-            <CardTitle>قائمة النماذج</CardTitle>
-            <CardDescription style={{ color: palette.mut }}>
-              {session.role === "user"
-                ? "ستظهر لك نماذج كيانك بالإضافة إلى النماذج العامة. يمكنك البحث وتغيير حالة العرض."
-                : "فلترة حسب الكيان/الحالة أو البحث بالكود/العنوان/الوسوم"}
-            </CardDescription>
+        <SurfaceCard className="mx-3 sm:mx-[1cm] anim-popIn card-hover relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#EC1A24] to-transparent opacity-50" />
+          
+          <CardHeader className="pb-0 px-6 pt-6">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-12 w-12 rounded-2xl grid place-items-center transition-all duration-300 hover:scale-110 hover:rotate-6"
+                   style={{ background: "linear-gradient(135deg, #FFF0F0 0%, #FFE2E2 100%)", border: "1px solid #FFE2E2" }}>
+                <FileText className="h-6 w-6" color="#EC1A24" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl font-extrabold" style={{ color: palette.black }}>قائمة النماذج</CardTitle>
+                <CardDescription className="text-sm" style={{ color: palette.mut }}>
+                  {session.role === "user"
+                    ? "ستظهر لك نماذج كيانك بالإضافة إلى النماذج العامة. يمكنك البحث وتغيير حالة العرض."
+                    : "فلترة حسب الكيان/الحالة أو البحث بالكود/العنوان/الوسوم"}
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
 
-          <CardContent className="px-5 pb-5">
-            {/* فلاتر المشرف/مدير الكيان */}
-            {session.role !== "user" && (
+          <div className="mx-6 my-5 h-px relative overflow-hidden" style={{ backgroundColor: "#EDE8E1" }}>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#EC1A24] to-transparent opacity-30" style={{ animation: "shimmer 3s infinite" }} />
+          </div>
+
+          <CardContent className="px-6 pb-6">
+            {/* فلاتر المشرف فقط */}
+            {session.role === "unionSupervisor" && (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
                 <Field label="فلتر الكيان">
                   <Select value={filterEntity} onValueChange={setFilterEntity}>
@@ -784,6 +871,54 @@ export default function ISOPage() {
                   </Select>
                 </Field>
 
+                <div className="md:col-span-2">
+                  <Label className="text-sm" style={{ color: palette.black }}>بحث</Label>
+                  <div className="relative">
+                    <Search className="absolute top-1/2 -translate-y-1/2 right-3 h-4 w-4" color="#7A7A7A" />
+                    <Input placeholder="ابحث بالكود/العنوان/الوسوم..." className="pr-9 h-11 rounded-xl"
+                           style={{ backgroundColor: palette.white, color: palette.black, borderColor: "#E3E3E3" }}
+                           value={search} onChange={(e) => setSearch(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* فلاتر مدير الكيان: كيان ثابت + فلتر حالة + بحث */}
+            {session.role === "entityManager" && (
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
+                {/* شارة الكيان (ثابت) */}
+                <div className="md:col-span-2">
+                  <Label className="text-sm" style={{ color: palette.black }}>كيانك</Label>
+                  <div className="h-11 rounded-xl flex items-center px-3"
+                       style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5", color: palette.black }}>
+                    <Building2 className="h-4 w-4 mr-1" />
+                    <span className="text-sm">
+                      {entities.find((e)=> String(e.id)===String(session.entityId))?.name || "كيانك"}
+                      {" "} + النماذج العامة
+                    </span>
+                  </div>
+                </div>
+
+                {/* فلتر الحالة */}
+                <div className="md:col-span-2">
+                  <Field label="فلتر الحالة">
+                    <Select value={filterStatus} onValueChange={(v: ISOStatus | "all") => setFilterStatus(v)}>
+                      <SelectTrigger className="h-11 rounded-xl" style={{ backgroundColor: palette.white, border: "1px solid #E3E3E3", color: palette.black }}>
+                        <SelectValue placeholder="كل الحالات" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">كل الحالات</SelectItem>
+                        <SelectItem value="draft">مسودة</SelectItem>
+                        <SelectItem value="submitted">مُقدَّم</SelectItem>
+                        <SelectItem value="review">قيد المراجعة</SelectItem>
+                        <SelectItem value="approved">معتمد</SelectItem>
+                        <SelectItem value="rejected">مرفوض</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
+
+                {/* البحث */}
                 <div className="md:col-span-2">
                   <Label className="text-sm" style={{ color: palette.black }}>بحث</Label>
                   <div className="relative">
@@ -859,8 +994,10 @@ export default function ISOPage() {
                     (typeof f.tags === "string" && f.tags ? f.tags.split(",").map((s:string)=>s.trim()).filter(Boolean) : []);
 
                   return (
-                    <li key={f.id} className="rounded-2xl p-4 anim-fadeUp card-hover"
-                        style={{ backgroundColor: palette.white, border: `1px solid ${palette.border}`, boxShadow: "0 6px 12px rgba(0,0,0,0.04)", animationDelay: `${i*40}ms` }}>
+                    <li key={f.id} className="rounded-2xl p-5 anim-fadeUp relative overflow-hidden group transition-all duration-300 hover:scale-[1.01] hover:shadow-xl"
+                        style={{ backgroundColor: palette.white, border: `1px solid ${palette.border}`, boxShadow: "0 8px 18px rgba(0,0,0,0.06)", animationDelay: `${i*40}ms` }}>
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" 
+                           style={{ background: "radial-gradient(circle at top right, rgba(236,26,36,0.03) 0%, transparent 70%)" }} />
                       <div className="flex items-start justify-between gap-3">
                         <div className="w-full space-y-2">
                           {isEdit ? (
@@ -1042,6 +1179,8 @@ export default function ISOPage() {
         role={session?.role}
         entityId={String(effectiveEntityId || "")}
       />
+
+      <DeveloperFooter />
     </div>
   );
 }

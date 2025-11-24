@@ -14,24 +14,30 @@ export default function PrivacyPage() {
   return (
     <div dir="rtl" className={`${cairo.className} relative min-h-screen overflow-hidden flex flex-col`} style={{ backgroundColor: "#EFE6DE" }}>
       <HeaderBar />
-      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 pt-8 md:pt-12">
-        <div className="rounded-[24px] p-6 md:p-10" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 12px 24px rgba(0,0,0,0.06)" }}>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>
-              <ShieldCheck className="h-5 w-5" color="#1D1D1D" />
+      <section className="relative z-[1] mx-auto max-w-6xl w-full px-4 pt-12 md:pt-16">
+        <div className="rounded-[28px] p-8 md:p-12 text-center backdrop-blur-sm" style={{ backgroundColor: "rgba(255,255,255,0.98)", border: "1px solid rgba(231,226,220,0.8)", boxShadow: "0 24px 48px rgba(0,0,0,0.12), 0 0 0 1px rgba(255,255,255,0.5) inset" }}>
+          {/* Icon with glow */}
+          <div className="mx-auto mb-6 relative w-fit">
+            <div className="absolute inset-0 rounded-2xl blur-2xl opacity-20" style={{ backgroundColor: "#0F5132" }}></div>
+            <div className="relative h-20 w-20 rounded-2xl flex items-center justify-center mx-auto" style={{ backgroundColor: "#FFFFFF", border: "2px solid #E7E2DC", boxShadow: "0 8px 20px rgba(15,81,50,0.15)" }}>
+              <ShieldCheck className="h-10 w-10" color="#0F5132" />
             </div>
-            <span className="text-sm" style={{ color: "#6B6B6B" }}>سياسة الخصوصية</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-extrabold leading-tight" style={{ color: "#1D1D1D" }}>
-            نحمي بياناتك ونحترم خصوصيتك
+
+          <div className="inline-flex items-center h-8 px-4 rounded-full text-xs font-semibold mb-4" style={{ backgroundColor: "#E8F7EE", color: "#0F5132", border: "1px solid #CBE9D6" }}>
+            سياسة الخصوصية
+          </div>
+
+          <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-6" style={{ color: "#1D1D1D" }}>
+            نحمي بياناتك ونحترم خصوصيتك 🔒
           </h1>
-          <p className="mt-3 md:text-lg leading-relaxed" style={{ color: "#595959" }}>
+          <p className="max-w-3xl mx-auto text-lg md:text-xl leading-relaxed" style={{ color: "#595959" }}>
             توضح هذه السياسة كيف نجمع بياناتك ونستخدمها ونحفظها داخل منصة الكيانات الشبابية. بمتابعتك لاستخدام المنصة فأنت توافق على بنود هذه السياسة.
           </p>
         </div>
       </section>
 
-      <section className="relative z-10 mx-auto max-w-6xl w-full px-4 mt-8 md:mt-12 space-y-6">
+      <section className="relative z-[1] mx-auto max-w-6xl w-full px-4 mt-12 md:mt-16 space-y-6">
         <CardGlass>
           <SectionTitle icon={<Database className="h-5 w-5" color="#1D1D1D" />} title="البيانات التي نجمعها" />
           <ul className="list-disc pr-5 space-y-2" style={{ color: "#595959" }}>
@@ -182,7 +188,7 @@ function FooterBar() {
 
 function CardGlass({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl p-6" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)", color: "#1D1D1D" }}>
+    <div className="rounded-2xl p-8 transition-all hover:shadow-2xl" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)", color: "#1D1D1D" }}>
       {children}
     </div>
   );
@@ -190,9 +196,9 @@ function CardGlass({ children }: { children: React.ReactNode }) {
 
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
-    <div className="flex items-center gap-2 mb-3">
-      <span className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>{icon}</span>
-      <h2 className="text-xl md:text-2xl font-bold" style={{ color: "#1D1D1D" }}>{title}</h2>
+    <div className="flex items-center gap-3 mb-4">
+      <span className="h-12 w-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>{icon}</span>
+      <h2 className="text-xl md:text-2xl font-extrabold" style={{ color: "#1D1D1D" }}>{title}</h2>
     </div>
   );
 }
@@ -218,29 +224,29 @@ function CookiesCard() {
   const save = () => { localStorage.setItem("cookiePrefs", JSON.stringify(prefs)); setSaved(true); setTimeout(() => setSaved(false), 2000); };
 
   return (
-    <div className="rounded-2xl p-6" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
-      <div className="flex items-center gap-2 mb-3">
-        <span className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#F6F6F6", border: "1px solid #E5E5E5" }}>
-          <Cookie className="h-5 w-5" color="#1D1D1D" />
+    <div className="rounded-2xl p-8 transition-all hover:shadow-2xl" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E7E2DC", boxShadow: "0 8px 18px rgba(0,0,0,0.05)" }}>
+      <div className="flex items-center gap-3 mb-4">
+        <span className="h-12 w-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#FFF8E8", border: "1px solid #F2E7C6" }}>
+          <Cookie className="h-6 w-6" color="#6B5400" />
         </span>
-        <h2 className="text-xl md:text-2xl font-bold" style={{ color: "#1D1D1D" }}>ملفات الارتباط (Cookies)</h2>
+        <h2 className="text-xl md:text-2xl font-extrabold" style={{ color: "#1D1D1D" }}>ملفات الارتباط (Cookies)</h2>
       </div>
 
-      <p className="mb-4" style={{ color: "#595959" }}>
+      <p className="mb-6 text-base leading-relaxed" style={{ color: "#595959" }}>
         نستخدم الكوكيز لتحسين تجربتك. يمكنك إدارة تفضيلاتك أدناه. الكوكيز الضرورية مطلوبة لتشغيل الموقع.
       </p>
 
-      <div className="grid sm:grid-cols-3 gap-3">
+      <div className="grid sm:grid-cols-3 gap-4">
         <CookieToggle title="ضرورية" desc="لازمة لتسجيل الدخول وتشغيل الأساسيات." checked={prefs.necessary} onChange={() => toggle("necessary")} disabled />
         <CookieToggle title="تحليلات" desc="مساعدة في فهم الاستخدام بشكل إحصائي." checked={prefs.analytics} onChange={() => toggle("analytics")} />
         <CookieToggle title="تسويقية" desc="محتوى مخصص وإشعارات ذات صلة." checked={prefs.marketing} onChange={() => toggle("marketing")} />
       </div>
 
-      <div className="mt-4 flex items-center gap-3">
-        <button onClick={save} className="inline-flex items-center justify-center h-11 px-6 rounded-full font-semibold" style={{ backgroundColor: "#EC1A24", color: "#FFFFFF" }}>
+      <div className="mt-6 flex items-center gap-3">
+        <button onClick={save} className="inline-flex items-center justify-center h-12 px-6 rounded-full font-bold transition-all hover:shadow-lg" style={{ backgroundColor: "#EC1A24", color: "#FFFFFF", boxShadow: "0 4px 12px rgba(236,26,36,0.3)" }}>
           احفظ تفضيلاتي
         </button>
-        {saved && <span className="text-sm" style={{ color: "#1D1D1D" }}>✔ تم الحفظ</span>}
+        {saved && <span className="text-sm font-semibold" style={{ color: "#0F5132" }}>✔ تم الحفظ بنجاح</span>}
       </div>
     </div>
   );
