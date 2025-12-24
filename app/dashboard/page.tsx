@@ -577,8 +577,8 @@ export default function DashboardPage() {
                 {session?.role === "entityManager" && (
                   <UnitCard
                     icon={<Users className="h-5 w-5 text-[#1D1D1D]" />}
-                    title="طلبات الانضمام إلى كيانك"
-                    desc="مراجعة طلبات انضمام الأفراد والموافقة/الرفض."
+                    title="طلبات الانضمام و المغادرة إلى كيانك"
+                    desc="مراجعة طلبات انضمام و المغادرة الأفراد والموافقة/الرفض."
                     href="/dashboard/requests"
                     blocked={suspendedAny}
                     onOpen={(href) => guardNavigate(href)}

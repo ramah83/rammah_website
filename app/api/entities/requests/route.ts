@@ -5,6 +5,7 @@ export const revalidate = 0;
 import { NextRequest, NextResponse } from "next/server";
 import { getDB, uid } from "@/lib/server/sqlite";
 import { getSession, fromBase64Any, toCoreRole } from "@/lib/server/session";
+import { createNotification } from "@/lib/server/notifications";
 
 type Sess = {
   id: string;
@@ -349,14 +350,58 @@ export async function PATCH(req: NextRequest) {
     `
     ).run(s.id, note, rid);
 
-    if (action === "leave_membership" && reqRow.targetEntityId) {
-      db.prepare(
+    // إرسال إشعارات حسب نوع الطلب
+    try {
+      if (action === "leave_membership" && reqRow.targetEntityId) {
+        db.prepare(
+          `
+          INSERT INTO entity_events (id, entityId, action, fromStatus, toStatus, reason, actorId, actorName, actorRole, createdAt)
+          VALUES (?, ?, 'leave_rejected', NULL, NULL, ?, ?, ?, ?, datetime('now'))
         `
-        INSERT INTO entity_events (id, entityId, action, fromStatus, toStatus, reason, actorId, actorName, actorRole, createdAt)
-        VALUES (?, ?, 'leave_rejected', NULL, NULL, ?, ?, ?, ?, datetime('now'))
-      `
-      ).run(uid(), String(reqRow.targetEntityId), note, s.id, s.name || s.email || "مستخدم", s.role || "unknown");
+        ).run(uid(), String(reqRow.targetEntityId), note, s.id, s.name || s.email || "مستخدم", s.role || "unknown");
+        
+        const userId = payload?.userId || reqRow.createdBy;
+        if (userId) {
+          const entityName = db.prepare(`SELECT name FROM entities WHERE id = ?`).get(reqRow.targetEntityId) as { name?: string } | undefined;
+          createNotification({
+            userId: String(userId),
+            type: "leave_rejected",
+            title: "تم رفض طلب المغادرة",
+            message: `تم رفض طلب مغادرتك من ${entityName?.name || "الكيان"}${note ? `: ${note}` : ""}`,
+            link: "/membership",
+          });
+        }
+      } else if (action === "create") {
+        createNotification({
+          userId: String(reqRow.createdBy),
+          type: "entity_request",
+          title: "تم رفض طلب إنشاء الكيان",
+          message: `تم رفض طلب إنشاء الكيان "${payload?.name || "الكيان"}"${note ? `: ${note}` : ""}`,
+          link: "/entities",
+        });
+      } else if (action === "update" && reqRow.targetEntityId) {
+        const entityName = db.prepare(`SELECT name FROM entities WHERE id = ?`).get(reqRow.targetEntityId) as { name?: string } | undefined;
+        createNotification({
+          userId: String(reqRow.createdBy),
+          type: "entity_request",
+          title: "تم رفض طلب تحديث الكيان",
+          message: `تم رفض طلب تحديث بيانات الكيان "${entityName?.name || "الكيان"}"${note ? `: ${note}` : ""}`,
+          link: `/entities/${reqRow.targetEntityId}`,
+        });
+      } else if (action === "delete" && reqRow.targetEntityId) {
+        const entityName = db.prepare(`SELECT name FROM entities WHERE id = ?`).get(reqRow.targetEntityId) as { name?: string } | undefined;
+        createNotification({
+          userId: String(reqRow.createdBy),
+          type: "entity_request",
+          title: "تم رفض طلب حذف الكيان",
+          message: `تم رفض طلب حذف الكيان "${entityName?.name || "الكيان"}"${note ? `: ${note}` : ""}`,
+          link: `/entities/${reqRow.targetEntityId}`,
+        });
+      }
+    } catch (e) {
+      console.error("Failed to send rejection notification:", e);
     }
+    
     return NextResponse.json({ ok: true, status: "rejected" });
   }
 
@@ -398,6 +443,19 @@ export async function PATCH(req: NextRequest) {
         `).run(uid(), newEntityId, note, s.id, s.name || s.email || "مستخدم", s.role || "unknown");
       });
       tx();
+
+      // إرسال إشعار لمقدم الطلب بالموافقة
+      try {
+        createNotification({
+          userId: String(reqRow.createdBy),
+          type: "entity_request",
+          title: "تمت الموافقة على طلب إنشاء الكيان",
+          message: `تمت الموافقة على طلب إنشاء الكيان "${payload.name}". يمكنك الآن إدارة الكيان الخاص بك.`,
+          link: `/entities/${newEntityId}`,
+        });
+      } catch (e) {
+        console.error("Failed to send entity creation approval notification:", e);
+      }
 
       return NextResponse.json({ ok: true, status: "approved", entityId: newEntityId });
     }
@@ -441,6 +499,20 @@ export async function PATCH(req: NextRequest) {
       });
       tx();
 
+      // إرسال إشعار لمقدم الطلب بالموافقة
+      try {
+        const entityName = db.prepare(`SELECT name FROM entities WHERE id = ?`).get(entityId) as { name?: string } | undefined;
+        createNotification({
+          userId: String(reqRow.createdBy),
+          type: "entity_request",
+          title: "تمت الموافقة على طلب تحديث الكيان",
+          message: `تمت الموافقة على طلب تحديث بيانات الكيان "${entityName?.name || "الكيان"}".`,
+          link: `/entities/${entityId}`,
+        });
+      } catch (e) {
+        console.error("Failed to send entity update approval notification:", e);
+      }
+
       return NextResponse.json({ ok: true, status: "approved" });
     }
 
@@ -451,6 +523,8 @@ export async function PATCH(req: NextRequest) {
         throw new Error("معرف الكيان غير موجود");
       }
 
+      const entityName = db.prepare(`SELECT name FROM entities WHERE id = ?`).get(entityId) as { name?: string } | undefined;
+      
       const tx = db.transaction(() => {
         // Soft delete: mark as deleted or remove
         db.prepare(`DELETE FROM entities WHERE id=?`).run(entityId);
@@ -469,6 +543,19 @@ export async function PATCH(req: NextRequest) {
         `).run(uid(), entityId, note, s.id, s.name || s.email || "مستخدم", s.role || "unknown");
       });
       tx();
+
+      // إرسال إشعار لمقدم الطلب بالموافقة
+      try {
+        createNotification({
+          userId: String(reqRow.createdBy),
+          type: "entity_request",
+          title: "تمت الموافقة على طلب حذف الكيان",
+          message: `تمت الموافقة على طلب حذف الكيان "${entityName?.name || "الكيان"}". تم حذف الكيان بنجاح.`,
+          link: "/entities",
+        });
+      } catch (e) {
+        console.error("Failed to send entity deletion approval notification:", e);
+      }
 
       return NextResponse.json({ ok: true, status: "approved" });
     }
@@ -526,6 +613,20 @@ export async function PATCH(req: NextRequest) {
       ).run(uid(), entityId, note, s.id, s.name || s.email || "مستخدم", actorRole);
     });
     tx();
+
+    // إرسال إشعار للمستخدم بالموافقة
+    try {
+      const entityName = db.prepare(`SELECT name FROM entities WHERE id = ?`).get(entityId) as { name?: string } | undefined;
+      createNotification({
+        userId: String(userId),
+        type: "leave_approved",
+        title: "تمت الموافقة على طلب المغادرة",
+        message: `تمت الموافقة على طلب مغادرتك من ${entityName?.name || "الكيان"}. تم إلغاء عضويتك بنجاح.`,
+        link: "/membership",
+      });
+    } catch (e) {
+      console.error("Failed to send leave approval notification:", e);
+    }
 
     return NextResponse.json({ ok: true, status: "approved_and_left" });
   } catch (e: any) {

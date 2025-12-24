@@ -142,13 +142,34 @@ export async function GET(req: NextRequest) {
       ${scopedEntityId ? `AND em.entityId = ?` : ``}
     `;
 
+    // استعلام لجلب مدير الكيان
+    const qManagers = `
+      SELECT
+        'mgr_' || lower(hex(randomblob(8)))       AS id,
+        COALESCE(u.name, '—')                     AS name,
+        u.email                                   AS email,
+        u.phone                                   AS phone,
+        e.id                                      AS entityId,
+        u.nationalId                              AS nationalId,
+        COALESCE(e.createdAt, datetime('now'))    AS joinedAt,
+        u.city                                    AS city,
+        u.avatar                                  AS avatar,
+        'manager'                                 AS role
+      FROM entities e
+      JOIN users u ON u.id = e.managerUserId
+      LEFT JOIN members m3 ON m3.entityId = e.id AND m3.nationalId = u.nationalId
+      LEFT JOIN entity_members em2 ON em2.entityId = e.id AND em2.userId = u.id
+      WHERE m3.id IS NULL AND em2.id IS NULL
+      ${scopedEntityId ? `AND e.id = ?` : ``}
+    `;
+
     const canSeeAll = s?.role === "unionSupervisor" && !scopedEntityId;
 
     let rows: any[] = [];
     if (canSeeAll) {
-      rows = [...db.prepare(qMembers).all(), ...db.prepare(qLegacy).all()] as any[];
+      rows = [...db.prepare(qMembers).all(), ...db.prepare(qLegacy).all(), ...db.prepare(qManagers).all()] as any[];
     } else if (scopedEntityId) {
-      rows = [...db.prepare(qMembers).all(scopedEntityId), ...db.prepare(qLegacy).all(scopedEntityId)] as any[];
+      rows = [...db.prepare(qMembers).all(scopedEntityId), ...db.prepare(qLegacy).all(scopedEntityId), ...db.prepare(qManagers).all(scopedEntityId)] as any[];
     } else {
       rows = [];
     }

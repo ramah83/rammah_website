@@ -1,13 +1,18 @@
 {
-  "/api/notifications/route": "app/api/notifications/route.js",
-  "/api/events/route": "app/api/events/route.js",
-  "/api/me/route": "app/api/me/route.js",
+  "/api/admin/current-admins/route": "app/api/admin/current-admins/route.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
   "/api/entities/route": "app/api/entities/route.js",
-  "/api/membership/my/route": "app/api/membership/my/route.js",
+  "/api/notifications/route": "app/api/notifications/route.js",
+  "/api/me/route": "app/api/me/route.js",
+  "/api/events/route": "app/api/events/route.js",
   "/api/iso/route": "app/api/iso/route.js",
-  "/entities/page": "app/entities/page.js",
+  "/api/members/route": "app/api/members/route.js",
+  "/api/contact/route": "app/api/contact/route.js",
   "/page": "app/page.js",
-  "/evaluations/new/page": "app/evaluations/new/page.js",
+  "/about/page": "app/about/page.js",
+  "/profile/page": "app/profile/page.js",
+  "/profile/history/page": "app/profile/history/page.js",
+  "/support/page": "app/support/page.js",
   "/dashboard/page": "app/dashboard/page.js",
-  "/dashboard/requests/page": "app/dashboard/requests/page.js"
+  "/dashboard/contact-messages/page": "app/dashboard/contact-messages/page.js"
 }

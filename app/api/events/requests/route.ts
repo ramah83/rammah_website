@@ -99,6 +99,37 @@ export async function POST(req: NextRequest) {
       `).run(uid(), eventId, JSON.stringify(payload));
     });
     tx();
+
+    // إرسال إشعارات لأعضاء الكيان
+    if (targetEntityId) {
+      try {
+        const { createNotification } = await import("@/lib/server/notifications");
+        const entityName = db.prepare("SELECT name FROM entities WHERE id = ?").get(targetEntityId) as { name?: string } | undefined;
+        
+        // جلب جميع أعضاء الكيان
+        const members = db.prepare(`
+          SELECT DISTINCT userId FROM (
+            SELECT userId FROM entity_members WHERE entityId = ?
+            UNION
+            SELECT userId FROM join_requests WHERE entityId = ? AND status = 'approved'
+          )
+        `).all(targetEntityId, targetEntityId) as { userId: string }[];
+
+        for (const member of members) {
+          if (member.userId !== s.id) { // لا نرسل إشعار للمنشئ نفسه
+            createNotification({
+              userId: member.userId,
+              type: "event_created",
+              title: "فعالية جديدة",
+              message: `تم إضافة فعالية جديدة "${title}" في ${entityName?.name || "الكيان"}`,
+              link: `/events/${eventId}`,
+            });
+          }
+        }
+      } catch (notifError) {
+        console.error("Failed to send event creation notifications:", notifError);
+      }
+    }
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "تعذر إرسال الطلب" }, { status: 500 });
   }

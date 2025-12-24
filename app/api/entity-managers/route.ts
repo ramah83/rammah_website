@@ -33,6 +33,27 @@ export async function GET(req: NextRequest) {
 
     const rows: any[] = [];
 
+    // جلب مدير الكيان الرئيسي من جدول entities
+    const mainManagerSql = `
+      SELECT
+        u.id                                AS id,
+        u.name                              AS name,
+        u.email                             AS email,
+        u.phone                             AS phone,
+        e.id                                AS entityId,
+        'entityManager'                     AS role,
+        COALESCE(e.createdAt, u.createdAt)  AS joinedAt,
+        u.city                              AS city,
+        u.avatar                            AS avatar,
+        u.nationalId                        AS nationalId
+      FROM entities e
+      JOIN users u ON u.id = e.managerUserId
+      WHERE e.managerUserId IS NOT NULL
+      ${scopedEntityId ? `AND e.id = ?` : ``}
+    `;
+    const mainManagers = scopedEntityId ? db.prepare(mainManagerSql).all(scopedEntityId) : db.prepare(mainManagerSql).all();
+    rows.push(...mainManagers);
+
     if (hasManagers) {
       const sql = `
         SELECT

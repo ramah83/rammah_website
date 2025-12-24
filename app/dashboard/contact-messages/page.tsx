@@ -48,6 +48,8 @@ export default function ContactMessagesPage() {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [response, setResponse] = useState("");
   const [sending, setSending] = useState(false);
+  const [showNewMessageModal, setShowNewMessageModal] = useState(false);
+  const [newMessage, setNewMessage] = useState({ subject: "", message: "" });
 
   useEffect(() => {
     try {
@@ -119,6 +121,30 @@ export default function ContactMessagesPage() {
     }
   };
 
+  const sendNewMessage = async () => {
+    if (!newMessage.subject.trim() || !newMessage.message.trim()) return;
+    setSending(true);
+    try {
+      await fetch("/api/contact", {
+        method: "POST",
+        headers: buildSessionHeaders(),
+        body: JSON.stringify({
+          name: session.name || session.email,
+          email: session.email,
+          subject: newMessage.subject,
+          message: newMessage.message,
+        }),
+      });
+      setNewMessage({ subject: "", message: "" });
+      setShowNewMessageModal(false);
+      loadMessages();
+    } catch (error) {
+      console.error("Failed to send message:", error);
+    } finally {
+      setSending(false);
+    }
+  };
+
   const isAdmin = session && ["unionSupervisor", "entityManager"].includes(session.role);
   const filteredMessages = isAdmin 
     ? messages.filter((m) => filter === "all" || m.status === filter)
@@ -167,6 +193,20 @@ export default function ContactMessagesPage() {
       </section>
 
       <main className="relative z-[1] mx-auto max-w-6xl w-full px-4 mt-6 pb-10">
+        {/* New Message Button - For regular users */}
+        {!isAdmin && (
+          <div className="mb-6">
+            <button
+              onClick={() => setShowNewMessageModal(true)}
+              className="h-12 px-6 rounded-full font-bold transition-all hover:shadow-lg"
+              style={{ background: COLORS.primary, color: "#FFFFFF" }}
+            >
+              <Send className="h-5 w-5 inline mr-2" />
+              إرسال رسالة جديدة
+            </button>
+          </div>
+        )}
+
         {/* Filters - Only for admins */}
         {isAdmin && (
           <div
@@ -305,6 +345,63 @@ export default function ContactMessagesPage() {
           </div>
         )}
       </main>
+
+      {/* New Message Modal - For regular users */}
+      {showNewMessageModal && (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowNewMessageModal(false)} />
+          <div
+            className="relative z-10 w-full max-w-2xl rounded-2xl p-6"
+            style={{ background: COLORS.card, boxShadow: "0 24px 48px rgba(0,0,0,0.2)" }}
+          >
+            <h3 className="text-xl font-bold mb-4" style={{ color: COLORS.text }}>
+              إرسال رسالة جديدة
+            </h3>
+            <div className="mb-4">
+              <label className="block text-sm font-semibold mb-2" style={{ color: COLORS.text }}>
+                الموضوع
+              </label>
+              <input
+                type="text"
+                value={newMessage.subject}
+                onChange={(e) => setNewMessage({ ...newMessage, subject: e.target.value })}
+                placeholder="موضوع الرسالة"
+                className="w-full rounded-xl px-4 py-3"
+                style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}`, color: COLORS.text }}
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-semibold mb-2" style={{ color: COLORS.text }}>
+                الرسالة
+              </label>
+              <textarea
+                value={newMessage.message}
+                onChange={(e) => setNewMessage({ ...newMessage, message: e.target.value })}
+                placeholder="اكتب رسالتك هنا..."
+                className="w-full rounded-xl px-4 py-3 resize-none"
+                style={{ background: COLORS.soft, border: `1px solid ${COLORS.line}`, color: COLORS.text, minHeight: "150px" }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={sendNewMessage}
+                disabled={sending || !newMessage.subject.trim() || !newMessage.message.trim()}
+                className="h-11 px-6 rounded-full font-bold transition-all disabled:opacity-50"
+                style={{ background: COLORS.primary, color: "#FFFFFF" }}
+              >
+                {sending ? "جاري الإرسال..." : "إرسال"}
+              </button>
+              <button
+                onClick={() => setShowNewMessageModal(false)}
+                className="h-11 px-6 rounded-full font-semibold"
+                style={{ background: COLORS.soft, color: COLORS.text }}
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Response Modal */}
       {selectedMessage && (

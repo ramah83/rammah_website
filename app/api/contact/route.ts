@@ -106,6 +106,37 @@ export async function POST(req: NextRequest) {
       VALUES (?, ?, ?, ?, ?, 'unread', ?)
     `).run(id, name, email, subject, message, createdAt);
 
+    // Send notifications to all union supervisors and entity managers
+    try {
+      const { createNotification } = await import("@/lib/server/notifications");
+      
+      // Notify union supervisors
+      const supervisors = db.prepare("SELECT id FROM users WHERE role = 'unionSupervisor'").all() as { id: string }[];
+      for (const supervisor of supervisors) {
+        createNotification({
+          userId: supervisor.id,
+          type: "entity_request",
+          title: "رسالة تواصل جديدة",
+          message: `رسالة جديدة من ${name}: ${subject}`,
+          link: "/dashboard/contact-messages",
+        });
+      }
+
+      // Notify entity managers
+      const managers = db.prepare("SELECT id FROM users WHERE role = 'entityManager'").all() as { id: string }[];
+      for (const manager of managers) {
+        createNotification({
+          userId: manager.id,
+          type: "entity_request",
+          title: "رسالة تواصل جديدة",
+          message: `رسالة جديدة من ${name}: ${subject}`,
+          link: "/dashboard/contact-messages",
+        });
+      }
+    } catch (notifError) {
+      console.error("Failed to send notifications:", notifError);
+    }
+
     return NextResponse.json({ success: true, id });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -159,7 +190,26 @@ export async function PATCH(req: NextRequest) {
         WHERE id = ?
       `).run(response, respondedAt, session.id, id);
 
-      // Send email notification to the user
+      // Check if the sender is a registered user
+      const senderUser = db.prepare("SELECT id FROM users WHERE email = ?").get(message.email) as { id?: string } | undefined;
+
+      if (senderUser?.id) {
+        // Send in-app notification if user is registered
+        try {
+          const { createNotification } = await import("@/lib/server/notifications");
+          createNotification({
+            userId: senderUser.id,
+            type: "entity_request",
+            title: "تم الرد على رسالتك",
+            message: `تم الرد على رسالتك "${message.subject}" من قبل ${session.name || "فريق الدعم"}`,
+            link: "/dashboard/contact-messages",
+          });
+        } catch (notifError) {
+          console.error("Failed to send in-app notification:", notifError);
+        }
+      }
+
+      // Send email notification (for both registered and non-registered users)
       try {
         const { sendEmail, createContactResponseEmail } = await import("@/lib/server/email");
         

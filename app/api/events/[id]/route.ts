@@ -148,6 +148,52 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   db.prepare(sql).run(...args);
 
   const after = db.prepare(`SELECT * FROM events WHERE id=?`).get(params.id);
+
+  // إرسال إشعارات لأعضاء الكيان عند التعديل أو الموافقة
+  if (ex.entityId) {
+    try {
+      const { createNotification } = await import("@/lib/server/notifications");
+      const entityName = db.prepare("SELECT name FROM entities WHERE id = ?").get(ex.entityId) as { name?: string } | undefined;
+      
+      // جلب جميع أعضاء الكيان
+      const members = db.prepare(`
+        SELECT DISTINCT userId FROM (
+          SELECT userId FROM entity_members WHERE entityId = ?
+          UNION
+          SELECT userId FROM join_requests WHERE entityId = ? AND status = 'approved'
+        )
+      `).all(ex.entityId, ex.entityId) as { userId: string }[];
+
+      let notifType: "event_approved" | "event_rejected" | "event_created" = "event_created";
+      let notifTitle = "تم تحديث الفعالية";
+      let notifMessage = `تم تحديث فعالية "${next.title}" في ${entityName?.name || "الكيان"}`;
+
+      if (isApproving) {
+        notifType = "event_approved";
+        notifTitle = "تمت الموافقة على الفعالية";
+        notifMessage = `تمت الموافقة على فعالية "${next.title}" في ${entityName?.name || "الكيان"}`;
+      } else if (ex.status !== "rejected" && status === "rejected") {
+        notifType = "event_rejected";
+        notifTitle = "تم رفض الفعالية";
+        notifMessage = `تم رفض فعالية "${next.title}" في ${entityName?.name || "الكيان"}`;
+      }
+
+      for (const member of members) {
+        if (member.userId !== s.id) {
+          createNotification({
+            userId: member.userId,
+            type: notifType,
+            title: notifTitle,
+            message: notifMessage,
+            link: `/events/${params.id}`,
+          });
+        }
+      }
+    } catch (notifError) {
+      console.error("Failed to send event update notifications:", notifError);
+    }
+  }
+
   return NextResponse.json(after);
 }
 
@@ -167,5 +213,37 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   }
 
   db.prepare(`DELETE FROM events WHERE id=?`).run(params.id);
+
+  // إرسال إشعارات لأعضاء الكيان عند الحذف
+  if (ex.entityId) {
+    try {
+      const { createNotification } = await import("@/lib/server/notifications");
+      const entityName = db.prepare("SELECT name FROM entities WHERE id = ?").get(ex.entityId) as { name?: string } | undefined;
+      
+      // جلب جميع أعضاء الكيان
+      const members = db.prepare(`
+        SELECT DISTINCT userId FROM (
+          SELECT userId FROM entity_members WHERE entityId = ?
+          UNION
+          SELECT userId FROM join_requests WHERE entityId = ? AND status = 'approved'
+        )
+      `).all(ex.entityId, ex.entityId) as { userId: string }[];
+
+      for (const member of members) {
+        if (member.userId !== s.id) {
+          createNotification({
+            userId: member.userId,
+            type: "event_deleted",
+            title: "تم حذف فعالية",
+            message: `تم حذف فعالية "${ex.title}" من ${entityName?.name || "الكيان"}`,
+            link: "/events",
+          });
+        }
+      }
+    } catch (notifError) {
+      console.error("Failed to send event deletion notifications:", notifError);
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }

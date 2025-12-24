@@ -150,6 +150,7 @@ export function NotificationBell() {
       case "event_approved": return <CalendarCheck className="h-5 w-5" style={{ color: "#0F5132" }} />;
       case "event_rejected": return <CalendarX className="h-5 w-5" style={{ color: "#7A0010" }} />;
       case "event_deleted": return <Trash2 className="h-5 w-5" style={{ color: "#7A0010" }} />;
+      case "entity_request": return <FileText className="h-5 w-5" style={{ color: COLORS.primary }} />;
       case "iso_submitted": return <Shield className="h-5 w-5" style={{ color: COLORS.primary }} />;
       case "iso_approved": return <ShieldCheck className="h-5 w-5" style={{ color: "#0F5132" }} />;
       case "iso_rejected": return <ShieldX className="h-5 w-5" style={{ color: "#7A0010" }} />;

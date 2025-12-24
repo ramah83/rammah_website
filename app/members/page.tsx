@@ -682,6 +682,12 @@ export default function MembersPage() {
                         <Building2 className="h-3 w-3" color={PALETTE.muted} />
                         <span>{ent?.name || "بدون كيان"}</span>
                       </div>
+                      {(m as any).role === "manager" && (
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold" style={{ backgroundColor: "#FFF0F0", color: PALETTE.red, border: "1px solid #FFE2E2" }}>
+                          <Shield className="h-3 w-3" />
+                          مدير الكيان
+                        </div>
+                      )}
                       <div className="text-xs" style={{ color: PALETTE.txt }}>
                         الرقم القومي: {maskedNID}
                       </div>
